@@ -397,3 +397,60 @@ def test_not_checked_lists_required_areas(reports: dict[str, dict[str, Any]]) ->
     for n in SYSBUILD:
         areas = {x["area"] for x in reports[n]["not_checked"]}
         assert required <= areas, (n, required - areas)
+
+
+# --- --deployed-image ------------------------------------------------------------------------
+
+
+def test_deployed_image_signed_with_another_key(
+    reports: dict[str, dict[str, Any]], tmp_path: Path
+) -> None:
+    """A field image signed with the product's own ECDSA key (not the build's default RSA
+    key): the target image, signed with the default key, must be flagged."""
+    r = reports["B"]
+    old_key = r["contexts"][0]["key"]
+    tool = CACHE / "workspaces" / SHAS["v4.2.2"] / "bootloader/mcuboot/scripts/imgtool.py"
+    key = tmp_path / "product.pem"
+    subprocess.run(
+        [sys.executable, str(tool), "keygen", "-k", str(key), "-t", "ecdsa-p256"], check=True
+    )
+    deployed = tmp_path / "deployed.signed.bin"
+    subprocess.run(
+        [
+            sys.executable,
+            str(tool),
+            "sign",
+            "--version",
+            "0.0.0+0",
+            "--header-size",
+            "0x200",
+            "--slot-size",
+            "483328",
+            "--align",
+            "4",
+            "--key",
+            str(key),
+            str(CACHE / "builds" / old_key / "p1-mode/zephyr/zephyr.bin"),
+            str(deployed),
+        ],
+        check=True,
+    )
+    _, board, frm, to, extra = FIXTURES["B"]
+    args = ["scan", "--app", str(ROOT / "tests/fixtures/p1-mode"), "--board", board]
+    args += ["--from", frm, "--to", to, "--sysbuild", "--sdk", str(SDK)]
+    args += ["--analyzers", "layout,mcuboot", "--deployed-image", str(deployed)]
+    for m in COMMON + extra:
+        args += ["--module", m]
+    args += ["--format", "json", "--out", str(tmp_path / "out")]
+    assert main(args) == 0
+    out = json.loads((tmp_path / "out" / "report.json").read_text())
+    (d,) = of(out, "mcuboot", "signed-image-diff")
+    assert d["old"]["path"] == str(deployed)
+    kinds = {f["kind"] for f in of(out, "mcuboot") if f.get("remedy")}
+    assert {"tlv-set-changed", "app-bootloader-mismatch"} <= kinds
+    (tlv,) = of(out, "mcuboot", "tlv-set-changed")
+    assert any("ECDSA" in str(t) for t in tlv["old"])
+    cat = out["upgrade_path"]["categories"]["mcuboot"]
+    assert any("--deployed-image" in a for a in cat["assumptions"])
+    checks = {c["check"]: c["status"] for c in cat["direction_a_checks"]}
+    assert checks["signing key"] == "mismatch" and checks["TLV set"] == "mismatch"
