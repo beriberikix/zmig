@@ -14,8 +14,11 @@ from zmig import __version__, analyzers
 from zmig.buildctx import BuildContext, BuildMode, BuildSpec, build, hash_tree
 from zmig.cache import Cache, default_cache_root
 from zmig.errors import ZmigError
-from zmig.findings import Report
-from zmig.refs import resolve_ref
+from zmig.findings import Category, Confidence, Finding, Report, Severity, plural
+from zmig.forks import compare_tree, guess_version_tag
+from zmig.manifest import load_manifest, scan_user_workspace
+from zmig.plan import PlanContext
+from zmig.refs import ResolvedRef, resolve_ref
 from zmig.report import render
 from zmig.tools import Runner, check_zephyr_python, find_tool, tool_version
 from zmig.workspace import materialize
@@ -57,7 +60,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     plan.add_argument("--from", dest="from_ref", required=True)
     plan.add_argument("--to", dest="to_ref", required=True)
-    plan.add_argument("--workspace", type=Path, default=Path("."))
+    plan.add_argument(
+        "--workspace",
+        type=Path,
+        default=None,
+        help="your west workspace topdir (default: the current directory, if it is one)",
+    )
+    plan.add_argument(
+        "--upstream",
+        action="append",
+        default=[],
+        metavar="NAME=URL",
+        help="upstream URL for a project, overriding upstream Zephyr's manifest",
+    )
+    plan.add_argument(
+        "--analyzers",
+        type=_csv,
+        default=None,
+        help="comma-separated analyzers to run (default: all)",
+    )
 
     scan = sub.add_parser(
         "scan",
@@ -188,6 +209,97 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     return EXIT_OK
 
 
+def _resolve_plan_from(
+    spec: str, cache: Cache, runner: Runner
+) -> tuple[ResolvedRef, list[Finding]]:
+    """--from may be an untracked Zephyr tree (no .git): infer its release from VERSION,
+    and report how its content differs from that release."""
+    p = Path(spec).expanduser()
+    if not (p.is_dir() and not (p / ".git").exists()):
+        return resolve_ref(spec, cache, runner), []
+    guess = guess_version_tag(p)
+    if guess.tag is None:
+        raise ZmigError(
+            f"{spec} is not a git checkout and its VERSION ({guess.version}) "
+            f"names no release ({guess.reason}); pass a git ref as --from"
+        )
+    resolved = resolve_ref(guess.tag, cache, runner)
+    diff = compare_tree(resolved.mirror, resolved.ref.sha, p)
+    if diff.clean:
+        return resolved, []
+    changed = diff.modified + diff.missing + diff.added
+    return resolved, [
+        Finding(
+            category=Category.FORK,
+            kind="content-mismatch",
+            subject="zephyr",
+            title=f"{spec} is not a git checkout; it claims {guess.tag} (from VERSION) but "
+            f"differs from it in {plural(len(changed), 'file')}",
+            severity=Severity.RISKY,
+            confidence=Confidence.MEDIUM,
+            action="Record these changes as commits on top of the release in a git checkout "
+            "so they can be classified and carried forward.",
+            analyzer="forks",
+            scope=(resolved.ref.sha,),
+            new={
+                "modified": list(diff.modified),
+                "missing": list(diff.missing),
+                "added": list(diff.added),
+                "compared_files": diff.compared,
+            },
+            heuristics=("fork.version-from-VERSION-file", "fork.blob-hash-no-filters"),
+        )
+    ]
+
+
+def cmd_plan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
+    find_tool("git")
+    selected = analyzers.select("workspace", args.analyzers)
+    overrides = dict(_kv(s) for s in args.upstream)
+    old_r, pre = _resolve_plan_from(args.from_ref, cache, runner)
+    new_r = resolve_ref(args.to_ref, cache, runner)
+    old_ws, new_ws = materialize(old_r, cache, runner), materialize(new_r, cache, runner)
+
+    user = None
+    topdir = args.workspace
+    if topdir is None and (Path.cwd() / ".west" / "config").is_file():
+        topdir = Path.cwd()
+    if topdir is not None:
+        user = scan_user_workspace(topdir, runner)
+    ctx = PlanContext(
+        cache=cache,
+        runner=runner,
+        old=old_ws,
+        new=new_ws,
+        old_manifest=load_manifest(old_ws.root),
+        new_manifest=load_manifest(new_ws.root),
+        user=user,
+        upstream_overrides=overrides,
+    )
+    report = Report(
+        command="plan",
+        zmig_version=__version__,
+        inputs={
+            "from": old_r.ref.to_json(),
+            "to": new_r.ref.to_json(),
+            "from_spec": args.from_ref,
+            "workspace": runner.redact(str(user.topdir)) if user else None,
+        },
+        environment=_environment(runner),
+    )
+    report.findings, report.analyzers = analyzers.run_workspace_analyzers(selected, ctx)
+    report.findings = pre + report.findings
+    _emit(report, runner, args)
+    return EXIT_OK
+
+
+def _kv(s: str) -> tuple[str, str]:
+    if "=" not in s:
+        raise ZmigError(f"--upstream expects NAME=URL, got {s!r}")
+    k, v = s.split("=", 1)
+    return k, v
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     level = [logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbose, 2)]
@@ -203,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "scan":
             return cmd_scan(args, cache, runner)
         if args.command == "plan":
-            raise ZmigError("`zmig plan` lands in milestone M2")
+            return cmd_plan(args, cache, runner)
         raise ZmigError(f"`zmig {args.command}` is outside the MVP scope (see docs/DESIGN.md)")
     except ZmigError as e:
         print(f"zmig: error: {e}", file=sys.stderr)

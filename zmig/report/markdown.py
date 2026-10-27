@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from typing import Any
 
 from zmig.findings import Category, Finding, Report, Severity
@@ -12,6 +14,15 @@ def _ref(r: dict[str, Any]) -> str:
     return f"`{r['spec']}` ({r['sha'][:12]}){dirty}"
 
 
+def _short(v: Any) -> str:
+    """Compact display of an evidence value: abbreviate SHAs, JSON for structures."""
+    if isinstance(v, str) and re.fullmatch(r"[0-9a-f]{40}", v):
+        return v[:12]
+    if isinstance(v, (dict, list)):
+        return json.dumps(v, sort_keys=True)
+    return "none" if v is None else str(v)
+
+
 def _evidence(ev: dict[str, Any]) -> str:
     t = ev["type"]
     if t == "file_line":
@@ -19,9 +30,17 @@ def _evidence(ev: dict[str, Any]) -> str:
     if t == "doc_entry":
         return f"`{ev['doc']}:{ev['line']}` @ {ev['ref']}"
     if t == "artifact_diff":
-        return f"{ev['artifact']}: `{ev['old']}` → `{ev['new']}`"
-    if t in ("git_commit", "git_conflict"):
+        old, new = ev["old"], ev["new"]
+        if isinstance(old, dict) and isinstance(new, dict):
+            keys = sorted(k for k in old.keys() | new.keys() if old.get(k) != new.get(k))
+            return f"{ev['artifact']}: " + ", ".join(
+                f"{k} `{_short(old.get(k))}` → `{_short(new.get(k))}`" for k in keys
+            )
+        return f"{ev['artifact']}: `{_short(old)}` → `{_short(new)}`"
+    if t == "git_commit":
         return f"{ev['repo']}@{ev['sha'][:12]}"
+    if t == "git_conflict":
+        return "conflicts in " + ", ".join(f"`{f}`" for f in ev["files"])
     return str(ev.get("invocation", t))
 
 

@@ -90,6 +90,11 @@ def tool_output(invocation: str, excerpt: str) -> JSON:
     return {"type": "tool_output", "invocation": invocation, "excerpt": excerpt}
 
 
+def plural(n: int, word: str, suffix: str = "s") -> str:
+    """'1 file', '3 files'."""
+    return f"{n} {word}" if n == 1 else f"{n} {word}{suffix}"
+
+
 def make_id(category: Category, kind: str, subject: str, scope: tuple[str, ...]) -> str:
     """Stable id: CATEGORY-KIND-hash8 over (category, kind, subject, scope).
 
@@ -179,15 +184,16 @@ class Report:
         return sorted(self.findings, key=Finding.sort_key)
 
     def top(self) -> list[Finding]:
-        """The first findings to act on: breaking ones that point into the app's own
-        files rank ahead of the plain severity order."""
+        """The first findings to act on: breaking and risky ones only, with breaking
+        findings that point into the user's own files ahead of the plain order."""
 
         def key(f: Finding) -> tuple[int, tuple[int, int, str, str]]:
             in_app = any(e.get("type") == "file_line" for e in f.evidence)
             boost = 0 if (f.severity is Severity.BREAKING and in_app) else 1
             return (boost, f.sort_key())
 
-        return sorted(self.findings, key=key)[:TOP_N]
+        actionable = [f for f in self.findings if f.severity is not Severity.INFO]
+        return sorted(actionable, key=key)[:TOP_N]
 
     def counts(self) -> dict[str, int]:
         return {str(s): sum(1 for f in self.findings if f.severity is s) for s in Severity}

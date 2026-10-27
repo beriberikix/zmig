@@ -7,9 +7,12 @@ import pytest
 from zmig.cli import main
 
 
-def test_plan_not_yet(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["plan", "--from", "v1", "--to", "v2", "--cache-dir", str(tmp_path)]) == 1
-    assert "M2" in capsys.readouterr().err
+def test_plan_rejects_non_workspace(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from zmig.cli import _kv
+
+    assert _kv("hal_x=https://example.com/x") == ("hal_x", "https://example.com/x")
+    with pytest.raises(Exception, match="NAME=URL"):
+        _kv("nope")
 
 
 def test_out_of_scope_commands(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

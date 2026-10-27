@@ -18,7 +18,7 @@ from zmig.findings import AnalyzerStatus, Finding
 
 if TYPE_CHECKING:
     from zmig.buildctx import Artifact, BuildContext
-    from zmig.workspace import RefWorkspace
+    from zmig.plan import PlanContext
 
 Status = Literal["ok", "skipped", "error"]
 
@@ -47,17 +47,23 @@ class BuildAnalyzer(Protocol):
 
 @runtime_checkable
 class WorkspaceAnalyzer(Protocol):
-    """Used by `plan`: compares two workspaces (manifests, forks, history)."""
+    """Used by `plan`: compares upstream at two refs against the user's workspace."""
 
     name: ClassVar[str]
     kind: ClassVar[Literal["workspace"]]
 
-    def analyze(self, old: RefWorkspace, new: RefWorkspace, user: object) -> AnalyzerResult: ...
+    def analyze(self, ctx: PlanContext) -> AnalyzerResult: ...
 
 
-# Populated as milestones land (M2: manifest, forks, hops; M3: board, kconfig, ...).
-BUILTIN_BUILD: list[type[BuildAnalyzer]] = []
-BUILTIN_WORKSPACE: list[type[WorkspaceAnalyzer]] = []
+def _builtin(kind: str) -> list[type[Any]]:
+    """Built-in analyzers, in run order. Imported lazily: they import this module."""
+    if kind == "workspace":
+        from zmig.analyzers.forks import ForksAnalyzer
+        from zmig.analyzers.hops import HopsAnalyzer
+        from zmig.analyzers.manifest import ManifestAnalyzer
+
+        return [ManifestAnalyzer, ForksAnalyzer, HopsAnalyzer]
+    return []  # M3: board, kconfig, devicetree; M4: guide; M5: sbom, buildlog
 
 
 def _plugins(kind: str) -> list[type[Any]]:
@@ -71,8 +77,7 @@ def _plugins(kind: str) -> list[type[Any]]:
 
 def select(kind: Literal["build", "workspace"], names: Iterable[str] | None) -> list[type[Any]]:
     """Analyzer classes of `kind`, filtered to `names` (None = all, empty = none)."""
-    builtin: list[type[Any]] = list(BUILTIN_BUILD if kind == "build" else BUILTIN_WORKSPACE)
-    available = {c.name: c for c in builtin + _plugins(kind)}
+    available = {c.name: c for c in _builtin(kind) + _plugins(kind)}
     if names is None:
         return list(available.values())
     wanted = list(names)
@@ -100,6 +105,22 @@ def run_build_analyzers(
             continue
         try:
             res: AnalyzerResult = cls().analyze(old, new, usage)
+        except ZmigError as e:
+            statuses.append(AnalyzerStatus(cls.name, "error", str(e)))
+            continue
+        findings += res.findings
+        statuses.append(AnalyzerStatus(cls.name, res.status, res.reason))
+    return findings, statuses
+
+
+def run_workspace_analyzers(
+    classes: list[type[Any]], ctx: PlanContext
+) -> tuple[list[Finding], list[AnalyzerStatus]]:
+    findings: list[Finding] = []
+    statuses: list[AnalyzerStatus] = []
+    for cls in classes:
+        try:
+            res: AnalyzerResult = cls().analyze(ctx)
         except ZmigError as e:
             statuses.append(AnalyzerStatus(cls.name, "error", str(e)))
             continue

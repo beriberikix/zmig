@@ -169,7 +169,7 @@ Field rules:
 - The report contains **no timestamps, absolute cache paths, or invocation lists**, so it is byte-stable for identical inputs. That holds whether or not the cache was warm (verified in M1). Paths are relative to the app or workspace.
 - The commands that ran are recorded separately, in `logs/invocations.json` next to the per-command logs, with the cache root and home directory redacted. A cache hit changes which commands run, so they are kept out of the report.
 - Findings are sorted by (severity, confidence, category, id).
-- **`top`** holds the first five findings in that order. It gives breaking findings with a file_line evidence pointing into the app a small boost, because those are actionable.
+- **`top`** holds the first five **breaking or risky** findings in that order, never `info`. It gives breaking findings with file_line evidence pointing into the user's files a small boost, because those are actionable.
 - An analyzer that cannot run is reported as `skipped` or `error` with a reason. **It never silently drops out.**
 - A JSON Schema file ships in `zmig/schema/report-1.json`, and tests validate against it.
 
@@ -258,8 +258,9 @@ class AnalyzerResult:
 
 class WorkspaceAnalyzer(Protocol):          # used by `plan`
     name: ClassVar[str]
-    def analyze(self, old: WorkspaceContext, new: WorkspaceContext,
-                user: UserWorkspace) -> AnalyzerResult: ...
+    def analyze(self, ctx: PlanContext) -> AnalyzerResult: ...
+    # PlanContext (zmig/plan.py): upstream workspaces and resolved manifests at both
+    # refs, the user's workspace as found on disk, and cache mirrors on demand.
 
 class BuildAnalyzer(Protocol):              # used by `scan`
     name: ClassVar[str]
@@ -295,6 +296,8 @@ class BuildAnalyzer(Protocol):              # used by `scan`
 2. Local-only commits = `git rev-list <merge-base(HEAD, upstream base)>..HEAD`, run in a cache mirror that has the upstream fetched.
 3. Classify each commit, first match wins:
    - **upstreamed**: its `git patch-id --stable` matches a commit in `base..target-upstream`. Confidence high. If only the normalized subject line matches, confidence is medium.
+     - A subject-only match is still trial-applied, like a rebase would. The finding then says whether keeping the commit would conflict. Found in M2: a real rebase stops on such a commit when its content differs.
+     - The replay is sequential, onto the target plus the previously applied local commits, so it mirrors `git rebase --onto <target>`. The M2 tests compare it against a real rebase.
    - **applies-cleanly**: `git merge-tree --write-tree --merge-base=<c>^ <target> <c>` produces no conflicts. This emulates a cherry-pick with **no worktree at all** (git ≥ 2.38; this machine has 2.53).
    - **conflicts**: the same command, but it reports conflicted paths. We list those files.
    - **overlaps** (an orthogonal flag): the commit touches files upstream also changed in `base..target`. We list both sides' commits.
@@ -310,7 +313,8 @@ class BuildAnalyzer(Protocol):              # used by `scan`
 
 - Count the releases between the two refs using tags and `VERSION`.
 - If the gap spans more than N minor releases (default 2), or crosses a flagged boundary, suggest hops. Prefer a hop at an LTS release.
-- **LTS knowledge is a small data file in zmig** (e.g. 2.7 and 3.7). Zephyr git doesn't mark LTS, so this is a maintained list and tagged as one.
+- **LTS knowledge is a small data file in zmig**, `zmig/data/releases.json`: 1.14, 2.7, and 3.7, with 4.6 planned. It was sourced from the Zephyr releases page on 2026-10-27. Zephyr git doesn't mark LTS, so this is a maintained list, and findings that use it carry the `hops.release-data` heuristic.
+- **Hop path:** stop at every LTS or boundary release crossed, then add filler stops so no step crosses more than `max_minor_gap` (2) minors. Each stop is the latest patch release of that minor. The suggested path is `risky` (one jump across more minors than the gap is the risk); each boundary crossed is `info`.
 - **Flagged boundaries** are also a data file, e.g. "3.7: Hardware Model v2". Any guide section that changes the board or toolchain contract can add one.
 
 ### 5.2 `scan`
