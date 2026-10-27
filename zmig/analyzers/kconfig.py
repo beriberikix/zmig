@@ -311,7 +311,9 @@ class KconfigAnalyzer:
                     severity=Severity.INFO,
                     confidence=Confidence.HIGH,
                     action="Everything else in this report compares against that salvaged "
-                    "build; fix the breaking findings and rerun.",
+                "build, so values that depended on the disabled lines (symbols they "
+                "selected, for example) differ in it too. Fix the breaking findings and "
+                "rerun.",
                     analyzer=self.name,
                     scope=ctx.scope,
                     evidence=tuple(file_line(e.file, e.line, e.text) for e in ctx.salvage),

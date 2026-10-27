@@ -117,12 +117,11 @@ class BoardAnalyzer:
         # enough to report them (a failed configure lists nothing, which proves nothing).
         if "configure-failed" in (ctx.old.status, ctx.new.status):
             return AnalyzerResult(findings)
-        app = ctx.usage.app
-        old_inputs = set(app_relative(ctx.old_facts.overlays, app)) | set(
-            app_relative(ctx.old_facts.configs, app)
+        old_inputs = set(app_relative(ctx.old_facts.overlays, ctx.old.src)) | set(
+            app_relative(ctx.old_facts.configs, ctx.old.src)
         )
-        new_inputs = set(app_relative(ctx.new_facts.overlays, ctx.new.spec.app)) | set(
-            app_relative(ctx.new_facts.configs, ctx.new.spec.app)
+        new_inputs = set(app_relative(ctx.new_facts.overlays, ctx.new.src)) | set(
+            app_relative(ctx.new_facts.configs, ctx.new.src)
         )
         applied = artifact_diff(
             "build log: applied app files",

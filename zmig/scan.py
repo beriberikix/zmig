@@ -93,7 +93,7 @@ class ScanContext:
         """Undefined symbols of the app's objects in the source build (see nm)."""
         if self.old.status != "ok":
             return None
-        return app_undefined_symbols(self.old, self.usage.app, self.runner)
+        return app_undefined_symbols(self.old, self.old.src, self.runner)
 
     @cached_property
     def guide_documents(self) -> list[Document]:

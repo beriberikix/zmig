@@ -161,3 +161,52 @@ def deprecated_board_line(text: str, old: str) -> int:
         if re.match(rf"^set\(\s*{re.escape(old)}_DEPRECATED\b", line.strip()):
             return i
     return 0
+
+
+# --- Warnings ---------------------------------------------------------------------------
+
+_W_COMPILER = re.compile(
+    r"^(?P<file>[^\s:]+):(?P<line>\d+):(?:\d+:)? warning: (?P<msg>.*?)"
+    r"(?: \[(?P<flag>-W[^\]]+)\])?$",
+    re.M,
+)
+_W_PLAIN = re.compile(r"^warning: (?P<msg>.+)$", re.M)
+_W_CMAKE = re.compile(
+    r"^CMake (?:Deprecation )?Warning(?: \(dev\))? at (?P<file>\S+):(?P<line>\d+) \([\w]+\):\n"
+    r"(?P<body>(?:(?:  .*)?\n)+)",
+    re.M,
+)
+
+
+@dataclass(frozen=True)
+class BuildWarning:
+    source: str  # "compiler" | "kconfig" | "cmake"
+    file: str  # as printed (absolute), or "" if none
+    line: int
+    message: str
+    flag: str = ""
+
+    def key(self, roots: dict[str, str]) -> tuple[str, str, str]:
+        """Identity across builds: paths made relative to known roots (the zephyr tree,
+        the app, the build dir) and line numbers dropped, since both shift between
+        versions without the warning changing."""
+
+        def norm(s: str) -> str:
+            for prefix, token in sorted(roots.items(), key=lambda kv: -len(kv[0])):
+                s = s.replace(prefix, token)
+            return " ".join(s.split())
+
+        return (self.source, norm(self.file), norm(self.message))
+
+
+def parse_warnings(text: str) -> list[BuildWarning]:
+    out = [
+        BuildWarning("compiler", m["file"], int(m["line"]), m["msg"].strip(), m["flag"] or "")
+        for m in _W_COMPILER.finditer(text)
+    ]
+    out += [BuildWarning("kconfig", "", 0, m["msg"].strip()) for m in _W_PLAIN.finditer(text)]
+    out += [
+        BuildWarning("cmake", m["file"], int(m["line"]), " ".join(m["body"].split()))
+        for m in _W_CMAKE.finditer(text)
+    ]
+    return out

@@ -114,7 +114,7 @@ class GuideAnalyzer:
         for _, prop, loc in u.dt_props_set:
             props_set.setdefault(prop, []).append(loc)
         props_read: dict[str, list[Loc]] = {}
-        for _, token, loc in u.dt_props_read:
+        for _, token, loc, _ in u.dt_props_read:
             props_read.setdefault(token, []).append(loc)
         boards = {ctx.old.spec.board.split("@")[0].split("/")[0], ctx.old.spec.board}
 

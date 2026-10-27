@@ -7,7 +7,9 @@ from collections.abc import Callable
 
 from zmig.errors import ZmigError
 from zmig.findings import Report
+from zmig.report.human import render_human
 from zmig.report.markdown import render_markdown
+from zmig.report.sarif import render_sarif
 
 
 def render_json(report: Report) -> str:
@@ -17,11 +19,12 @@ def render_json(report: Report) -> str:
 RENDERERS: dict[str, Callable[[Report], str]] = {
     "json": render_json,
     "markdown": render_markdown,
-    "human": render_markdown,
+    "human": render_human,
+    "sarif": render_sarif,
 }
 
 
 def render(report: Report, fmt: str) -> str:
     if fmt not in RENDERERS:
-        raise ZmigError(f"--format {fmt} is not available yet (planned for M5)")
+        raise ZmigError(f"unknown format {fmt}")
     return RENDERERS[fmt](report)

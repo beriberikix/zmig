@@ -24,6 +24,8 @@ zephyr = [
     "packaging",
     "anytree",
     "jsonschema",
+    # `west spdx` imports it from v4.x (Zephyr's requirements-base.txt).
+    "reuse>=6.0.0",
 ]
 
 [project.scripts]

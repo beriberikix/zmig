@@ -212,7 +212,11 @@ hashes, mode, sysbuild)`, at `<cache>/builds/<key>/`.
   - `full` (default): configure and build. Produces the ELF, map file, object files (for `nm`-based API usage), and build warnings.
   - `--fast`: CMake configure only. Produces `.config`, `zephyr.dts`, `edt.pickle`, and `compile_commands.json`. Analyzers that need build outputs report `skipped`, and API usage falls back to the low-confidence token scan.
 - We invoke `west build -p always -b <board> -d <dir> <app> -- <cmake args>` under the ref's workspace. `ZEPHYR_BASE` is set explicitly, and `ZEPHYR_TOOLCHAIN_VARIANT=host` is used for native_sim.
-- **SBOM preparation is version-aware.** If that ref's `scripts/west_commands/spdx.py` still needs `--init`, we run it before configuring. Otherwise we add `-DCONFIG_BUILD_OUTPUT_META=y`.
+- **The app is built from a copy** at `<workspace>/apps/<content hash>/<name>`. Zephyr's scripts locate the west workspace by searching upward from the app's directory (`west spdx` does). Found in M5: with the app under a directory that is itself inside another west workspace, the SBOM came out empty. Building a copy inside zmig's workspace keeps every such lookup isolated.
+- **SBOM preparation:** zmig writes the empty CMake file-API query (`.cmake/api/v1/query/codemodel-v2`) before configure. That is exactly what `west spdx --init` does on v3.6 through v4.4, so no per-version branching is needed.
+  - It sets `-DCONFIG_BUILD_OUTPUT_META=y` on both builds; every version's `west spdx` requires it, and setting it on both keeps it out of the diff.
+  - After a successful build it runs that ref's `west spdx`. Its exit status isn't trusted: v3.6 exits 0 after "bailing". A missing SBOM is reported with spdx's own error.
+  - SPDX needs a completed build (`zephyr_meta.yml`), so a target that doesn't compile has no SBOM, and the analyzer says so.
 - **Artifact locator:** exposes typed paths and raises `ArtifactMissing` with the producing step named.
 - **Snapshot extraction:** we run `extract/kconfig_dump.py` and `extract/edt_dump.py` with **that ref's Python interpreter and `sys.path` pointing into that ref's `scripts/`**. Each writes a normalized JSON snapshot. Why subprocesses:
   - Two `edtlib`/`kconfiglib` versions can't coexist in one process.
@@ -359,14 +363,15 @@ class BuildAnalyzer(Protocol):              # used by `scan`
 - **An overlay no longer applies:** the target configure fails in DTS. We capture the dtc/edtlib error and map it back to the overlay line. Breaking.
 - Changes to nodes the app doesn't reference are only counted.
 
-**buildlog**
+**buildlog** (implemented in M3 and M5)
 
-- Warnings at the target that weren't present at the source, normalized by stripping line numbers and absolute paths. Risky when the warning is in app code, info elsewhere.
-- In full mode, ROM/RAM deltas from the ELF sections and the per-symbol map. A finding is raised for changes above a threshold.
+- Target configure and compile failures, quoting the real errors.
+- **New warnings** (compiler, Kconfig, CMake) at the target that the source build didn't have. Identity is the source, the path relative to `<zephyr>`/`<app>`/`<build>`, and the message; line numbers are ignored. Risky when the warning is in app code or is a deprecation; info otherwise. Resolved warnings are listed too.
+- **ROM/RAM** from the ELFs by section flags (pyelftools), matching binutils `size` exactly on the fixture. Per-symbol deltas come from the ELF symbol table. The finding is risky above +1 KiB and +5%.
 
-**sbom**
+**sbom** (implemented in M5)
 
-- Run `west spdx` at both refs and parse the SPDX 2.3 JSON for packages and files with SHA1/SHA256.
+- Run `west spdx` at both refs. Parse the tag-value documents: SPDX 2.2 at v3.6, 2.3 later, with module packages named `<m>` or `<m>-sources`.
 - **Packages added or dropped** means modules. Files that appeared or disappeared from the build. Hash changes.
 - **Scoping:** the compiled-file set from the target build limits which upstream changes (`git diff --stat old..new -- <files>`) are listed as "upstream changed a file you compile": risky when an app-visible header or driver for a used compatible changed, info otherwise.
 
@@ -430,9 +435,9 @@ Verified on v3.6.0 → v4.4.2: a hawkBit entry that mentions `CONFIG_BOARD`, and
   - Header: versions with SHAs, board(s), build mode, counts by severity, and the "Do these first" top 5.
   - Then one section per category, severity first. Each finding is a `- [ ]` checklist line with the action and linked evidence (relative `path:line`).
   - A "Low-confidence and heuristic findings" appendix, and an "Analyzers skipped" note.
-- **`human`**: a terminal rendering of the same content.
-- **`sarif`**: SARIF 2.1.0. Only findings with `file_line` evidence are mapped to `results`.
-- **`--out <dir>`** writes `report.json`, `MIGRATION.md`, and `logs/`.
+- **`human`**: a compact terminal summary: the top 5, every breaking and risky finding with its first location in your files, and analyzer problems.
+- **`sarif`**: SARIF 2.1.0. Only findings with `file_line` evidence in the user's files become `results`, with paths relative to the app (`APPROOT`). The output validates against the OASIS schema; a test checks this.
+- **`--out <dir>`** writes `report.json`, `MIGRATION.md`, `report.sarif`, and `logs/` (including `invocations.json`).
 
 **Exit codes:**
 

@@ -153,6 +153,7 @@ def _emit(report: Report, runner: Runner, args: argparse.Namespace) -> None:
         out.mkdir(parents=True, exist_ok=True)
         (out / "report.json").write_text(render(report, "json"))
         (out / "MIGRATION.md").write_text(render(report, "markdown"))
+        (out / "report.sarif").write_text(render(report, "sarif"))
         (out / "logs" / "invocations.json").write_text(
             json.dumps([i.to_json() for i in runner.invocations], indent=2) + "\n"
         )
@@ -229,18 +230,11 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     log.warning("  %s: %s", args.from_ref, old.status)
     log.warning("building %s for %s at %s (%s)...", app, to_board, args.to_ref, mode)
     salvage = build_with_salvage(new_ws, spec(to_board), cache, runner)
-    # Tool messages quote absolute app paths; report them relative to the app.
+    # Tool messages quote absolute paths of the built app copies; report them as <app>.
     runner.redactions[str(app.resolve())] = "<app>"
-    if salvage.salvaged is not None:
-        runner.redactions[str(salvage.salvaged.spec.app.resolve())] = "<app>"
-    log.warning(
-        "  %s: %s%s",
-        args.to_ref,
-        salvage.original.status,
-        f" (salvaged by disabling {len(salvage.edits)} line(s): {salvage.effective.status})"
-        if salvage.salvaged
-        else "",
-    )
+    for built in (old, salvage.original, salvage.salvaged):
+        if built is not None:
+            runner.redactions[str(built.src)] = "<app>"
 
     contexts = [old.to_json(), salvage.original.to_json()]
     if salvage.salvaged is not None:

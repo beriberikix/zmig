@@ -44,7 +44,8 @@ class ProjectUsage:
     kconfig_read: dict[str, list[Loc]] = field(default_factory=dict)
     dt_nodes: list[tuple[NodeRef, Loc]] = field(default_factory=list)
     dt_props_set: list[tuple[NodeRef, str, Loc]] = field(default_factory=list)
-    dt_props_read: list[tuple[NodeRef, str, Loc]] = field(default_factory=list)
+    # (node, property token, location, macro used: DT_PROP, DT_PROP_OR, ...)
+    dt_props_read: list[tuple[NodeRef, str, Loc, str]] = field(default_factory=list)
     dt_compats: dict[str, list[Loc]] = field(default_factory=dict)
     includes: dict[str, list[Loc]] = field(default_factory=dict)  # "zephyr/kernel.h" -> locs
     identifiers: dict[str, list[Loc]] = field(default_factory=dict)  # C identifiers used
@@ -76,7 +77,7 @@ def dt_token(name: str) -> str:
 
 _C_NODE = re.compile(r"\b(DT_NODELABEL|DT_ALIAS|DT_PATH)\s*\(\s*([A-Za-z0-9_,\s]+?)\s*\)")
 _C_PROP = re.compile(
-    r"\b(?:DT_PROP|DT_PROP_OR|DT_PROP_LEN|DT_PROP_LEN_OR|DT_NODE_HAS_PROP|DT_PROP_BY_IDX|"
+    r"\b(DT_PROP|DT_PROP_OR|DT_PROP_LEN|DT_PROP_LEN_OR|DT_NODE_HAS_PROP|DT_PROP_BY_IDX|"
     r"DT_PHA|DT_PHANDLE|DT_ENUM_IDX|DT_STRING_TOKEN)\s*\(\s*"
     r"(?:(DT_NODELABEL|DT_ALIAS|DT_PATH)\s*\(\s*([A-Za-z0-9_,\s]+?)\s*\)|(\w+))\s*,\s*(\w+)"
 )
@@ -112,9 +113,9 @@ def _scan_c(rel: str, text: str, u: ProjectUsage) -> None:
         for m in _C_NODE.finditer(line):
             u.dt_nodes.append((_c_noderef(m[1], m[2]), loc))
         for m in _C_PROP.finditer(line):
-            node = _c_noderef(m[1], m[2]) if m[1] else defines.get(m[3])
+            node = _c_noderef(m[2], m[3]) if m[2] else defines.get(m[4])
             if node is not None:
-                u.dt_props_read.append((node, m[4], loc))
+                u.dt_props_read.append((node, m[5], loc, m[1]))
         for m in _C_COMPAT.finditer(line):
             u.dt_compats.setdefault(m[1] or m[2], []).append(loc)
         for m in _KCONFIG_READ.finditer(line):

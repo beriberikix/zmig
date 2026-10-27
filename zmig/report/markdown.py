@@ -47,11 +47,71 @@ def _evidence(ev: dict[str, Any]) -> str:
     return str(t)
 
 
+SECTION_TITLES = {
+    "manifest": "Manifest",
+    "fork": "Forks and local patches",
+    "hop": "Upgrade path",
+    "board": "Board",
+    "kconfig": "Kconfig",
+    "devicetree": "Devicetree",
+    "build": "Build",
+    "guide": "Migration guide",
+    "sbom": "SBOM",
+}
+_SEV_RANK = {Severity.BREAKING: 0, Severity.RISKY: 1, Severity.INFO: 2}
+PREVIEW = 8
+LEGEND = (
+    "Severity: **breaking** = the build fails or something you rely on is gone; "
+    "**risky** = builds but behavior may differ; **info** = for awareness. "
+    "Confidence says how the finding was derived: high = read from build artifacts or git; "
+    "medium/low = matched by name or wording (see Heuristics)."
+)
+
+
+def _preview(items: list[str]) -> str:
+    more = len(items) - PREVIEW
+    return ", ".join(f"`{i}`" for i in items[:PREVIEW]) + (f" … (+{more})" if more > 0 else "")
+
+
+def _details(f: Finding) -> str | None:
+    """A short preview of aggregated data so info findings aren't empty in Markdown."""
+    new = f.new
+    if isinstance(new, dict):
+        if f.kind in ("default-changed",):
+            return _preview([f"{k}: {v[0]} → {v[1]}" for k, v in new.items()])
+        if f.kind in ("newly-set", "no-longer-set"):
+            return _preview([f"{k}={v}" for k, v in new.items()])
+        if f.kind == "footprint":
+            return "Largest changes: " + _preview(
+                [f"{s['symbol']} {s['delta']:+}" for s in new.get("symbols", [])]
+            )
+        if f.kind == "zephyr-sources":
+            parts = []
+            if new.get("busiest"):
+                parts.append(
+                    "most-changed upstream: "
+                    + _preview([f"{b['file']} ({b['commits']})" for b in new["busiest"]])
+                )
+            for key in ("added", "removed"):
+                if new.get(key):
+                    parts.append(f"{key}: " + _preview(new[key]))
+            return "; ".join(parts) or None
+        if f.kind == "other-nodes":
+            return "; ".join(f"{k}: " + _preview(v) for k, v in new.items() if v) or None
+        if f.kind == "module-repinned" and new.get("changed"):
+            return "changed: " + _preview(new["changed"])
+    if isinstance(new, list) and new and all(isinstance(x, str) for x in new):
+        return _preview(new)
+    return None
+
+
 def _item(f: Finding) -> list[str]:
     lines = [
         f"- [ ] **{f.severity}** / {f.confidence}: {f.title} (`{f.id}`)",
         f"  - Action: {f.action}",
     ]
+    if (details := _details(f)) is not None:
+        lines.append(f"  - Details: {details}")
     if f.evidence:
         lines.append("  - Evidence: " + "; ".join(_evidence(e) for e in f.evidence))
     if f.heuristics:
@@ -76,6 +136,8 @@ def render_markdown(report: Report) -> str:
         f"- Findings: {counts['breaking']} breaking, {counts['risky']} risky, "
         f"{counts['info']} info",
         "",
+        LEGEND,
+        "",
     ]
     if report.findings:
         out += ["## Do these first", ""]
@@ -85,15 +147,12 @@ def render_markdown(report: Report) -> str:
         by_cat: dict[Category, list[Finding]] = {}
         for f in report.sorted_findings():
             by_cat.setdefault(f.category, []).append(f)
-        # Categories with breaking findings first, then by name.
+        # Sections by their worst finding (breaking, then risky, then info), then name.
         for cat in sorted(
             by_cat,
-            key=lambda c: (
-                min(0 if f.severity is Severity.BREAKING else 1 for f in by_cat[c]),
-                str(c),
-            ),
+            key=lambda c: (min(_SEV_RANK[f.severity] for f in by_cat[c]), str(c)),
         ):
-            out += [f"## {str(cat).capitalize()}", ""]
+            out += [f"## {SECTION_TITLES.get(str(cat), str(cat).capitalize())}", ""]
             for f in by_cat[cat]:
                 out += _item(f)
             out.append("")
@@ -115,6 +174,13 @@ def render_markdown(report: Report) -> str:
     if report.contexts:
         out += ["", "## Builds", ""]
         for c in report.contexts:
-            out.append(f"- `{c['ref']}` / `{c['board']}` ({c['mode']}): {c['status']}")
+            line = f"- `{c['ref']}` / `{c['board']}` ({c['mode']}): {c['status']}"
+            if edits := c.get("salvage_edits"):
+                line += (
+                    " (salvaged: disabled "
+                    + ", ".join(f"`{e['file']}:{e['line']}`" for e in edits)
+                    + ")"
+                )
+            out.append(line)
     out.append("")
     return "\n".join(out)

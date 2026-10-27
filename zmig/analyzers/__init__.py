@@ -69,10 +69,17 @@ def _builtin(kind: str) -> list[type[Any]]:
     from zmig.analyzers.devicetree import DevicetreeAnalyzer
     from zmig.analyzers.guide import GuideAnalyzer
     from zmig.analyzers.kconfig import KconfigAnalyzer
+    from zmig.analyzers.sbom import SbomAnalyzer
 
     # The guide analyzer runs last: it links its findings to the ones before it.
-    # M5: sbom, buildlog warnings and size.
-    return [BoardAnalyzer, KconfigAnalyzer, DevicetreeAnalyzer, BuildlogAnalyzer, GuideAnalyzer]
+    return [
+        BoardAnalyzer,
+        KconfigAnalyzer,
+        DevicetreeAnalyzer,
+        BuildlogAnalyzer,
+        SbomAnalyzer,
+        GuideAnalyzer,
+    ]
 
 
 def _plugins(kind: str) -> list[type[Any]]:
@@ -107,11 +114,17 @@ def run_build_analyzers(
     findings: list[Finding] = []
     statuses: list[AnalyzerStatus] = []
     for cls in classes:
-        missing = sorted(a.value for a in cls.requires if not (ctx.old.has(a) and ctx.new.has(a)))
-        if missing:
-            statuses.append(
-                AnalyzerStatus(cls.name, "skipped", f"missing artifacts: {', '.join(missing)}")
+        missing = [
+            f"{side} ({spec}): {b.missing_reason(art)}"
+            for art in sorted(cls.requires, key=lambda x: x.value)
+            for side, b, spec in (
+                ("source", ctx.old, ctx.old_spec),
+                ("target", ctx.new, ctx.new_spec),
             )
+            if not b.has(art)
+        ]
+        if missing:
+            statuses.append(AnalyzerStatus(cls.name, "skipped", "; ".join(missing)))
             continue
         ctx.prior = list(findings)
         try:

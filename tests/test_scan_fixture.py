@@ -40,6 +40,8 @@ def report(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
                 "v3.6.0",
                 "--to",
                 "v3.7.0",
+                "--module",
+                "zcbor",
                 "--format",
                 "json",
                 "--out",
@@ -80,16 +82,11 @@ def test_builds_and_salvage(report: dict[str, Any]) -> None:
         "listed_in": "v3.7.0:boards/deprecated.cmake:442",
     }
     old, raw, salvaged = report["contexts"]
-    assert (old["status"], raw["status"]) == ("ok", "configure-failed")
-    # The salvaged configure succeeds; compiling then fails on DT_PROP(sample_point),
-    # which the devicetree analyzer predicts below.
-    assert salvaged["status"] == "build-failed"
+    assert (old["status"], raw["status"], salvaged["status"]) == ("ok", "configure-failed", "ok")
     assert [(e["file"], e["line"]) for e in salvaged["salvage_edits"]] == [
         ("prj.conf", 3),
         ("prj.conf", 5),
     ]
-    log = (CACHE / "builds" / f"{salvaged['key']}.log").read_text()
-    assert "DT_N_S_can_P_sample_point" in log
 
 
 def test_expected_findings(report: dict[str, Any]) -> None:
@@ -172,6 +169,8 @@ def test_deterministic(report: dict[str, Any], tmp_path: Path) -> None:
                 "v3.6.0",
                 "--to",
                 "v3.7.0",
+                "--module",
+                "zcbor",
                 "--format",
                 "json",
                 "--out",
@@ -217,6 +216,7 @@ def test_large_gap_v442(tmp_path: Path) -> None:
         "devicetree": "ok",
         "guide": "ok",
         "kconfig": "ok",
+        "sbom": "ok",
     }
     assert r["inputs"]["board"]["listed_in"].startswith("v4.0.0:")
     f = find(r, "board-renamed", "native_sim_64")
@@ -300,3 +300,95 @@ def test_guide_gating_large_gap(tmp_path: Path) -> None:
     assert find(r, "entry-match", "MG-3.7-0034:ident:can_recover")["severity"] == "breaking"
     cov = find(r, "coverage", "documents")
     assert len(cov["new"]["documents"]) == 12 and cov["new"]["entries"] > 700
+
+
+def _spdx_files(spdx_dir: Path) -> dict[str, dict[str, str]]:
+    """Independent reading of zephyr.spdx: {package: {file: sha1}} by plain line scan."""
+    out: dict[str, dict[str, str]] = {}
+    pkg, cur = "", ""
+    for line in (spdx_dir / "zephyr.spdx").read_text().splitlines():
+        if line.startswith("PackageName: "):
+            pkg = line.split(": ", 1)[1].removesuffix("-sources")
+            pkg = "zephyr" if pkg in ("zephyr", "zephyr-sources") else pkg
+            out.setdefault(pkg, {})
+        elif line.startswith("FileName: "):
+            cur = line.split(": ", 1)[1].removeprefix("./")
+        elif line.startswith("FileChecksum: SHA1: "):
+            out[pkg][cur] = line.rsplit(" ", 1)[1]
+    return out
+
+
+def test_sbom_matches_independent_sources(report: dict[str, Any]) -> None:
+    import subprocess
+
+    old_b = CACHE / "builds" / report["contexts"][0]["key"]
+    new_b = CACHE / "builds" / report["contexts"][2]["key"]
+    o, n = _spdx_files(old_b / "spdx"), _spdx_files(new_b / "spdx")
+
+    f = find(report, "zephyr-sources", "zephyr")
+    assert set(f["new"]["added"]) == n["zephyr"].keys() - o["zephyr"].keys()
+    assert set(f["new"]["removed"]) == o["zephyr"].keys() - n["zephyr"].keys()
+    assert set(f["new"]["changed"]) == {
+        k for k in o["zephyr"].keys() & n["zephyr"].keys() if o["zephyr"][k] != n["zephyr"][k]
+    }
+    # HWMv2 moved native_sim's board sources.
+    assert "zephyr/boards/posix/native_sim/cmdline.c" in f["new"]["removed"]
+    assert "zephyr/boards/native/native_sim/cmdline.c" in f["new"]["added"]
+
+    mirror = next((CACHE / "mirrors").glob("*zephyr.git"))
+
+    def pin(ref: str) -> str:
+        wy = subprocess.run(
+            ["git", "--git-dir", str(mirror), "show", f"{ref}:west.yml"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        block = wy.split("- name: zcbor\n", 1)[1]
+        return next(
+            ln.split(":", 1)[1].strip()
+            for ln in block.splitlines()
+            if ln.strip().startswith("revision:")
+        )
+
+    z = find(report, "module-repinned", "zcbor")
+    assert (z["old"], z["new"]["sha"]) == (pin("v3.6.0"), pin("v3.7.0"))
+    assert z["new"]["changed"] == sorted(
+        k for k in o["zcbor"].keys() & n["zcbor"].keys() if o["zcbor"][k] != n["zcbor"][k]
+    )
+
+    sizes = []
+    for b in (old_b, new_b):
+        text, data, bss = (
+            subprocess.run(
+                ["size", "--format=berkeley", str(b / "zephyr" / "zephyr.elf")],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            .stdout.splitlines()[1]
+            .split()[:3]
+        )
+        sizes.append({"rom": int(text) + int(data), "ram": int(data) + int(bss)})
+    fp = find(report, "footprint")
+    assert fp["old"] == sizes[0]
+    assert {k: fp["new"][k] for k in ("rom", "ram")} == sizes[1]
+
+
+def test_sarif_validates_against_official_schema(report: dict[str, Any], tmp_path: Path) -> None:
+    import urllib.request
+
+    url = (
+        "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/"
+        "sarif-schema-2.1.0.json"
+    )
+    with urllib.request.urlopen(url, timeout=60) as resp:
+        schema = json.load(resp)
+    sarif = json.loads((Path(report["_out"]) / "report.sarif").read_text())
+    jsonschema.validators.validator_for(schema)(schema).validate(sarif)
+    uris = {
+        loc["physicalLocation"]["artifactLocation"]["uri"]
+        for r in sarif["runs"][0]["results"]
+        for loc in r["locations"]
+    }
+    assert uris and all((APP / u).is_file() for u in uris)

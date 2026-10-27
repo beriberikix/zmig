@@ -88,7 +88,7 @@ class DevicetreeAnalyzer:
             )
 
         # Diagnostics: the target configure rejected the app's devicetree.
-        overlays = list(app_relative(ctx.new_raw_facts.overlays, ctx.new_raw.spec.app))
+        overlays = list(app_relative(ctx.new_raw_facts.overlays, ctx.new_raw.src))
         for d in ctx.new_raw_facts.diagnostics:
             if d.kind == "dt-undeclared-property":
                 hit = find_dt_property(ctx.usage.app, overlays, d.symbol)
@@ -222,7 +222,12 @@ class DevicetreeAnalyzer:
                 )
 
         # Properties the app's C code reads.
-        for ref, token, loc in ctx.usage.dt_props_read:
+        consequence = {
+            "DT_PROP_OR": "DT_PROP_OR() now silently returns its default instead",
+            "DT_PROP_LEN_OR": "DT_PROP_LEN_OR() now silently returns its default instead",
+            "DT_NODE_HAS_PROP": "DT_NODE_HAS_PROP() is now false",
+        }
+        for ref, token, loc, macro in ctx.usage.dt_props_read:
             po, pn = resolve(ref, old), resolve(ref, new)
             if not (po and pn):
                 continue
@@ -235,8 +240,8 @@ class DevicetreeAnalyzer:
                     f"{ctx.new_spec}",
                     Severity.BREAKING,
                     Confidence.HIGH,
-                    "DT_PROP() on it no longer compiles; set it in an overlay, use "
-                    "DT_PROP_OR(), or move to its replacement.",
+                    consequence.get(macro, f"{macro}() on it no longer compiles")
+                    + "; set it in an overlay, or move to its replacement.",
                     (
                         *_ev([loc]),
                         artifact_diff(

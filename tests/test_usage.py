@@ -21,8 +21,8 @@ def test_fixture_app_usage() -> None:
     assert (NodeRef("label", "can0"), "src/main.c", 7) in refs
     assert (NodeRef("label", "can0"), "boards/native_sim_64.overlay", 1) in refs
     # DT_PROP(CAN_NODE, ...) resolves the #define to DT_NODELABEL(can0).
-    assert [(r, p, loc.line) for r, p, loc in u.dt_props_read] == [
-        (NodeRef("label", "can0"), "sample_point", 17)
+    assert [(r, p, loc.line, macro) for r, p, loc, macro in u.dt_props_read] == [
+        (NodeRef("label", "can0"), "sample_point", 17, "DT_PROP_OR")
     ]
     assert [loc.line for loc in u.includes["version.h"]] == [4]
     assert [loc.line for loc in u.identifiers["can_recover"]] == [19]

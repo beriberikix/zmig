@@ -14,7 +14,7 @@ int main(void)
 #if DT_NODE_EXISTS(GPIO_NODE)
 	printk("emulated gpio at %s\n", DT_NODE_PATH(GPIO_NODE));
 #endif
-	printk("can0 sample point %d\n", DT_PROP(CAN_NODE, sample_point));
+	printk("can0 sample point %d\n", DT_PROP_OR(CAN_NODE, sample_point, 0));
 	if (can != NULL) {
 		(void)can_recover(can, K_MSEC(100));
 	}

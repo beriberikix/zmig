@@ -25,7 +25,7 @@ from zmig.tools import Runner
 from zmig.workspace import Module, RefWorkspace, west_argv
 
 # Bump when the build recipe changes in a way that invalidates cached builds.
-RECIPE_VERSION = 3
+RECIPE_VERSION = 6
 
 BuildMode = Literal["full", "fast"]
 BuildStatus = Literal["ok", "configure-failed", "build-failed"]
@@ -45,10 +45,11 @@ class Artifact(Enum):
     CMAKE_CACHE = "CMakeCache.txt"
     ELF = "zephyr/zephyr.elf"
     MAP = "zephyr/zephyr.map"
+    SPDX = "spdx/zephyr.spdx"  # plus app.spdx and build.spdx in the same directory
 
 
 # Artifacts that exist only after the build step, not after configure.
-BUILD_ONLY = frozenset({Artifact.ELF, Artifact.MAP})
+BUILD_ONLY = frozenset({Artifact.ELF, Artifact.MAP, Artifact.SPDX})
 
 
 def hash_tree(root: Path) -> str:
@@ -83,6 +84,8 @@ class BuildContext:
     dir: Path
     status: BuildStatus
     log: Path
+    # The copy of the app that was built (inside the workspace; see app_source()).
+    src: Path
 
     @property
     def app_dir(self) -> Path:
@@ -91,6 +94,20 @@ class BuildContext:
 
     def has(self, a: Artifact) -> bool:
         return (self.app_dir / a.value).is_file()
+
+    def missing_reason(self, a: Artifact) -> str:
+        """Why an artifact is missing, quoting the producing tool when it said."""
+        if a is Artifact.SPDX and self.log.is_file():
+            text = self.log.read_text()
+            tail = text[text.rfind(" spdx -d ") :] if " spdx -d " in text else ""
+            errors = [ln.strip() for ln in tail.splitlines() if ln.strip().startswith("ERROR:")]
+            if errors:
+                return f"west spdx: {errors[0].removeprefix('ERROR:').strip()}"
+            if self.status != "ok":
+                return f"the build {self.status.replace('-', ' ')}; west spdx needs a full build"
+        if a in BUILD_ONLY and self.spec.mode == "fast":
+            return f"{a.value} needs a full build (rerun without --fast)"
+        return f"{a.value} missing"
 
     def artifact(self, a: Artifact) -> Path:
         p = self.app_dir / a.value
@@ -123,9 +140,7 @@ def build_key(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> str:
         "ref": ws.resolved.ref.key,
         "modules": [[m.name, m.sha] for m in modules],
         "board": spec.board,
-        # Content and location: artifacts (compile_commands, logs) embed the app path.
         "app": hash_tree(spec.app),
-        "app_path": str(spec.app.resolve()),
         "mode": spec.mode,
         "sysbuild": spec.sysbuild,
         "cmake_args": list(spec.cmake_args),
@@ -133,19 +148,47 @@ def build_key(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> str:
     return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()[:16]
 
 
+def app_source(ws: RefWorkspace, spec: BuildSpec) -> Path:
+    """Where the app is copied before building: inside the ref's workspace.
+
+    Zephyr's scripts locate the west workspace by searching upward from the app's own
+    directory (west spdx does, for one). Building a copy placed inside zmig's workspace
+    keeps those lookups isolated from whatever surrounds the user's app.
+    """
+    return ws.root / "apps" / hash_tree(spec.app)[:16] / spec.app.resolve().name
+
+
+def _copy_app(src: Path, dest: Path) -> None:
+    if dest.is_dir():
+        return
+    tmp = dest.with_name(dest.name + ".tmp")
+    shutil.rmtree(tmp, ignore_errors=True)
+    shutil.copytree(src, tmp, ignore=shutil.ignore_patterns(*APP_IGNORE_DIRS))
+    tmp.rename(dest)
+
+
 def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> BuildContext:
     """Configure (fast) or build (full) `spec` in an isolated, cached directory."""
     modules = ws.modules(runner)
     key = build_key(ws, spec, modules)
+    src = app_source(ws, spec)
     bdir = cache.builds / key
     marker = cache.builds / f"{key}.json"
     log = cache.builds / f"{key}.log"
     if marker.is_file() and bdir.is_dir():
         status: BuildStatus = json.loads(marker.read_text())["status"]
         runner.redactions.setdefault(str(bdir), f"$BUILD[{key}]")
-        return BuildContext(ws, spec, key, bdir, status, log)
+        return BuildContext(ws, spec, key, bdir, status, log, src)
 
     shutil.rmtree(bdir, ignore_errors=True)
+    src.parent.mkdir(parents=True, exist_ok=True)
+    _copy_app(spec.app.resolve(), src)
+    # Ask CMake for its file-based API reply (codemodel), which `west spdx` reads. This
+    # empty query file is what `west spdx --init` creates on every version from v3.6
+    # to v4.4, so zmig creates it directly instead of branching per version.
+    query = bdir / ".cmake" / "api" / "v1" / "query" / "codemodel-v2"
+    query.parent.mkdir(parents=True)
+    query.touch()
     env = {"ZEPHYR_BASE": str(ws.zephyr)}
     if is_host_board(spec.board):
         env["ZEPHYR_TOOLCHAIN_VARIANT"] = "host"
@@ -159,7 +202,7 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
         "-d",
         str(bdir),
         "-s",
-        str(spec.app.resolve()),
+        str(src),
         "--sysbuild" if spec.sysbuild else "--no-sysbuild",
     ]
     if spec.mode == "fast":
@@ -168,6 +211,9 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
         "--",
         f"-DPython3_EXECUTABLE={sys.executable}",
         "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+        # Required by `west spdx` on every version; set on both sides of a comparison,
+        # so it never shows up as a difference.
+        "-DCONFIG_BUILD_OUTPUT_META=y",
         *spec.cmake_args,
     ]
     if modules:
@@ -191,6 +237,8 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
             if configured and (bdir / "build.ninja").is_file()
             else "configure-failed"
         )
+    if status != "configure-failed":
+        _spdx(ws, spec, bdir, env, runner, log)
     marker.write_text(
         json.dumps(
             {
@@ -208,7 +256,7 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
         )
     )
     runner.redactions.setdefault(str(bdir), f"$BUILD[{key}]")
-    return BuildContext(ws, spec, key, bdir, status, log)
+    return BuildContext(ws, spec, key, bdir, status, log, src)
 
 
 # --- Salvage -------------------------------------------------------------------------
@@ -325,7 +373,7 @@ def build_with_salvage(
     current = original
     for _ in range(MAX_SALVAGE_ROUNDS):
         # Paths in the log point at whichever app copy that build used.
-        edits = locate_salvage_edits(current.log.read_text(), current.spec.app.resolve())
+        edits = locate_salvage_edits(current.log.read_text(), current.src)
         new_edits = [
             e for e in edits if (e.file, e.line) not in {(a.file, a.line) for a in all_edits}
         ]
@@ -339,3 +387,17 @@ def build_with_salvage(
     if not all_edits:
         return SalvageResult(original, None, ())
     return SalvageResult(original, current, tuple(all_edits))
+
+
+def _spdx(
+    ws: RefWorkspace, spec: BuildSpec, bdir: Path, env: dict[str, str], runner: Runner, log: Path
+) -> None:
+    """Generate SPDX documents with this ref's own `west spdx` (best effort: a failure is
+    logged and leaves the SPDX artifact missing, which the sbom analyzer reports). The
+    exit status isn't trusted: v3.6's spdx exits 0 after "bailing"."""
+    app_dir = bdir / spec.app.resolve().name if spec.sysbuild else bdir
+    out = app_dir / "spdx"
+    argv = [*west_argv(), "spdx", "-d", str(app_dir), "-s", str(out)]
+    proc = runner.run(argv, cwd=ws.root, env=env, unset_env=["PYTHONPATH"], check=False)
+    with log.open("a") as f:
+        f.write(f"\n$ {' '.join(argv)}\nexit {proc.returncode}\n{proc.stdout}\n{proc.stderr}")
