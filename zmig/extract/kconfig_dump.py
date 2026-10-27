@@ -75,6 +75,7 @@ def main():
             "help": helps[0] if helps else None,
             "deprecated": deprecated(sym),
             "selects": sorted({sel[0].name for sel in sym.selects}),
+            "implies": sorted({imp[0].name for imp in sym.implies}),
             "depends": kconfiglib.expr_str(sym.direct_dep),
             "defaults": [
                 kconfiglib.expr_str(v) + ("" if c is kconf.y else " if " + kconfiglib.expr_str(c))

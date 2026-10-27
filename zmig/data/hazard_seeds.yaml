@@ -48,3 +48,33 @@ imgtool:
   files: [scripts/imgtool/image.py]
   # The click option whose default is the image byte order.
   endian_option: {file: scripts/imgtool/main.py, option: --endian}
+
+storage:
+  # Backend source trees in the Zephyr tree. A symbol is a backend's when its Kconfig
+  # definition is under one of `trees`; the backend is enabled when such a symbol is y in
+  # the app's resolved .config. Each tree is verified to exist at each ref.
+  backends:
+    settings:
+      trees: [subsys/settings]
+      seeds:
+        - {kind: define-prefix, name: NVS_, reason: settings-on-NVS record IDs (name/value ids)}
+        - {kind: define-prefix, name: ZMS_, reason: settings-on-ZMS record IDs and hashing}
+    nvs:
+      trees: [subsys/fs/nvs]
+      seeds:
+        - {kind: struct, name: nvs_ate, reason: on-flash allocation table entry}
+        - {kind: define-prefix, name: NVS_, reason: block size, CRC size, status values}
+        - {kind: define-prefix, name: ADDR_, reason: address encoding in ATEs}
+    zms:
+      trees: [subsys/fs/zms]
+      seeds:
+        - {kind: struct, name: zms_ate, reason: on-flash allocation table entry}
+        - {kind: define-prefix, name: ZMS_, reason: version, magic, ATE format, block size}
+        - {kind: define-prefix, name: ADDR_, reason: address encoding in ATEs}
+    secure_storage:
+      trees: [subsys/secure_storage]
+      seeds: []
+    filesystem:
+      trees: [subsys/fs]
+      exclude: [subsys/fs/nvs, subsys/fs/zms]
+      seeds: []

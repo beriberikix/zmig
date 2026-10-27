@@ -240,6 +240,21 @@ Files compiled into the bootloader, or used by an enabled storage backend, whose
 
 ---
 
+### 6.1 Implementation notes (from running §6 on fixtures A, B, C and xapp)
+
+- **Backends:** the trees and seeds are in `zmig/data/hazard_seeds.yaml` (`storage.backends`). Each tree is checked to exist at each ref. Membership comes from each symbol's Kconfig location. The `filesystem` tree (`subsys/fs`) excludes `fs/nvs` and `fs/zms`.
+- **Causes:** the kconfig snapshot now records `implies` as well as `selects` (snapshot v6). The exact `select`/`imply`/`depends on` line is found by scanning the defining Kconfig entry at that ref's SHA. Fixture C:
+  - `Kconfig.its_store:15` `select SETTINGS` and `:14` `imply NVS` at v4.0.0;
+  - `:34` `depends on SETTINGS` at v4.1.0, for the user's `CONFIG_SECURE_STORAGE_ITS_STORE_IMPLEMENTATION_SETTINGS=y`, so the choice falls back to `..._NONE`.
+  - Configure doesn't fail, so salvage never sees it.
+- **Remedy, verified:**
+  - Candidates are the settable symbols the causes name (lost `select`/`imply` targets, unmet `depends on`), plus their unmet dependencies over up to four rounds.
+  - `zmig/extract/kconfig_try.py` re-resolves the target image's Kconfig from the fragments its configure log lists ("Loaded/Merged configuration"), with the candidates merged last.
+  - `config-pin` is claimed only if every backend symbol enabled at the source, and every switched choice's source member, comes back `y`. Otherwise the remedy is `unknown`, and the finding names what didn't come back.
+  - For C this yields `FLASH, FLASH_MAP, FLASH_PAGE_LAYOUT, NVS, SETTINGS`. A real build with them added (`tests/test_p1_fixture.py::test_c_storage_remedy_builds`) keeps the source's backends, which agrees with `migration-guide-4.1.rst:725-729`.
+- **Partitions:** references to EDT partition labels and chosen nodes in the compiled files of each backend tree (app SBOM; headers count). NVS and ZMS are libraries that get their flash area from a caller (settings), so the category is unknown only when *no* enabled backend references a partition. A layout hazard on a referenced partition (fixture A: `storage_partition`, referenced by settings) is linked into the category and not duplicated as a storage finding.
+- **On-media definitions:** `srcdiff` of the backend seeds. They are unchanged for A (NVS, settings, v4.2.2→v4.3.0), so the changed compiled backend files are reported as implementation-only (medium).
+
 ## 7. BLE and security state (`ble` category), and wire format (`wire`)
 
 ### BLE

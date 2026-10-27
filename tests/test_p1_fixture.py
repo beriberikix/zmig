@@ -214,3 +214,75 @@ def test_signed_image_parser_matches_imgtool_dumpinfo(
                 for t, n in re.findall(r"type: \S+ \((0x[0-9a-f]+)\)\s+len:\s+(0x[0-9a-f]+)", out)
             ]
             assert tlvs == [(t["type"], t["len"]) for t in img["tlvs"]]
+
+
+# --- storage ---------------------------------------------------------------------------------
+
+C_RESTORE = ["FLASH", "FLASH_MAP", "FLASH_PAGE_LAYOUT", "NVS", "SETTINGS"]
+
+
+def test_c_storage_implicit_enable(reports: dict[str, dict[str, Any]]) -> None:
+    """v4.1.0: the ITS settings store stops selecting SETTINGS / implying NVS
+    (Kconfig.its_store:15 and :14 at v4.0.0) and depends on SETTINGS (:34 at v4.1.0)."""
+    r = reports["C"]
+    got = {(f["kind"], f["subject"]): f for f in of(r, "storage") if f.get("remedy")}
+    assert set(got) == {
+        ("backend-disabled", "settings"),
+        ("backend-disabled", "nvs"),
+        ("backend-switched", "secure_storage"),
+    }
+    ev = {
+        (e["path"], e["line"], e.get("text"))
+        for f in got.values()
+        for e in f["evidence"]
+        if e["type"] == "file_line"
+    }
+    assert ("<zephyr v4.0.0>/subsys/secure_storage/Kconfig.its_store", 15, "select SETTINGS") in ev
+    assert ("<zephyr v4.0.0>/subsys/secure_storage/Kconfig.its_store", 14, "imply NVS") in ev
+    assert (
+        "<zephyr v4.1.0>/subsys/secure_storage/Kconfig.its_store",
+        34,
+        "depends on SETTINGS",
+    ) in ev
+    sw = got[("backend-switched", "secure_storage")]
+    assert sw["new"]["choices"] == {
+        "SECURE_STORAGE_ITS_STORE_IMPLEMENTATION": "SECURE_STORAGE_ITS_STORE_IMPLEMENTATION_NONE"
+    }
+    for f in got.values():
+        assert f["severity"] == "breaking" and f["remedy"] == "config-pin"
+        assert f["new"]["restore"]["verified"] is True
+        assert f["new"]["restore"]["assign"] == [f"CONFIG_{s}=y" for s in C_RESTORE]
+
+
+def test_c_storage_remedy_builds(tmp_path: Path) -> None:
+    """Oracle for the config-pin: a real build of the fixture with the derived assignments
+    keeps the source's backends (only informational storage findings remain)."""
+    app = tmp_path / "p1-rename"
+    import shutil
+
+    shutil.copytree(ROOT / "tests/fixtures/p1-rename", app)
+    with (app / "prj.conf").open("a") as f:
+        f.writelines(f"CONFIG_{s}=y\n" for s in C_RESTORE)
+    _, board, frm, to, extra = FIXTURES["C"]
+    args = ["scan", "--app", str(app), "--board", board, "--from", frm, "--to", to]
+    args += ["--sysbuild", "--sdk", str(SDK), "--analyzers", "storage"]
+    for m in COMMON + extra:
+        args += ["--module", m]
+    args += ["--format", "json", "--out", str(tmp_path / "out")]
+    assert main(args) == 0
+    r = json.loads((tmp_path / "out" / "report.json").read_text())
+    assert [c["status"] for c in r["contexts"]] == ["ok", "ok"]
+    assert {f["severity"] for f in of(r, "storage")} <= {"info"}
+
+
+def test_a_storage_links_layout_stranding(reports: dict[str, dict[str, Any]]) -> None:
+    r = reports["A"]
+    assert not [f for f in of(r, "storage") if f.get("remedy")]
+    (st,) = of(r, "layout", "storage-stranded")
+    assert st["subject"] == "storage_partition"
+    (impl,) = of(r, "storage", "implementation-changed")
+    assert "subsys/settings/src/settings_store.c" in impl["new"]["files"]
+
+
+def test_b_has_no_storage(reports: dict[str, dict[str, Any]]) -> None:
+    assert not of(reports["B"], "storage")

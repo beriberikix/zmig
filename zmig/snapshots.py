@@ -16,6 +16,7 @@ import json
 import re
 import shlex
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,7 @@ from zmig.tools import Runner
 from zmig.workspace import RefWorkspace
 
 EXTRACT = Path(__file__).parent / "extract"
-SNAPSHOT_VERSION = 5
+SNAPSHOT_VERSION = 6
 
 ConfigValues = dict[str, str]
 
@@ -108,6 +109,45 @@ def kconfig_symbols(
 
     syms: dict[str, dict[str, Any]] = _cached(img, "kconfig", produce)["symbols"]
     return syms
+
+
+_FRAGMENT = re.compile(r"^(?:Loaded|Merged) configuration '(.+)'$")
+
+
+def kconfig_try(
+    img: ImageContext,
+    ws: RefWorkspace,
+    runner: Runner,
+    assign: dict[str, str],
+    report: list[str],
+) -> dict[str, str | None] | None:
+    """The image's Kconfig re-resolved with `assign` merged after the fragments its
+    configure log names (zmig/extract/kconfig_try.py). None if the fragments aren't in the
+    log. Not cached: each call is a different question."""
+    ninja = img.dir / "build.ninja"
+    if not ninja.is_file() or not img.log.is_file():
+        return None
+    frags = [m[1] for ln in img.log.read_text().splitlines() if (m := _FRAGMENT.match(ln))]
+    if not frags or not all(Path(f).is_file() for f in frags):
+        return None
+    env, root = menuconfig_env(ninja)
+    with tempfile.TemporaryDirectory() as d:
+        req, out = Path(d) / "req.json", Path(d) / "out.json"
+        req.write_text(json.dumps({"fragments": frags, "assign": assign, "report": report}))
+        runner.run(
+            [
+                sys.executable,
+                EXTRACT / "kconfig_try.py",
+                ws.zephyr / "scripts" / "kconfig",
+                root,
+                req,
+                out,
+            ],
+            env=env,
+            unset_env=["PYTHONPATH"],
+        )
+        values: dict[str, str | None] = json.loads(out.read_text())["values"]
+    return values
 
 
 def edt(img: ImageContext, ws: RefWorkspace, runner: Runner) -> dict[str, Any]:
