@@ -59,6 +59,18 @@ SECTION_TITLES = {
     "sbom": "SBOM",
     "images": "Images",
     "crossimage": "Consistency between images",
+    "sysbuild": "Sysbuild configuration",
+    "layout": "Flash layout",
+    "mcuboot": "MCUboot and image format",
+    "storage": "Persistent storage",
+    "ble": "Bluetooth bonds and identity",
+    "wire": "Wire formats",
+}
+VERDICT_TEXT = {
+    "direct-ok": "a device running the source build can take the target build by app OTA",
+    "needs-changes": "app OTA works after the changes listed under remedies",
+    "blocked": "not by app OTA alone: some hazard needs the bootloader changed or a reflash",
+    "unknown": "not established: some category couldn't be checked (see below)",
 }
 _SEV_RANK = {Severity.BREAKING: 0, Severity.RISKY: 1, Severity.INFO: 2}
 PREVIEW = 8
@@ -112,6 +124,8 @@ def _item(f: Finding) -> list[str]:
         f"- [ ] **{f.severity}** / {f.confidence}: {f.title} (`{f.id}`)",
         f"  - Action: {f.action}",
     ]
+    if f.remedy is not None:
+        lines.append(f"  - Remedy: {f.remedy}")
     if (details := _details(f)) is not None:
         lines.append(f"  - Details: {details}")
     if f.evidence:
@@ -165,6 +179,10 @@ def render_markdown(report: Report) -> str:
         LEGEND,
         "",
     ]
+    if report.upgrade_path:
+        out += _field_upgrade(report.upgrade_path)
+    introduced = [f for f in report.sorted_findings() if f.introduced_by_migration]
+    pre_existing = [f for f in report.sorted_findings() if not f.introduced_by_migration]
     if report.findings:
         out += ["## Do these first", ""]
         for i, f in enumerate(report.top(), 1):
@@ -172,7 +190,7 @@ def render_markdown(report: Report) -> str:
             out.append(f"{i}. **{f.severity}**: {where}{f.title} (`{f.id}`)")
         out.append("")
         groups: dict[str | None, list[Finding]] = {}
-        for f in report.sorted_findings():
+        for f in introduced:
             groups.setdefault(f.image, []).append(f)
         if set(groups) == {None}:
             out += _categories(groups[None], "##")
@@ -187,6 +205,17 @@ def render_markdown(report: Report) -> str:
                 name = app if image is None else image
                 out += [f"## Image: {name} ({roles.get(name, 'image')})", ""]
                 out += _categories(groups[image], "###")
+        if pre_existing:
+            out += [
+                "## Already true of the source build",
+                "",
+                "Not introduced by the migration: the source build has these too. They "
+                "affect what a deployed device is running (see the verdict's assumptions).",
+                "",
+            ]
+            for f in pre_existing:
+                out += _item(f)
+            out.append("")
         low = [f for f in report.sorted_findings() if f.heuristics]
         if low:
             out += ["## Heuristic and low-confidence findings", ""]
@@ -194,6 +223,13 @@ def render_markdown(report: Report) -> str:
             out.append("")
     else:
         out += ["No findings.", ""]
+    if report.not_checked:
+        out += ["## Not checked", ""]
+        out += [
+            f"- **{n.area}** ({n.analyzer}): {n.reason}"
+            for n in sorted(report.not_checked, key=lambda n: (n.analyzer, n.area))
+        ]
+        out.append("")
     not_ok = [a for a in report.analyzers if a.status != "ok"]
     out += ["## Analyzers", ""]
     if not report.analyzers:
@@ -215,3 +251,37 @@ def render_markdown(report: Report) -> str:
             out.append(line)
     out.append("")
     return "\n".join(out)
+
+
+def _field_upgrade(u: dict[str, Any]) -> list[str]:
+    """The upgrade-path verdict: can deployed devices take the target build by app OTA?"""
+    out = [
+        "## Field upgrade",
+        "",
+        f"**Verdict: {u['verdict']}** ({u['confidence']} confidence): "
+        f"{VERDICT_TEXT.get(u['verdict'], '')}.",
+        "",
+        "| Category | Status | Confidence | Notes |",
+        "|---|---|---|---|",
+    ]
+    for name, c in u["categories"].items():
+        notes = c.get("reason") or (
+            f"{len(c['findings'])} hazard finding(s)"
+            if c.get("findings")
+            else "; ".join(c.get("checked", [])[:1])
+        )
+        notes = str(notes).replace("|", "\\|")
+        title = SECTION_TITLES.get(name, name)
+        out.append(f"| {title} | {c['status']} | {c.get('confidence', '')} | {notes} |")
+    out.append("")
+    if u.get("remedies"):
+        out += ["Remedies:", ""]
+        out += [
+            f"- **{r}**: " + ", ".join(f"`{i}`" for i in ids) for r, ids in u["remedies"].items()
+        ]
+        out.append("")
+    if u.get("assumptions"):
+        out += ["Assumptions:", ""] + [f"- {a}" for a in u["assumptions"]] + [""]
+    if u.get("basis"):
+        out += ["Basis:", ""] + [f"- {b}" for b in u["basis"]] + [""]
+    return out

@@ -323,7 +323,7 @@ class McubootAnalyzer:
 
         # --- category ---------------------------------------------------------------------
         hazards = [
-            f.kind for f in findings if f.remedy is not None and f.severity is not Severity.INFO
+            f.id for f in findings if f.remedy is not None and f.severity is not Severity.INFO
         ]
         status: CategoryStatus = (
             "hazard" if hazards else ("unknown" if unknowns or st_a == "unknown" else "clean")
@@ -361,6 +361,28 @@ class McubootAnalyzer:
                 "updatable": upd,
             },
         )
+        others = sorted({i.name for i in ctx.old.images + ctx.new.images if i.role == "other"})
+        nc.append(
+            NotChecked(
+                "bootloaders other than MCUboot",
+                "only an MCUboot image built here is checked (role from CONFIG_MCUBOOT=y); a "
+                "first-stage bootloader, ROM bootloader or vendor updater isn't. Other images "
+                "built: " + (", ".join(others) if others else "none"),
+                self.name,
+            )
+        )
+        if any(d.status == "extended" for ds in diffs.values() for d in ds) or any(
+            f.kind == "slot-geometry" for f in findings
+        ):
+            nc.append(
+                NotChecked(
+                    "preprocessor conditions in MCUboot definitions",
+                    "#if branches aren't evaluated: conditional #define variants are reported "
+                    "as 'extended', and slot conditions whose macros have several conditional "
+                    "definitions are left unevaluated",
+                    self.name,
+                )
+            )
         if st_b == "not-applicable":
             nc.append(
                 NotChecked(

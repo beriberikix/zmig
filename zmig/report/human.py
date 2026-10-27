@@ -20,6 +20,18 @@ def render_human(report: Report) -> str:
     if board := inp.get("board"):
         lines[0] += f"  ({board['from']} → {board['to']})"
     lines.append(f"{c['breaking']} breaking, {c['risky']} risky, {c['info']} info")
+    if u := report.upgrade_path:
+        lines.append(
+            f"Field upgrade: {u['verdict']} ({u['confidence']} confidence)"
+            + (
+                "; remedies: " + ", ".join(f"{r} x{len(ids)}" for r, ids in u["remedies"].items())
+                if u.get("remedies")
+                else ""
+            )
+        )
+        unknown = [n for n, cat in u["categories"].items() if cat["status"] == "unknown"]
+        if unknown:
+            lines.append("  unknown: " + ", ".join(unknown))
     if report.top():
         lines += ["", "Do these first:"]
         lines += [
@@ -33,6 +45,8 @@ def render_human(report: Report) -> str:
     info = sum(1 for f in report.findings if f.severity is Severity.INFO)
     if info:
         lines.append(f"(+{info} info findings in MIGRATION.md / report.json)")
+    if report.not_checked:
+        lines.append(f"({len(report.not_checked)} areas not checked: see MIGRATION.md)")
     bad = [a for a in report.analyzers if a.status != "ok"]
     for a in bad:
         lines.append(f"! analyzer {a.name} {a.status}: {a.reason}")

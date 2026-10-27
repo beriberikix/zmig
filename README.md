@@ -83,6 +83,35 @@ errors, so it usually does), zmig reports Zephyr's errors as findings, then disa
 exactly those lines in a copy of your app and compares the rest. The report lists every
 disabled line.
 
+## Field upgrades (`--sysbuild` builds, or any build with persistent state)
+
+`scan` also answers: can a device running the `--from` build take the `--to` build by app
+OTA? The report's `upgrade_path` (and the "Field upgrade" section of MIGRATION.md) gives
+one verdict: `direct-ok`, `needs-changes`, `blocked` or `unknown`. It is never OK by
+default: every category below must be checked clean or shown not to apply.
+
+| Category | What is compared |
+|---|---|
+| `layout` | flash partitions in the bootloader's final devicetree: moved, resized, removed, reordered; storage partitions left behind |
+| `mcuboot` | whether the deployed (source) MCUboot accepts the target's signed image: header/TLV layout read from `image.h` at each MCUboot pin, measured on both signed `.bin` files; app/bootloader mode agreement; slot geometry from `boot_slots_compatible()` |
+| `storage` | settings/NVS/ZMS/secure-storage backends enabled, implicit enables via `select`/`imply`, on-media definitions; remedies verified by re-resolving the target Kconfig |
+| `ble` | Bluetooth settings keys, persisted key structs, identity options |
+| `wire` | a documented allowlist (`zmig/data/wire_format.yaml`, extend with `--wire-allowlist`) of values peers see |
+| `sysbuild`, `images`, `crossimage` | `SB_CONFIG` changes and how they reach images; bootloader added/removed; app/bootloader disagreements |
+
+Each hazard finding carries a `remedy` (`config-pin`, `app-change`, `intermediate-hop`,
+`bootloader-update`, `reflash`, `unknown`), its evidence and provenance, and whether the
+migration introduced it. Assumptions (e.g. "the deployed bootloader is the source build's
+MCUboot") and what isn't checked are listed in the report.
+
+- `--sdk <dir>`: build with this Zephyr SDK (recorded in the report; the build fails if any
+  image used another).
+- `--deployed-image <file.bin>`: compare against a signed image read from a device instead of
+  the source build's.
+- `--wire-allowlist <file.yaml>`: extra wire-format entries.
+
+Design: [docs/DESIGN-P1.md](docs/DESIGN-P1.md).
+
 ## Determinism and trust
 
 - Same inputs → byte-identical `report.json` (no timestamps or machine paths; finding ids

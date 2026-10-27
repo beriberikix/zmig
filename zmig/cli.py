@@ -16,7 +16,7 @@ from zmig.boards import alias_tables, map_board
 from zmig.buildctx import BuildMode, BuildSpec, build, build_with_salvage, hash_tree, sdk_identity
 from zmig.cache import Cache, default_cache_root
 from zmig.errors import ZmigError
-from zmig.findings import Category, Confidence, Finding, Report, Severity, plural
+from zmig.findings import Category, Confidence, Finding, NotChecked, Report, Severity, plural
 from zmig.forks import compare_tree, guess_version_tag
 from zmig.manifest import load_manifest, scan_user_workspace
 from zmig.plan import PlanContext
@@ -30,6 +30,7 @@ from zmig.tools import (
     find_tool,
     tool_version,
 )
+from zmig.verdict import upgrade_path
 from zmig.workspace import materialize
 
 log = logging.getLogger("zmig")
@@ -315,6 +316,20 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     report.findings, report.analyzers, report.not_checked = analyzers.run_build_analyzers(
         selected, ctx
     )
+    report.not_checked.append(
+        NotChecked(
+            "salvage of files the app doesn't own",
+            "salvage only disables lines in the app's own config and overlay files; a target "
+            "configure failure caused by board, module or generated files can't be salvaged"
+            + (
+                f" (this run salvaged {len(salvage.edits)} line(s))"
+                if salvage.edits
+                else " (no salvage was needed in this run)"
+            ),
+            "scan",
+        )
+    )
+    report.upgrade_path = upgrade_path(ctx.shared, report.findings, report.analyzers)
     _emit(report, runner, args)
     return EXIT_OK
 

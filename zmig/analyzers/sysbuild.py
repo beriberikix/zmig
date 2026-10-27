@@ -35,7 +35,7 @@ from zmig.findings import (
     artifact_diff,
     file_line,
 )
-from zmig.hazards import bootloader_role, provenance
+from zmig.hazards import bootloader_role, provenance, set_category
 from zmig.scan import ScanContext
 from zmig.snapshots import (
     ConfigValues,
@@ -94,6 +94,7 @@ class SysbuildAnalyzer:
         if ov is not None and nv is not None:
             ov, nv = _normalized(ov, ctx.old), _normalized(nv, ctx.new)
         if ov is None or nv is None:
+            set_category(ctx.shared, "sysbuild", "not-applicable", "high", ["not a sysbuild build"])
             return AnalyzerResult(
                 not_checked=[
                     NotChecked(
@@ -116,6 +117,30 @@ class SysbuildAnalyzer:
                     self.name,
                 )
             )
+
+        # Pair rules live in share/sysbuild/image_configurations; only MAIN and BOOTLOADER
+        # are read (zmig.sysbuild_rules). Name whatever else this tree has.
+        known = {Path(f).name for f in IMAGE_FILES.values()}
+        others = sorted(
+            {
+                f"{f.name}@{b.workspace.resolved.ref.spec}"
+                for b in (ctx.old, ctx.new)
+                for f in (b.workspace.zephyr / "share/sysbuild/image_configurations").glob(
+                    "*.cmake"
+                )
+                if f.name not in known
+            }
+        )
+        not_checked.append(
+            NotChecked(
+                "sysbuild pair rules outside MAIN/BOOTLOADER",
+                "only MAIN_image_default.cmake and BOOTLOADER_image_default.cmake are read; "
+                + ("not read: " + ", ".join(others) if others else "no other files at either ref")
+                + ". Image pairs set up by other sysbuild CMake (modules, vendor images) aren't "
+                "checked.",
+                self.name,
+            )
+        )
 
         def propagation(syms: set[str]) -> list[Propagation]:
             out = []

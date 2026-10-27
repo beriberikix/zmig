@@ -1,6 +1,6 @@
 # zmig P1 design: field-upgrade hazard analyzer
 
-Status: approved with amendments (2026-10-27 review). Amended: §2.4, §5.3, §5.5, §5.6, §5.7, §8, §9, §10, §11, §13. Nothing is implemented yet.
+Status: approved with amendments (2026-10-27 review). Amended: §2.4, §5.3, §5.5, §5.6, §5.7, §8, §9, §10, §11, §13. Implemented through §12 (2026-10-27); implementation notes follow §5, §6 and §7.
 
 **Goal:** answer one question with evidence. Can a device that runs the `--from` build
 today receive the `--to` build over the air and keep working? If not, what has to happen

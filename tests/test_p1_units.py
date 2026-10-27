@@ -221,3 +221,132 @@ def test_struct_locate_accepts_packing_macro(tmp_path: Path) -> None:
     (d,) = Source(repo, "HEAD", Runner()).locate(Seed("struct", "image_tlv", ""), ["inc"])
     assert d.decl == "STRUCT_PACKED"
     assert d.members == (("uint16_t", "it_type", ""), ("uint16_t", "it_len", ""))
+
+
+# --- verdict (§8) ----------------------------------------------------------------------------
+
+
+def _f(
+    cat: Category, kind: str, sev: Severity, remedy: Remedy | None, intro: bool = True
+) -> Finding:
+    return Finding(
+        category=cat,
+        kind=kind,
+        subject=kind,
+        title=kind,
+        severity=sev,
+        confidence=Confidence.HIGH,
+        action="",
+        analyzer=cat.value,
+        scope="s",
+        remedy=remedy,
+        introduced_by_migration=intro,
+    )
+
+
+def _clean_shared() -> dict[str, Any]:
+    cats = {
+        n: {"status": "clean", "confidence": "high", "checked": ["x"]}
+        for n in ("layout", "mcuboot", "storage", "ble", "wire")
+    }
+    return {"categories": cats}
+
+
+def _ok() -> list[Any]:
+    from zmig.findings import AnalyzerStatus
+    from zmig.verdict import CATEGORIES
+
+    return [AnalyzerStatus(a, "ok") for a in CATEGORIES.values()]
+
+
+def test_verdict_precedence_and_never_default_ok() -> None:
+    from zmig.findings import AnalyzerStatus
+    from zmig.verdict import upgrade_path
+
+    assert upgrade_path(_clean_shared(), [], _ok())["verdict"] == "direct-ok"
+    # A category whose analyzer didn't run is unknown, so the verdict is unknown.
+    statuses = [s for s in _ok() if s.name != "ble"]
+    u = upgrade_path(_clean_shared(), [], statuses)
+    assert u["verdict"] == "unknown" and u["categories"]["ble"]["status"] == "unknown"
+    # A failed per-image run counts as not run.
+    u = upgrade_path(_clean_shared(), [], [*_ok(), AnalyzerStatus("layout@mcuboot", "error", "x")])
+    assert u["categories"]["layout"]["status"] == "unknown"
+    # needs-changes beats unknown; blocked beats needs-changes.
+    pin = _f(Category.MCUBOOT, "m", Severity.BREAKING, Remedy.CONFIG_PIN)
+    assert upgrade_path(_clean_shared(), [pin], statuses)["verdict"] == "needs-changes"
+    unk = _f(Category.STORAGE, "s", Severity.RISKY, Remedy.UNKNOWN)
+    assert upgrade_path(_clean_shared(), [unk], _ok())["verdict"] == "needs-changes"
+    rf = _f(Category.LAYOUT, "l", Severity.BREAKING, Remedy.REFLASH)
+    u = upgrade_path(_clean_shared(), [pin, rf], _ok())
+    assert u["verdict"] == "blocked"
+    assert u["remedies"] == {"config-pin": [pin.id], "reflash": [rf.id]}
+    # Info findings with a remedy are not hazards.
+    info = _f(Category.WIRE, "w", Severity.INFO, Remedy.CONFIG_PIN)
+    assert upgrade_path(_clean_shared(), [info], _ok())["verdict"] == "direct-ok"
+
+
+def test_verdict_bootloader_update_needs_evidenced_updatability() -> None:
+    from zmig.verdict import upgrade_path
+
+    bu = _f(Category.LAYOUT, "l", Severity.BREAKING, Remedy.BOOTLOADER_UPDATE)
+    u = upgrade_path(_clean_shared(), [bu], _ok())
+    assert u["remedies"] == {"reflash": [bu.id]} and u["verdict"] == "blocked"
+    shared = _clean_shared()
+    shared["categories"]["mcuboot"]["updatable"] = "yes"
+    assert upgrade_path(shared, [bu], _ok())["remedies"] == {"bootloader-update": [bu.id]}
+
+
+def test_verdict_pre_existing_breaking() -> None:
+    """§8.3: the touched categories become unknown and confidence is capped at low."""
+    from zmig.verdict import upgrade_path
+
+    pre = _f(Category.CROSSIMAGE, "partition", Severity.BREAKING, None, intro=False)
+    u = upgrade_path(_clean_shared(), [pre], _ok())
+    assert u["verdict"] == "unknown" and u["confidence"] == "low"
+    assert u["categories"]["crossimage"]["status"] == "unknown"
+    assert u["categories"]["layout"]["status"] == "unknown"
+    assert any("contradicted by" in a for a in u["assumptions"])
+    # A proven hazard elsewhere still stands.
+    rf = _f(Category.MCUBOOT, "m", Severity.BREAKING, Remedy.REFLASH)
+    u = upgrade_path(_clean_shared(), [pre, rf], _ok())
+    assert u["verdict"] == "blocked" and u["confidence"] == "low"
+
+
+def test_report_rendering_separates_pre_existing_and_lists_not_checked() -> None:
+    ref = {"spec": "v1", "sha": "a" * 40, "kind": "tag", "url": "u", "dirty": False}
+    new = _f(Category.LAYOUT, "partition-moved", Severity.RISKY, Remedy.REFLASH)
+    pre = _f(Category.CROSSIMAGE, "partition", Severity.BREAKING, None, intro=False)
+    r = Report(
+        command="scan",
+        zmig_version="0",
+        inputs={"from": ref, "to": ref},
+        environment={},
+        findings=[pre, new],
+        not_checked=[NotChecked("bootloaders other than MCUboot", "only MCUboot", "mcuboot")],
+        upgrade_path={
+            "verdict": "blocked",
+            "confidence": "low",
+            "categories": {
+                "layout": {"status": "hazard", "confidence": "high", "findings": [new.id]}
+            },
+            "remedies": {"reflash": [new.id]},
+            "assumptions": ["deployed == source build: contradicted by x"],
+            "basis": [],
+        },
+    )
+    # Introduced findings first, even when a pre-existing one is more severe.
+    assert r.top()[0] is new
+    md = render(r, "markdown")
+    assert "**Verdict: blocked** (low confidence)" in md
+    assert f"- **reflash**: `{new.id}`" in md
+    assert "## Not checked" in md and "bootloaders other than MCUboot" in md
+    pre_section = md.split("## Already true of the source build", 1)[1]
+    assert pre.id in pre_section
+    assert (
+        pre.id
+        not in md.split("## Already true of the source build", 1)[0]
+        .split("## Do these first", 1)[1]
+        .split("\n\n", 2)[2]
+    )
+    human = render(r, "human")
+    assert "Field upgrade: blocked (low confidence); remedies: reflash x1" in human

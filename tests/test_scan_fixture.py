@@ -219,6 +219,18 @@ def test_large_gap_v442(tmp_path: Path) -> None:
         "images": "ok",
         "kconfig": "ok",
         "sbom": "ok",
+        "sysbuild": "ok",
+        "layout": "ok",
+        "mcuboot": "ok",
+        "storage": "ok",
+        "ble": "ok",
+        "wire": "ok",
+    }
+    # A plain native_sim build: the verdict is computed and every category is decided.
+    assert {c["status"] for c in r["upgrade_path"]["categories"].values()} <= {
+        "clean",
+        "hazard",
+        "not-applicable",
     }
     assert r["inputs"]["board"]["listed_in"].startswith("v4.0.0:")
     f = find(r, "board-renamed", "native_sim_64")

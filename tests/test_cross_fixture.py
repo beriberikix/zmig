@@ -295,3 +295,20 @@ def test_wire_ignores_values_no_compiled_code_reads(report: dict[str, Any]) -> N
     """Regression: CONFIG_USB_DEVICE_PRODUCT in MCUboot goes "MCUBOOT" -> unset, but the USB
     stack isn't built at either ref, so nothing reaches a host."""
     assert not [f for f in report["findings"] if f["category"] == "wire"]
+
+
+def test_verdict_xapp(report: dict[str, Any]) -> None:
+    u = report["upgrade_path"]
+    assert u["verdict"] == "direct-ok" and u["confidence"] == "medium"
+
+
+def test_verdict_pre_existing_mismatch(tmp_path: Path) -> None:
+    """§8.3: xapp-mismatch's slot1 disagreement exists at the source, so it is attributed
+    as pre-existing, layout and crossimage are unknown, and confidence is capped at low."""
+    r = scan("xapp-mismatch", tmp_path)
+    (f,) = [x for x in r["findings"] if x["category"] == "crossimage" and "slot1" in x["subject"]]
+    assert f["introduced_by_migration"] is False
+    u = r["upgrade_path"]
+    assert u["verdict"] == "unknown" and u["confidence"] == "low"
+    assert u["categories"]["crossimage"]["status"] == "unknown"
+    assert u["categories"]["layout"]["status"] == "unknown"

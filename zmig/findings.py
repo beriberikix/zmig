@@ -235,13 +235,14 @@ class Report:
         return sorted(self.findings, key=Finding.sort_key)
 
     def top(self) -> list[Finding]:
-        """The first findings to act on: breaking and risky ones only, with breaking
-        findings that point into the user's own files ahead of the plain order."""
+        """The first findings to act on: breaking and risky ones only. Findings the migration
+        introduces come before ones already true of the source build; then breaking findings
+        that point into the user's own files ahead of the plain order."""
 
-        def key(f: Finding) -> tuple[int, tuple[int, int, str, str]]:
+        def key(f: Finding) -> tuple[int, int, tuple[int, int, str, str]]:
             in_app = any(e.get("type") == "file_line" for e in f.evidence)
             boost = 0 if (f.severity is Severity.BREAKING and in_app) else 1
-            return (boost, f.sort_key())
+            return (0 if f.introduced_by_migration else 1, boost, f.sort_key())
 
         actionable = [f for f in self.findings if f.severity is not Severity.INFO]
         return sorted(actionable, key=key)[:TOP_N]

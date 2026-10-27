@@ -364,3 +364,36 @@ def test_wire_user_allowlist(tmp_path: Path) -> None:
     assert "(user)" in ch["provenance"]["evidence_source"]
     (nf,) = of(r, "wire", "allowlist-entry-not-found")
     assert nf["new"] == ["USER-ACL-RX-COUNT (CONFIG_BT_BUF_ACL_RX_COUNT not defined at v4.3.0)"]
+
+
+# --- verdict -------------------------------------------------------------------------------------
+
+
+def test_verdicts(reports: dict[str, dict[str, Any]]) -> None:
+    v = {n: r["upgrade_path"] for n, r in reports.items()}
+    assert v["A"]["verdict"] == "blocked"
+    assert "reflash" in v["A"]["remedies"]
+    assert v["B"]["verdict"] == "needs-changes"
+    assert set(v["B"]["remedies"]) == {"config-pin"}
+    # C is derived, not asserted up front: the storage switch has a verified config pin.
+    assert v["C"]["verdict"] == "needs-changes"
+    assert v["C"]["categories"]["storage"]["status"] == "hazard"
+    assert v["D"]["verdict"] == "direct-ok"
+    assert v["D"]["confidence"] == "medium"  # rests on implementation-only storage files
+    assert any(b.startswith("storage: clean on definitions") for b in v["D"]["basis"])
+    for u in v.values():
+        assert u["verdict"] != "direct-ok" or all(
+            c["status"] in ("clean", "not-applicable") for c in u["categories"].values()
+        )
+
+
+def test_not_checked_lists_required_areas(reports: dict[str, dict[str, Any]]) -> None:
+    required = {
+        "sysbuild pair rules outside MAIN/BOOTLOADER",
+        "bootloaders other than MCUboot",
+        "salvage of files the app doesn't own",
+        "wire formats outside the allowlist",
+    }
+    for n in SYSBUILD:
+        areas = {x["area"] for x in reports[n]["not_checked"]}
+        assert required <= areas, (n, required - areas)
