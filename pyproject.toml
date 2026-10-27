@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zmig"
+version = "0.1.0"
+description = "Migration assistant for Zephyr RTOS upgrades: what changed for your project"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "west>=1.2",
+]
+
+[project.optional-dependencies]
+# Python packages Zephyr's own build scripts import (scripts/requirements-base.txt,
+# the subset needed to configure and build). zmig runs `west build` with its own
+# interpreter, so these must be importable there.
+zephyr = [
+    "pyelftools>=0.29",
+    "PyYAML>=6.0",
+    "pykwalify",
+    "packaging",
+    "anytree",
+    "jsonschema",
+]
+
+[project.scripts]
+zmig = "zmig.cli:main"
+
+[project.entry-points."zmig.analyzers"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-PyYAML",
+    "jsonschema",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["zmig"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+packages = ["zmig"]
+
+[[tool.mypy.overrides]]
+module = ["west.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "build: runs real Zephyr builds (slow, needs the zephyr mirror and host gcc)",
+    "network: needs network access to clone or fetch",
+]
+addopts = "-m 'not build and not network'"

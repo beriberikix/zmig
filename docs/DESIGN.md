@@ -157,8 +157,6 @@ Field rules:
   },
   "environment": {"python": "3.14.4", "west": "1.5.0", "cmake": "4.2.3",
                   "dtc": "1.7.2", "toolchain": "host"},
-  "invocations": [{"id": "cmd-007", "argv": ["cmake", "…"], "cwd": "…",
-                   "exit": 0, "log": "logs/cmd-007.log"}],
   "analyzers": [{"name": "kconfig", "status": "ok"},
                 {"name": "sbom", "status": "skipped",
                  "reason": "CONFIG_BUILD_OUTPUT_META unsupported at v3.6.0 for native_sim"}],
@@ -168,7 +166,8 @@ Field rules:
 }
 ```
 
-- The report contains **no timestamps or absolute cache paths**, so it is byte-stable for identical inputs. Paths are relative to the app or workspace.
+- The report contains **no timestamps, absolute cache paths, or invocation lists**, so it is byte-stable for identical inputs. That holds whether or not the cache was warm (verified in M1). Paths are relative to the app or workspace.
+- The commands that ran are recorded separately, in `logs/invocations.json` next to the per-command logs, with the cache root and home directory redacted. A cache hit changes which commands run, so they are kept out of the report.
 - Findings are sorted by (severity, confidence, category, id).
 - **`top`** holds the first five findings in that order. It gives breaking findings with a file_line evidence pointing into the app a small boost, because those are actionable.
 - An analyzer that cannot run is reported as `skipped` or `error` with a reason. **It never silently drops out.**
@@ -227,7 +226,7 @@ Every subprocess goes through one wrapper. It:
 
 - logs argv, cwd, the relevant env keys, exit code, and duration;
 - stores output under `<out>/logs/`;
-- records each invocation in `report.json` under `invocations`.
+- records each invocation in `logs/invocations.json`.
 
 Tool discovery order: explicit flag, then `$VIRTUAL_ENV`, then `<workspace>/.venv`,
 then PATH. Missing tools produce a one-line actionable error, for example:
@@ -319,8 +318,9 @@ class BuildAnalyzer(Protocol):              # used by `scan`
 **board**
 
 - Resolve `--board` at the source ref. At the target ref, if the same name no longer resolves, zmig **maps it automatically** and builds with the mapped name, e.g. `native_sim_64` → `native_sim/native/64`.
-  - The mapping uses the target ref's `list_boards.py` output plus the migration guide.
-  - The mapping is reported as a `board` finding: `info` severity, `high` confidence when it is exact (single candidate whose board/soc/variant match the old name's parts), `medium` otherwise.
+  - The primary mapping source is the target ref's `boards/deprecated.cmake` (`<old>_DEPRECATED` → new target). Zephyr itself uses it to redirect old names with a CMake warning; this was verified at v3.7.0, where `native_sim_64` → `native_sim/native/64`. That gives `high` confidence. The resolved `CONFIG_BOARD_TARGET` in the target `.config` confirms the result.
+  - When no deprecation entry exists, a fallback uses the target's `list_boards.py` output plus the migration guide, at `medium` confidence.
+  - The mapping is reported as a `board` finding: `risky` when the old name only works through the deprecation alias, which upstream removes in a later release; `info` when zmig had to map it.
   - If no unique candidate exists, zmig stops with a clear error listing the candidates. `--to-board` overrides the mapping.
 - A board rename also renames board-specific files the app relies on (`boards/<board>.overlay`/`.conf`). Those get findings with file_line evidence.
 
