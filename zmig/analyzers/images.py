@@ -16,7 +16,8 @@ from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact, ImageContext
-from zmig.findings import Category, Confidence, Finding, Severity, plural
+from zmig.findings import Category, Confidence, Finding, Remedy, Severity, plural
+from zmig.hazards import BootloaderRole, bootloader_role, provenance
 from zmig.sbom import APP_PACKAGE, compiled_sources, read_spdx_dir
 from zmig.scan import ScanContext
 from zmig.workspace import Module
@@ -83,7 +84,13 @@ class ImagesAnalyzer:
 
         old = {i.name: i for i in ctx.old.images}
         new = {i.name: i for i in ctx.new.images}
-        for n in sorted(old.keys() - new.keys()):
+        # The bootloader is matched by role: added, removed or renamed is one hazard.
+        ob, nb = bootloader_role(ctx.old), bootloader_role(ctx.new)
+        identity = self._identity(ctx, ob, nb)
+        if identity is not None:
+            findings.append(identity)
+        boot_names = {r.image.name for r in (ob, nb) if r.image is not None}
+        for n in sorted(old.keys() - new.keys() - boot_names):
             add(
                 "image-removed",
                 n,
@@ -92,7 +99,7 @@ class ImagesAnalyzer:
                 "Check whether your sysbuild configuration still enables it.",
                 old=old[n].to_json(),
             )
-        for n in sorted(new.keys() - old.keys()):
+        for n in sorted(new.keys() - old.keys() - boot_names):
             add(
                 "image-added",
                 n,
@@ -146,6 +153,55 @@ class ImagesAnalyzer:
         )
         findings += self._mcuboot(ctx, old, new)
         return AnalyzerResult(findings)
+
+    def _identity(self, ctx: ScanContext, ob: BootloaderRole, nb: BootloaderRole) -> Finding | None:
+        """One finding when the bootloader image appears, disappears or is renamed."""
+        o, n = ob.image, nb.image
+        if (o is None and n is None) or (o is not None and n is not None and o.name == n.name):
+            return None
+        if o is not None and n is not None:
+            kind, sev, remedy = "renamed", Severity.RISKY, Remedy.UNKNOWN
+            title = (
+                f"The bootloader image is named {o.name} at {ctx.old_spec} and {n.name} "
+                f"at {ctx.new_spec}"
+            )
+            action = (
+                "It is compared by role, so its config and code are still analyzed; "
+                "check scripts that refer to it by name (flashing, signing, CI)."
+            )
+        elif o is not None:
+            kind, sev, remedy = "removed", Severity.BREAKING, Remedy.REFLASH
+            title = f"The bootloader image {o.name} is no longer built at {ctx.new_spec}"
+            action = (
+                "Field devices keep the old bootloader, which expects a signed image in "
+                "its slot layout; an app built without it can't be installed by OTA."
+            )
+        else:
+            assert n is not None
+            kind, sev, remedy = "added", Severity.BREAKING, Remedy.REFLASH
+            title = f"A bootloader image {n.name} is built at {ctx.new_spec}, not at {ctx.old_spec}"
+            action = (
+                "Field devices have no bootloader to install the new app from its slot; "
+                "adding one requires reflashing."
+            )
+        return Finding(
+            category=Category.IMAGES,
+            kind="bootloader-identity-changed",
+            subject=kind,
+            title=title,
+            severity=sev,
+            confidence=Confidence.HIGH,
+            action=action,
+            analyzer=self.name,
+            scope=ctx.scope,
+            old=o.to_json() if o else None,
+            new=n.to_json() if n else None,
+            remedy=remedy,
+            provenance=provenance(
+                f"domains.yaml and image .config at {ctx.old_spec} and {ctx.new_spec}",
+                nb if n else ob,
+            ),
+        )
 
     def _mcuboot(
         self, ctx: ScanContext, old: dict[str, ImageContext], new: dict[str, ImageContext]

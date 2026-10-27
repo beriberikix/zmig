@@ -4,20 +4,29 @@ Each ref gets <cache>/workspaces/<ref key>/ laid out like a `west init -l`
 workspace: the zephyr worktree at `zephyr/` and a `.west/config` pointing at its
 west.yml. Modules are cloned on demand with `west update --narrow <names>`, so
 only what the project needs is fetched, and nothing else is visible to the build.
+
+A process holds an exclusive lock on each workspace it materializes until it exits:
+the active module set is workspace state, so two runs of the same ref with different
+modules would otherwise build (or analyze) against each other's set.
 """
 
 from __future__ import annotations
 
+import fcntl
+import logging
 import re
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import IO
 
 from zmig.cache import Cache
 from zmig.errors import ZmigError
 from zmig.refs import ResolvedRef
 from zmig.tools import Runner, find_tool
+
+log = logging.getLogger("zmig")
 
 WEST_CONFIG = """\
 [manifest]
@@ -27,6 +36,23 @@ file = west.yml
 [zephyr]
 base = zephyr
 """
+
+
+_held: dict[Path, IO[str]] = {}
+
+
+def lock_workspace(lock: Path) -> None:
+    """Hold an exclusive lock on a workspace until this process exits (idempotent)."""
+    if lock in _held:
+        return
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    f = lock.open("a")
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        log.warning("waiting for another zmig run using %s", lock.with_suffix(""))
+        fcntl.flock(f, fcntl.LOCK_EX)
+    _held[lock] = f
 
 
 def west_argv() -> list[str]:
@@ -56,8 +82,8 @@ class RefWorkspace:
 
         Zephyr's module discovery only considers active projects, so this pins what
         a build sees to the requested set, regardless of what an earlier run cloned
-        into this shared per-ref workspace. (Builds of the same ref with different
-        module sets must therefore not run concurrently.)
+        into this shared per-ref workspace. (Concurrent runs are serialized by
+        lock_workspace().)
         """
         rules = ["-.*", *(f"+{re.escape(n)}" for n in sorted(names))]
         runner.run(
@@ -88,6 +114,7 @@ def materialize(
 ) -> RefWorkspace:
     """Create or reuse the workspace for a ref, cloning `modules` (west project names)."""
     root = cache.workspaces / resolved.ref.key
+    lock_workspace(root.with_name(root.name + ".lock"))
     resolved.mirror.checkout(resolved.ref, root / "zephyr", resolved.dirty)
     if not (root / "zephyr" / "west.yml").is_file():
         raise ZmigError(f"{resolved.ref.spec} has no west.yml; is it a Zephyr tree?")
@@ -96,6 +123,15 @@ def materialize(
         cfg.parent.mkdir(parents=True, exist_ok=True)
         cfg.write_text(WEST_CONFIG)
     ws = RefWorkspace(resolved, root)
+    # A module requested for both refs may not exist in this ref's manifest (e.g. cmsis_6
+    # before v4.1, tinycrypt from v4.3); west update would fail on it, so skip it here.
+    from zmig.manifest import load_manifest
+
+    known = set(load_manifest(root))
+    missing = sorted(set(modules) - known)
+    if missing:
+        log.warning("not in %s's manifest, skipped: %s", resolved.ref.spec, ", ".join(missing))
+    modules = [m for m in modules if m in known]
     ws.activate(modules, runner)
     if modules:
         runner.run(

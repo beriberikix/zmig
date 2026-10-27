@@ -25,18 +25,20 @@ from zmig.tools import Runner
 from zmig.workspace import RefWorkspace
 
 EXTRACT = Path(__file__).parent / "extract"
-SNAPSHOT_VERSION = 3
+SNAPSHOT_VERSION = 4
 
 ConfigValues = dict[str, str]
 
 
-def parse_dotconfig(text: str) -> ConfigValues:
-    """CONFIG_X=v lines -> {X: v}; '# CONFIG_X is not set' -> {X: 'n'}."""
+def parse_dotconfig(text: str, prefix: str = "CONFIG_") -> ConfigValues:
+    """<prefix>X=v lines -> {X: v}; '# <prefix>X is not set' -> {X: 'n'}. Sysbuild's own
+    config uses the prefix SB_CONFIG_."""
     out: ConfigValues = {}
+    p = re.escape(prefix)
     for line in text.splitlines():
-        if m := re.match(r"^CONFIG_(\w+)=(.*)$", line):
+        if m := re.match(rf"^{p}(\w+)=(.*)$", line):
             out[m[1]] = m[2]
-        elif m := re.match(r"^# CONFIG_(\w+) is not set$", line):
+        elif m := re.match(rf"^# {p}(\w+) is not set$", line):
             out[m[1]] = "n"
     return out
 
@@ -68,8 +70,8 @@ def menuconfig_env(build_ninja: Path) -> tuple[dict[str, str], Path]:
     )
 
 
-def _cached(img: ImageContext, name: str, produce: Any) -> dict[str, Any]:
-    path = img.dir / f"zmig-{name}.json"
+def _cached(where: ImageContext | Path, name: str, produce: Any) -> dict[str, Any]:
+    path = (where.dir if isinstance(where, ImageContext) else where) / f"zmig-{name}.json"
     if path.is_file():
         data: dict[str, Any] = json.loads(path.read_text())
         if data.get("_v") == SNAPSHOT_VERSION:
@@ -151,3 +153,42 @@ def app_undefined_symbols(img: ImageContext, app: Path, runner: Runner) -> set[s
         nm = m[1].strip() or nm
     out = runner.run([nm, "-u", *sorted(objects)]).stdout
     return {line.split()[-1] for line in out.splitlines() if line.strip().startswith("U ")}
+
+
+# --- sysbuild level ---------------------------------------------------------------------
+
+SYSBUILD_PREFIX = "SB_CONFIG_"
+
+
+def sysbuild_config(bdir: Path) -> ConfigValues | None:
+    """Sysbuild's resolved config (<build>/zephyr/.config, prefix SB_CONFIG_), or None for
+    a plain build."""
+    cfg = bdir / "zephyr" / ".config"
+    if not (bdir / "domains.yaml").is_file() or not cfg.is_file():
+        return None
+    return parse_dotconfig(cfg.read_text(), SYSBUILD_PREFIX)
+
+
+def sysbuild_kconfig(bdir: Path, ws: RefWorkspace, runner: Runner) -> dict[str, dict[str, Any]]:
+    """Sysbuild's Kconfig metadata, from the menuconfig rule of the top-level build.ninja
+    (its root is share/sysbuild/Kconfig), with that ref's kconfiglib."""
+    ninja = bdir / "build.ninja"
+    if not ninja.is_file():
+        raise ArtifactMissing(f"sysbuild build.ninja missing in {bdir}")
+
+    def produce(out: Path) -> None:
+        env, root = menuconfig_env(ninja)
+        runner.run(
+            [
+                sys.executable,
+                EXTRACT / "kconfig_dump.py",
+                ws.zephyr / "scripts" / "kconfig",
+                root,
+                out,
+            ],
+            env=env,
+            unset_env=["PYTHONPATH"],
+        )
+
+    syms: dict[str, dict[str, Any]] = _cached(bdir, "sysbuild-kconfig", produce)["symbols"]
+    return syms

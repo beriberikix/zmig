@@ -14,7 +14,7 @@ from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol, runtime_checkable
 
 from zmig.errors import ZmigError
-from zmig.findings import AnalyzerStatus, Finding
+from zmig.findings import AnalyzerStatus, Finding, NotChecked
 
 if TYPE_CHECKING:
     from zmig.buildctx import Artifact
@@ -29,6 +29,7 @@ class AnalyzerResult:
     findings: list[Finding] = field(default_factory=list)
     status: Status = "ok"
     reason: str | None = None
+    not_checked: list[NotChecked] = field(default_factory=list)
 
     @classmethod
     def skipped(cls, reason: str) -> AnalyzerResult:
@@ -71,7 +72,9 @@ def _builtin(kind: str) -> list[type[Any]]:
     from zmig.analyzers.guide import GuideAnalyzer
     from zmig.analyzers.images import ImagesAnalyzer
     from zmig.analyzers.kconfig import KconfigAnalyzer
+    from zmig.analyzers.layout import LayoutAnalyzer
     from zmig.analyzers.sbom import SbomAnalyzer
+    from zmig.analyzers.sysbuild import SysbuildAnalyzer
 
     # The guide analyzer runs last: it links its findings to the ones before it.
     return [
@@ -82,6 +85,8 @@ def _builtin(kind: str) -> list[type[Any]]:
         SbomAnalyzer,
         ImagesAnalyzer,
         CrossImageAnalyzer,
+        SysbuildAnalyzer,
+        LayoutAnalyzer,
         GuideAnalyzer,
     ]
 
@@ -112,20 +117,22 @@ def select(kind: Literal["build", "workspace"], names: Iterable[str] | None) -> 
 
 def run_build_analyzers(
     classes: list[type[Any]], base: ScanContext
-) -> tuple[list[Finding], list[AnalyzerStatus]]:
+) -> tuple[list[Finding], list[AnalyzerStatus], list[NotChecked]]:
     """Run analyzers in order. Per-image analyzers (the default; a class can set
     `per_image = False`) run once for every image both builds have, and their findings
     carry that image unless it is the app. Missing artifacts and errors become a reported
     status. `related` links are made symmetric at the end."""
+    from zmig.buildctx import pair_images
     from zmig.scan import ScanContext as _Ctx
 
-    names = [i.name for i in base.old.images if base.new.image(i.name) is not None]
-    multi = len(names) > 1
+    pairs = pair_images(base.old, base.new)
+    multi = len(pairs) > 1
     findings: list[Finding] = []
     statuses: list[AnalyzerStatus] = []
+    not_checked: list[NotChecked] = []
     for cls in classes:
         per_image = getattr(cls, "per_image", True)
-        ctxs = [c for n in names if (c := _Ctx.for_image(base, n))] if per_image else [base]
+        ctxs = [_Ctx.for_pair(base, o, n) for o, n in pairs] if per_image else [base]
         for ctx in ctxs:
             label = f"{cls.name}@{ctx.image}" if per_image and multi else cls.name
             missing = [
@@ -148,8 +155,10 @@ def run_build_analyzers(
                 continue
             tag = None if (not per_image or ctx.is_app) else ctx.image
             findings += [replace(f, image=tag) if tag else f for f in res.findings]
+            not_checked += res.not_checked
             statuses.append(AnalyzerStatus(label, res.status, res.reason))
-    return link_related(findings), statuses
+            ctx.shared.setdefault("findings", []).extend(res.findings)
+    return link_related(findings), statuses, not_checked
 
 
 def link_related(findings: list[Finding]) -> list[Finding]:

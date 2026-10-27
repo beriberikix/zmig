@@ -13,7 +13,7 @@ from pathlib import Path
 
 from zmig import __version__, analyzers
 from zmig.boards import alias_tables, map_board
-from zmig.buildctx import BuildMode, BuildSpec, build, build_with_salvage, hash_tree
+from zmig.buildctx import BuildMode, BuildSpec, build, build_with_salvage, hash_tree, sdk_identity
 from zmig.cache import Cache, default_cache_root
 from zmig.errors import ZmigError
 from zmig.findings import Category, Confidence, Finding, Report, Severity, plural
@@ -124,6 +124,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=_csv,
         default=None,
         help="comma-separated analyzers to run, or 'none' (default: all)",
+    )
+    scan.add_argument(
+        "--sdk",
+        type=Path,
+        default=None,
+        help="Zephyr SDK to build with (sets ZEPHYR_SDK_INSTALL_DIR; the build fails if any "
+        "image uses another SDK)",
     )
     scan.add_argument(
         "--all-guide-entries",
@@ -237,6 +244,7 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
             mode=mode,
             sysbuild=args.sysbuild,
             cmake_args=tuple(args.cmake_args),
+            sdk=args.sdk.expanduser().resolve() if args.sdk else None,
         )
 
     log.warning("building %s for %s at %s (%s)...", app, args.board, args.from_ref, mode)
@@ -271,7 +279,10 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
             "build_mode": mode,
             "sysbuild": args.sysbuild,
         },
-        environment=_environment(runner),
+        environment={
+            **_environment(runner),
+            **({"sdk": sdk_identity(args.sdk.expanduser())} if args.sdk else {}),
+        },
         contexts=contexts,
     )
     ctx = ScanContext(
@@ -286,7 +297,9 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         board_mapping=mapping,
         all_guide_entries=args.all_guide_entries,
     )
-    report.findings, report.analyzers = analyzers.run_build_analyzers(selected, ctx)
+    report.findings, report.analyzers, report.not_checked = analyzers.run_build_analyzers(
+        selected, ctx
+    )
     _emit(report, runner, args)
     return EXIT_OK
 

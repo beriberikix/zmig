@@ -3,34 +3,87 @@
   "$id": "https://zmig.dev/schema/report/1",
   "title": "zmig report",
   "type": "object",
-  "required": ["schema", "schema_version", "zmig_version", "command", "inputs",
-               "environment", "contexts", "analyzers", "summary", "findings"],
+  "required": [
+    "schema",
+    "schema_version",
+    "zmig_version",
+    "command",
+    "inputs",
+    "environment",
+    "contexts",
+    "analyzers",
+    "summary",
+    "findings"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schema": {"const": "https://zmig.dev/schema/report/1"},
-    "schema_version": {"type": "string", "pattern": "^1\\.[0-9]+$"},
-    "zmig_version": {"type": "string"},
-    "command": {"enum": ["plan", "scan", "verify"]},
+    "schema": {
+      "const": "https://zmig.dev/schema/report/1"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$"
+    },
+    "zmig_version": {
+      "type": "string"
+    },
+    "command": {
+      "enum": [
+        "plan",
+        "scan",
+        "verify"
+      ]
+    },
     "inputs": {
       "type": "object",
-      "required": ["from", "to"],
+      "required": [
+        "from",
+        "to"
+      ],
       "properties": {
-        "from": {"$ref": "#/$defs/ref"},
-        "to": {"$ref": "#/$defs/ref"}
+        "from": {
+          "$ref": "#/$defs/ref"
+        },
+        "to": {
+          "$ref": "#/$defs/ref"
+        }
       }
     },
     "environment": {
       "type": "object",
-      "additionalProperties": {"type": ["string", "null"]}
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null",
+          "object"
+        ]
+      }
     },
     "contexts": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["ref", "board", "mode", "status", "key"],
+        "required": [
+          "ref",
+          "board",
+          "mode",
+          "status",
+          "key"
+        ],
         "properties": {
-          "status": {"enum": ["ok", "configure-failed", "build-failed"]},
-          "mode": {"enum": ["full", "fast"]}
+          "status": {
+            "enum": [
+              "ok",
+              "configure-failed",
+              "build-failed"
+            ]
+          },
+          "mode": {
+            "enum": [
+              "full",
+              "fast"
+            ]
+          }
         }
       }
     },
@@ -38,95 +91,475 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "status"],
+        "required": [
+          "name",
+          "status"
+        ],
         "additionalProperties": false,
         "properties": {
-          "name": {"type": "string"},
-          "status": {"enum": ["ok", "skipped", "error"]},
-          "reason": {"type": "string"}
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "skipped",
+              "error"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
         }
       }
     },
     "summary": {
       "type": "object",
-      "required": ["counts", "top"],
+      "required": [
+        "counts",
+        "top"
+      ],
       "properties": {
         "counts": {
           "type": "object",
-          "required": ["breaking", "risky", "info"],
-          "additionalProperties": {"type": "integer", "minimum": 0}
+          "required": [
+            "breaking",
+            "risky",
+            "info"
+          ],
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
         },
-        "top": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/id"}}
+        "top": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        }
       }
     },
-    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}}
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "upgrade_path": {
+      "type": "object",
+      "required": [
+        "verdict",
+        "confidence",
+        "categories",
+        "assumptions"
+      ],
+      "properties": {
+        "verdict": {
+          "enum": [
+            "direct-ok",
+            "needs-changes",
+            "blocked",
+            "unknown"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "categories": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "clean",
+                  "hazard",
+                  "unknown",
+                  "not-applicable"
+                ]
+              }
+            }
+          }
+        },
+        "remedies": {
+          "type": "object"
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "basis": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "not_checked": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "area",
+          "reason",
+          "analyzer"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "analyzer": {
+            "type": "string"
+          }
+        }
+      }
+    }
   },
   "$defs": {
-    "id": {"type": "string", "pattern": "^[A-Z]+-[A-Z0-9-]+-[0-9a-f]{8}$"},
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]+-[A-Z0-9-]+-[0-9a-f]{8}$"
+    },
     "ref": {
       "type": "object",
-      "required": ["spec", "sha", "kind", "dirty"],
+      "required": [
+        "spec",
+        "sha",
+        "kind",
+        "dirty"
+      ],
       "properties": {
-        "spec": {"type": "string"},
-        "sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-        "kind": {"enum": ["tag", "branch", "sha", "path"]},
-        "url": {"type": "string"},
-        "dirty": {"type": "boolean"}
+        "spec": {
+          "type": "string"
+        },
+        "sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "kind": {
+          "enum": [
+            "tag",
+            "branch",
+            "sha",
+            "path"
+          ]
+        },
+        "url": {
+          "type": "string"
+        },
+        "dirty": {
+          "type": "boolean"
+        }
       }
     },
     "finding": {
       "type": "object",
-      "required": ["id", "category", "kind", "subject", "title", "severity", "confidence",
-                   "old", "new", "evidence", "action", "related", "analyzer", "heuristics"],
+      "required": [
+        "id",
+        "category",
+        "kind",
+        "subject",
+        "title",
+        "severity",
+        "confidence",
+        "old",
+        "new",
+        "evidence",
+        "action",
+        "related",
+        "analyzer",
+        "heuristics"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "category": {"enum": ["manifest", "fork", "hop", "board", "kconfig", "devicetree",
-                              "build", "guide", "sbom", "images", "crossimage"]},
-        "kind": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-        "subject": {"type": "string"},
-        "title": {"type": "string"},
-        "severity": {"enum": ["breaking", "risky", "info"]},
-        "confidence": {"enum": ["high", "medium", "low"]},
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "category": {
+          "enum": [
+            "manifest",
+            "fork",
+            "hop",
+            "board",
+            "kconfig",
+            "devicetree",
+            "build",
+            "guide",
+            "sbom",
+            "images",
+            "crossimage",
+            "sysbuild",
+            "layout",
+            "mcuboot",
+            "storage",
+            "ble",
+            "wire"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "breaking",
+            "risky",
+            "info"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
         "old": {},
         "new": {},
-        "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
-        "action": {"type": "string"},
-        "related": {"type": "array", "items": {"type": "string"}},
-        "analyzer": {"type": "string"},
-        "heuristics": {"type": "array", "items": {"type": "string"}},
-        "image": {"type": "string", "description": "sysbuild image (since 1.1); absent = the app image"}
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "action": {
+          "type": "string"
+        },
+        "related": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "analyzer": {
+          "type": "string"
+        },
+        "heuristics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "image": {
+          "type": "string",
+          "description": "sysbuild image (since 1.1); absent = the app image"
+        },
+        "introduced_by_migration": {
+          "type": "boolean",
+          "description": "since 1.2"
+        },
+        "remedy": {
+          "enum": [
+            "config-pin",
+            "app-change",
+            "intermediate-hop",
+            "bootloader-update",
+            "reflash",
+            "unknown"
+          ]
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "evidence_source": {
+              "type": "string"
+            },
+            "role_source": {
+              "type": "string"
+            },
+            "role_evidence": {
+              "enum": [
+                "strong",
+                "weak",
+                "unknown"
+              ]
+            }
+          }
+        }
       }
     },
     "evidence": {
       "oneOf": [
-        {"type": "object", "required": ["type", "path", "line"], "additionalProperties": false,
-         "properties": {"type": {"const": "file_line"}, "path": {"type": "string"},
-                        "line": {"type": "integer", "minimum": 1}, "text": {"type": "string"}}},
-        {"type": "object", "required": ["type", "artifact", "old_ref", "new_ref", "old", "new"],
-         "additionalProperties": false,
-         "properties": {"type": {"const": "artifact_diff"}, "artifact": {"type": "string"},
-                        "old_ref": {"type": "string"}, "new_ref": {"type": "string"},
-                        "old": {}, "new": {}}},
-        {"type": "object", "required": ["type", "repo", "sha", "subject"],
-         "additionalProperties": false,
-         "properties": {"type": {"const": "git_commit"}, "repo": {"type": "string"},
-                        "sha": {"type": "string"}, "subject": {"type": "string"},
-                        "patch_id": {"type": "string"}}},
-        {"type": "object", "required": ["type", "repo", "sha", "files"],
-         "additionalProperties": false,
-         "properties": {"type": {"const": "git_conflict"}, "repo": {"type": "string"},
-                        "sha": {"type": "string"},
-                        "files": {"type": "array", "items": {"type": "string"}}}},
-        {"type": "object", "required": ["type", "doc", "line", "ref", "entry_id"],
-         "additionalProperties": false,
-         "properties": {"type": {"const": "doc_entry"}, "doc": {"type": "string"},
-                        "line": {"type": "integer", "minimum": 1}, "ref": {"type": "string"},
-                        "entry_id": {"type": "string"}, "text": {"type": "string"}}},
-        {"type": "object", "required": ["type", "invocation", "excerpt"],
-         "additionalProperties": false,
-         "properties": {"type": {"const": "tool_output"}, "invocation": {"type": "string"},
-                        "excerpt": {"type": "string"}}}
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "path",
+            "line"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "file_line"
+            },
+            "path": {
+              "type": "string"
+            },
+            "line": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "artifact",
+            "old_ref",
+            "new_ref",
+            "old",
+            "new"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "artifact_diff"
+            },
+            "artifact": {
+              "type": "string"
+            },
+            "old_ref": {
+              "type": "string"
+            },
+            "new_ref": {
+              "type": "string"
+            },
+            "old": {},
+            "new": {}
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "repo",
+            "sha",
+            "subject"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "git_commit"
+            },
+            "repo": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            },
+            "patch_id": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "repo",
+            "sha",
+            "files"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "git_conflict"
+            },
+            "repo": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "doc",
+            "line",
+            "ref",
+            "entry_id"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "doc_entry"
+            },
+            "doc": {
+              "type": "string"
+            },
+            "line": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "ref": {
+              "type": "string"
+            },
+            "entry_id": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "invocation",
+            "excerpt"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "tool_output"
+            },
+            "invocation": {
+              "type": "string"
+            },
+            "excerpt": {
+              "type": "string"
+            }
+          }
+        }
       ]
     }
   }

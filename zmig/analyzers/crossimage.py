@@ -19,6 +19,7 @@ from typing import Any, ClassVar, Literal
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact, BuildContext, ImageContext
 from zmig.findings import JSON, Category, Confidence, Finding, Severity, artifact_diff, file_line
+from zmig.hazards import bootloader_role, provenance
 from zmig.scan import ScanContext
 from zmig.snapshots import ConfigValues, config_values, edt, parse_dotconfig
 from zmig.sysbuild_rules import IMAGE_FILES, Pair, pairs, parse
@@ -64,15 +65,27 @@ class CrossImageAnalyzer:
             return AnalyzerResult()
         findings: list[Finding] = []
         target = self._check(ctx, ctx.new)
-        source = {k for k, *_ in self._check(ctx, ctx.old)} if len(ctx.old.images) > 1 else set()
+        source = (
+            {k: d for k, _, _, _, d in self._check(ctx, ctx.old)} if len(ctx.old.images) > 1 else {}
+        )
         for key, title, action, ev, data in target:
-            existing = key in source
+            # Pre-existing = the source build has the same disagreement, unchanged
+            # (docs/DESIGN-P1.md §2.3); a disagreement that changed counts as introduced.
+            pre_existing = key in source and source[key] == data
             findings.append(
                 Finding(
                     category=Category.CROSSIMAGE,
                     kind=key.split(":")[0],
                     subject=key,
-                    title=title + (" (already so in the source build)" if existing else ""),
+                    title=title
+                    + (
+                        " (pre-existing: the source build has the same disagreement)"
+                        if pre_existing
+                        else " (changed from the source build)"
+                        if key in source
+                        else ""
+                    ),
+                    introduced_by_migration=not pre_existing,
                     # A disagreement between images is a defect even if the source build
                     # already had it; the title says so instead of lowering the severity.
                     severity=Severity.BREAKING,
@@ -83,6 +96,12 @@ class CrossImageAnalyzer:
                     evidence=tuple(ev),
                     new=data,
                     heuristics=("crossimage.sysbuild-pairs",) if key.startswith("pair") else (),
+                    old=source.get(key),
+                    provenance=provenance(
+                        f"final devicetree and .config of every image at {ctx.old_spec} and "
+                        f"{ctx.new_spec}",
+                        bootloader_role(ctx.new),
+                    ),
                 )
             )
         return AnalyzerResult(findings)

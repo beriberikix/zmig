@@ -51,14 +51,10 @@ class ScanContext:
     shared: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def for_image(cls, base: ScanContext, name: str) -> ScanContext | None:
-        """The context for image `name`, if both builds have it."""
-        o, n = base.old.image(name), base.new.image(name)
-        if o is None or n is None:
-            return None
-        return replace(
-            base, old_img=o, new_img=n, new_raw_img=base.new_raw.image(name), prior=base.prior
-        )
+    def for_pair(cls, base: ScanContext, old: ImageContext, new: ImageContext) -> ScanContext:
+        """The context comparing image `old` (source build) with `new` (target build)."""
+        raw = base.new_raw.image(new.name)
+        return replace(base, old_img=old, new_img=new, new_raw_img=raw, prior=base.prior)
 
     @property
     def image(self) -> str:

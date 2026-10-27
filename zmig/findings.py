@@ -13,7 +13,7 @@ from enum import StrEnum
 from typing import Any
 
 SCHEMA_URI = "https://zmig.dev/schema/report/1"
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
 
 
 class Severity(StrEnum):
@@ -40,6 +40,28 @@ class Category(StrEnum):
     SBOM = "sbom"
     IMAGES = "images"
     CROSSIMAGE = "crossimage"
+    # Field-upgrade hazard categories (P1).
+    SYSBUILD = "sysbuild"
+    LAYOUT = "layout"
+    MCUBOOT = "mcuboot"
+    STORAGE = "storage"
+    BLE = "ble"
+    WIRE = "wire"
+
+
+class Remedy(StrEnum):
+    """What resolves a field-upgrade hazard (docs/DESIGN-P1.md §8.1)."""
+
+    CONFIG_PIN = "config-pin"
+    APP_CHANGE = "app-change"
+    INTERMEDIATE_HOP = "intermediate-hop"
+    BOOTLOADER_UPDATE = "bootloader-update"
+    REFLASH = "reflash"
+    UNKNOWN = "unknown"
+
+
+# Remedies an application OTA alone can't carry out (make the verdict "blocked").
+NOT_BY_APP_OTA = frozenset({Remedy.BOOTLOADER_UPDATE, Remedy.REFLASH})
 
 
 _SEV_ORDER = {Severity.BREAKING: 0, Severity.RISKY: 1, Severity.INFO: 2}
@@ -127,6 +149,12 @@ class Finding:
     # Sysbuild image the finding is about; None means the app image (or the build as a
     # whole), which keeps reports of plain builds unchanged.
     image: str | None = None
+    # Schema 1.2. True when the migration caused the problem; False when the source build
+    # already had it, unchanged (docs/DESIGN-P1.md §2.3).
+    introduced_by_migration: bool = True
+    # Hazard findings only: what resolves it, and where the evidence and role came from.
+    remedy: Remedy | None = None
+    provenance: JSON | None = None
 
     @property
     def id(self) -> str:
@@ -157,7 +185,22 @@ class Finding:
             "analyzer": self.analyzer,
             "heuristics": sorted(self.heuristics),
             **({"image": self.image} if self.image else {}),
+            "introduced_by_migration": self.introduced_by_migration,
+            **({"remedy": str(self.remedy)} if self.remedy else {}),
+            **({"provenance": self.provenance} if self.provenance else {}),
         }
+
+
+@dataclass(frozen=True)
+class NotChecked:
+    """Something the analysis could not verify (report section "not checked")."""
+
+    area: str
+    reason: str
+    analyzer: str
+
+    def to_json(self) -> JSON:
+        return {"area": self.area, "reason": self.reason, "analyzer": self.analyzer}
 
 
 @dataclass(frozen=True)
@@ -185,6 +228,8 @@ class Report:
     contexts: list[JSON] = field(default_factory=list)
     analyzers: list[AnalyzerStatus] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
+    not_checked: list[NotChecked] = field(default_factory=list)
+    upgrade_path: JSON | None = None
 
     def sorted_findings(self) -> list[Finding]:
         return sorted(self.findings, key=Finding.sort_key)
@@ -216,4 +261,9 @@ class Report:
             "analyzers": [a.to_json() for a in sorted(self.analyzers, key=lambda a: a.name)],
             "summary": {"counts": self.counts(), "top": [f.id for f in self.top()]},
             "findings": [f.to_json() for f in self.sorted_findings()],
+            **({"upgrade_path": self.upgrade_path} if self.upgrade_path else {}),
+            "not_checked": [
+                n.to_json()
+                for n in sorted(set(self.not_checked), key=lambda n: (n.area, n.analyzer, n.reason))
+            ],
         }

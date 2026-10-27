@@ -12,6 +12,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
+import os
 import re
 import shutil
 import sys
@@ -21,7 +22,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from zmig.cache import Cache
-from zmig.errors import ArtifactMissing
+from zmig.errors import ArtifactMissing, ZmigError
 from zmig.tools import Runner, find_tool
 from zmig.workspace import Module, RefWorkspace, west_argv
 
@@ -75,6 +76,8 @@ class BuildSpec:
     mode: BuildMode = "full"
     sysbuild: bool = False
     cmake_args: tuple[str, ...] = ()
+    # An explicitly selected Zephyr SDK (docs/DESIGN-P1.md §10); None = Zephyr's own search.
+    sdk: Path | None = None
 
 
 ImageRole = Literal["app", "bootloader", "other"]
@@ -158,6 +161,7 @@ class BuildContext:
             "status": self.status,
             "key": self.key,
             "images": [i.to_json() for i in self.images],
+            **({"sdk": sdk_identity(self.spec.sdk)} if self.spec.sdk else {}),
         }
 
 
@@ -200,6 +204,7 @@ def build_key(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> str:
         "mode": spec.mode,
         "sysbuild": spec.sysbuild,
         "cmake_args": list(spec.cmake_args),
+        "sdk": sdk_identity(spec.sdk),
     }
     return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()[:16]
 
@@ -226,6 +231,37 @@ def _copy_app(src: Path, dest: Path) -> None:
 _BANNER = re.compile(r"^\s*\*\s+Running CMake for (?P<image>\S+)\s+\*\s*$", re.M)
 _WRITTEN = re.compile(r"^-- Build files have been written to: (?P<dir>.+)$", re.M)
 SYSBUILD_SEGMENT = "sysbuild"
+
+
+_FOUND_TOOLCHAIN = re.compile(r"^-- Found toolchain: zephyr (?P<ver>\S+) \((?P<path>[^)]+)\)", re.M)
+
+
+def sdk_identity(sdk: Path | None) -> dict[str, str] | None:
+    """Path and version of a selected SDK, for the build key and the report."""
+    if sdk is None:
+        return None
+    version = (sdk / "sdk_version").read_text().strip() if (sdk / "sdk_version").is_file() else "?"
+    return {"path": str(sdk.resolve()), "version": version}
+
+
+def verify_sdk(configure_text: str, sdk: Path) -> None:
+    """Every image must report the selected SDK as its toolchain; fail loudly otherwise
+    (a hinted SDK that fails Zephyr's version check would otherwise be skipped silently)."""
+    want = sdk.resolve()
+    found = [
+        (m["ver"], Path(m["path"]).resolve()) for m in _FOUND_TOOLCHAIN.finditer(configure_text)
+    ]
+    if not found:
+        raise ZmigError(
+            f"could not confirm the toolchain: no 'Found toolchain: zephyr' line in "
+            f"the configure output (selected SDK {want})"
+        )
+    wrong = sorted({f"{v} ({p})" for v, p in found if p != want})
+    if wrong:
+        raise ZmigError(
+            f"the build used a different Zephyr SDK than --sdk {want}: "
+            f"{', '.join(wrong)}. Check that this Zephyr version accepts that SDK."
+        )
 
 
 def discover_images(bdir: Path, spec: BuildSpec) -> list[tuple[str, Path]]:
@@ -320,8 +356,26 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
     # one after configure, followed by a CMake re-run on that image (step 2).
     for d in [bdir] + ([bdir / spec.app.resolve().name] if spec.sysbuild else []):
         _cmake_query(d)
-    env = {"ZEPHYR_BASE": str(ws.zephyr)}
-    if is_host_board(spec.board):
+    # Child images (sysbuild) run their own CMake, and before v4.4 sysbuild doesn't forward
+    # -DPython3_EXECUTABLE to them: CMake's FindPython then picked the system python (found
+    # at v4.0.0, without Zephyr's packages). FindPython prefers $VIRTUAL_ENV, and PATH order
+    # decides the rest, so every image finds zmig's interpreter.
+    env = {
+        "ZEPHYR_BASE": str(ws.zephyr),
+        "VIRTUAL_ENV": sys.prefix,
+        "PATH": f"{Path(sys.executable).parent}:{os.environ.get('PATH', '')}",
+    }
+    unset = ["PYTHONPATH"]
+    sdk_args: list[str] = []
+    if spec.sdk is not None:
+        # ZEPHYR_SDK_INSTALL_DIR is a find_package HINTS path (FindZephyr-sdk.cmake:75-82 at
+        # v4.0-v4.3). CMake searches <Pkg>_ROOT and CMAKE_PREFIX_PATH before HINTS, and the
+        # user package registry after, so those are cleared and the registry disabled.
+        env["ZEPHYR_SDK_INSTALL_DIR"] = str(spec.sdk)
+        env["ZEPHYR_TOOLCHAIN_VARIANT"] = "zephyr"
+        unset += ["Zephyr-sdk_ROOT", "Zephyr-sdk_DIR", "CMAKE_PREFIX_PATH"]
+        sdk_args = ["-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF"]
+    elif is_host_board(spec.board):
         env["ZEPHYR_TOOLCHAIN_VARIANT"] = "host"
     argv: list[str] = [
         *west_argv(),
@@ -342,6 +396,7 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
         # Required by `west spdx` on every version; set on both sides of a comparison,
         # so it never shows up as a difference.
         "-DCONFIG_BUILD_OUTPUT_META=y",
+        *sdk_args,
         *spec.cmake_args,
     ]
     if modules:
@@ -349,9 +404,13 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
         argv.append("-DZEPHYR_MODULES=" + ";".join(str(m.path) for m in modules))
     # PYTHONPATH from the user's shell (e.g. ROS) can shadow the packages Zephyr's
     # scripts import; the build must see only zmig's interpreter environment.
-    run_env = {"env": env, "unset_env": ["PYTHONPATH"], "check": False, "merge_output": True}
+    run_env = {"env": env, "unset_env": unset, "check": False, "merge_output": True}
     conf = runner.run(argv, cwd=ws.root, **run_env)  # type: ignore[arg-type]
     configure_text = f"$ {' '.join(argv)}\n{conf.stdout}"
+    if spec.sdk is not None:
+        # Keep the evidence even when the check fails.
+        log.write_text(configure_text)
+        verify_sdk(configure_text, spec.sdk)
     found = discover_images(bdir, spec)
     segments = split_configure_log(configure_text, found)
     default = _default_image(bdir, spec)
@@ -626,3 +685,23 @@ def _spdx(ws: RefWorkspace, image_dir: Path, env: dict[str, str], runner: Runner
     (image_dir / "zmig-spdx.log").write_text(
         f"$ {' '.join(argv)}\nexit {proc.returncode}\n{proc.stdout}"
     )
+
+
+def pair_images(old: BuildContext, new: BuildContext) -> list[tuple[ImageContext, ImageContext]]:
+    """Images to compare across refs: the app with the app and the bootloader with the
+    bootloader (a renamed bootloader is still the bootloader), then the rest by name."""
+    pairs: list[tuple[ImageContext, ImageContext]] = []
+    used_o: set[str] = set()
+    used_n: set[str] = set()
+    for role in ("app", "bootloader"):
+        o = [i for i in old.images if i.role == role]
+        n = [i for i in new.images if i.role == role]
+        if len(o) == 1 and len(n) == 1:
+            pairs.append((o[0], n[0]))
+            used_o.add(o[0].name)
+            used_n.add(n[0].name)
+    for i in old.images:
+        if i.name not in used_o and (j := new.image(i.name)) and j.name not in used_n:
+            pairs.append((i, j))
+    order = {i.name: k for k, i in enumerate(old.images)}
+    return sorted(pairs, key=lambda p: order.get(p[0].name, len(order)))

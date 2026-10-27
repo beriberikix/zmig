@@ -11,6 +11,10 @@ import sys
 sys.path.insert(0, sys.argv[1])
 import kconfiglib
 
+# kconfiglib's expr_str recurses once per operand; some trees have long `||` chains
+# (nrf52840dk's app Kconfig at v4.3.0 overflows the default limit of 1000).
+sys.setrecursionlimit(100_000)
+
 srctree = os.environ.get("srctree", "")  # noqa: SIM112 (Zephyr's own name)
 
 
@@ -20,6 +24,16 @@ def rel(path):
 
 # Tuple shapes differ across kconfiglib versions (defaults/selects gained a third
 # element after v3.7), so entries are indexed rather than unpacked.
+
+
+def choice_id(sym):
+    c = sym.choice
+    if c is None:
+        return None
+    if c.name:
+        return c.name
+    prompts = [n.prompt[0] for n in c.nodes if n.prompt]
+    return prompts[0] if prompts else "<choice>"
 
 
 def deprecated(sym):
@@ -46,6 +60,8 @@ def main():
                 for v, c in ((d[0], d[1]) for d in sym.defaults)
             ],
             "locations": [f"{rel(n.filename)}:{n.linenr}" for n in sym.nodes],
+            # The choice the symbol is a member of (name, or its prompt when unnamed).
+            "choice": choice_id(sym),
         }
     with open(sys.argv[3], "w") as f:
         json.dump({"symbols": out}, f, sort_keys=True)
