@@ -9,6 +9,7 @@ longer applies) is itself something to report.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import re
@@ -25,7 +26,7 @@ from zmig.tools import Runner
 from zmig.workspace import Module, RefWorkspace, west_argv
 
 # Bump when the build recipe changes in a way that invalidates cached builds.
-RECIPE_VERSION = 6
+RECIPE_VERSION = 7
 
 BuildMode = Literal["full", "fast"]
 BuildStatus = Literal["ok", "configure-failed", "build-failed"]
@@ -134,9 +135,38 @@ class BuildContext:
         }
 
 
+@functools.cache
+def python_environment() -> dict[str, str]:
+    """Identity of the Python environment that runs Zephyr's build scripts.
+
+    Part of the build key: a build that failed because a package was missing (MCUboot's
+    imgtool needing `cryptography`, say) must not be served from cache after the
+    package is installed, and two venvs must not share builds.
+    """
+    from importlib.metadata import distributions
+
+    dists = sorted(
+        {
+            f"{d.metadata['Name']}=={d.version}".lower()
+            for d in distributions()
+            if d.metadata["Name"]
+        }
+    )
+    return {
+        "executable": sys.executable,
+        "prefix": sys.prefix,  # the venv; its python often symlinks to a shared binary
+        "version": sys.version.split()[0],
+        "packages": hashlib.sha256("\n".join(dists).encode()).hexdigest()[:16],
+    }
+
+
 def build_key(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> str:
+    from zmig import __version__
+
     material = {
         "recipe": RECIPE_VERSION,
+        "zmig": __version__,
+        "python": python_environment(),
         "ref": ws.resolved.ref.key,
         "modules": [[m.name, m.sha] for m in modules],
         "board": spec.board,
@@ -186,9 +216,12 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
     # Ask CMake for its file-based API reply (codemodel), which `west spdx` reads. This
     # empty query file is what `west spdx --init` creates on every version from v3.6
     # to v4.4, so zmig creates it directly instead of branching per version.
-    query = bdir / ".cmake" / "api" / "v1" / "query" / "codemodel-v2"
-    query.parent.mkdir(parents=True)
-    query.touch()
+    # Under sysbuild each image is its own CMake build; the app image's is <bdir>/<app>.
+    image_dirs = [bdir] + ([bdir / spec.app.resolve().name] if spec.sysbuild else [])
+    for d in image_dirs:
+        query = d / ".cmake" / "api" / "v1" / "query" / "codemodel-v2"
+        query.parent.mkdir(parents=True, exist_ok=True)
+        query.touch()
     env = {"ZEPHYR_BASE": str(ws.zephyr)}
     if is_host_board(spec.board):
         env["ZEPHYR_TOOLCHAIN_VARIANT"] = "host"

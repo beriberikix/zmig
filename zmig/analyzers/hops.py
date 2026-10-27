@@ -8,8 +8,11 @@ which is hand-maintained, so those findings carry the `hops.release-data` heuris
 from __future__ import annotations
 
 import json
+import os
 import re
+from dataclasses import dataclass
 from importlib.resources import files
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
@@ -21,9 +24,70 @@ Minor = tuple[int, int]
 HEURISTIC = "hops.release-data"
 
 
-def release_data() -> dict[str, Any]:
-    data: dict[str, Any] = json.loads(files("zmig").joinpath("data/releases.json").read_text())
+def release_data(override: Path | None = None) -> dict[str, Any]:
+    """The release data file: --release-data, else $ZMIG_RELEASE_DATA, else the bundled
+    one. It holds the contract-breaking boundaries, the step size, and LTS facts used
+    only when Zephyr's own docs don't state them."""
+    path = override or (Path(p) if (p := os.environ.get("ZMIG_RELEASE_DATA")) else None)
+    text = path.read_text() if path else files("zmig").joinpath("data/releases.json").read_text()
+    data: dict[str, Any] = json.loads(text)
+    data["_source"] = str(path) if path else "zmig/data/releases.json"
     return data
+
+
+@dataclass(frozen=True)
+class Lts:
+    label: str  # "LTS3"
+    source: str  # where this was read
+    planned: bool = False
+
+
+_INDEX_RELEASED = re.compile(r"Zephyr (\d+)\.(\d+)\.\d+ \(LTS(\d+)\)")
+_INDEX_PROSE = re.compile(r"\bLTS(\d+) \((\d+)\.(\d+)\.x\)")
+_INDEX_PLANNED = re.compile(r"^\|\s*(\d+)\.(\d+)\s*\|[^|\n]*\|\s*LTS(\d+)", re.M)
+_NOTES_LTS = re.compile(
+    r"\b(?:will be|is)\b(?: the next| an?)?\s+(?::ref:`)?Long Term Support", re.I
+)
+
+
+def derive_lts(
+    mirror: Mirror,
+    target: str,
+    minors: list[Minor],
+    tags: dict[Minor, list[tuple[int, str]]],
+    data: dict[str, Any],
+) -> dict[Minor, Lts]:
+    """LTS releases, from Zephyr's own docs where possible:
+    doc/releases/index.rst at the target ref (released and planned LTS), and each crossed
+    release's own release notes ("... will be the next Long Term Support release").
+    The data file fills gaps and is reported as the source when used."""
+
+    def show(rev: str, path: str) -> str:
+        proc = mirror.runner.run(
+            [mirror.git, "--git-dir", mirror.path, "show", f"{rev}:{path}"], check=False
+        )
+        return proc.stdout if proc.returncode == 0 else ""
+
+    out: dict[Minor, Lts] = {}
+    index = show(target, "doc/releases/index.rst")
+    where = f"doc/releases/index.rst@{target[:12]}"
+    for m in _INDEX_RELEASED.finditer(index):
+        out.setdefault((int(m[1]), int(m[2])), Lts(f"LTS{m[3]}", where))
+    for m in _INDEX_PROSE.finditer(index):
+        out.setdefault((int(m[2]), int(m[3])), Lts(f"LTS{m[1]}", where))
+    for m in _INDEX_PLANNED.finditer(index):
+        out.setdefault((int(m[1]), int(m[2])), Lts(f"LTS{m[3]}", where, planned=True))
+    for minor in minors:
+        if minor in out or minor not in tags:
+            continue
+        tag = tags[minor][0][1]
+        notes = show(tag, f"doc/releases/release-notes-{minor[0]}.{minor[1]}.rst")
+        intro = " ".join(notes.splitlines()[:40])
+        if _NOTES_LTS.search(" ".join(intro.split())):
+            out[minor] = Lts("LTS", f"doc/releases/release-notes-{minor[0]}.{minor[1]}.rst@{tag}")
+    for k, label in data.get("lts", {}).items():
+        out.setdefault(_minor(k), Lts(label, data["_source"]))
+    return out
 
 
 def _minor(s: str) -> Minor:
@@ -81,14 +145,15 @@ class HopsAnalyzer:
     kind: ClassVar[Literal["workspace"]] = "workspace"
 
     def analyze(self, ctx: PlanContext) -> AnalyzerResult:
-        data = release_data()
+        data = release_data(ctx.release_data_path)
         mirror = ctx.old.resolved.mirror
         old_v, _ = ref_version(mirror, ctx.old.resolved.ref.sha)
         # A development snapshot (PATCHLEVEL 99) of X.Y has crossed releases up to X.Y.
         new_v, _ = ref_version(mirror, ctx.new.resolved.ref.sha)
         tags = release_tags(mirror)
         crossed = sorted(m for m in tags if old_v < m <= new_v and any(p == 0 for p, _ in tags[m]))
-        lts = {_minor(k) for k in data["lts"]}
+        lts_info = derive_lts(mirror, ctx.new.resolved.ref.sha, crossed, tags, data)
+        lts = {m for m, info in lts_info.items() if not info.planned}
         boundaries = {_minor(k): v for k, v in data["boundaries"].items()}
         findings: list[Finding] = []
         old_spec, new_spec = ctx.old.resolved.ref.spec, ctx.new.resolved.ref.spec
@@ -119,7 +184,9 @@ class HopsAnalyzer:
             for m in hops:
                 why = []
                 if m in lts:
-                    why.append(f"{data['lts'][_fmt(m)]} long-term support release")
+                    why.append(
+                        f"{lts_info[m].label} long-term support release (per {lts_info[m].source})"
+                    )
                 if m in boundaries:
                     why.append(f"lands the {boundaries[m]['title']} change on its own")
                 if not why:
@@ -138,8 +205,29 @@ class HopsAnalyzer:
                     "passing tests before the next, so every step is a bisectable state.",
                     analyzer=self.name,
                     scope=ctx.scope,
-                    new={"path": path, "reasons": reasons, "crossed": [_fmt(m) for m in crossed]},
-                    heuristics=(HEURISTIC,),
+                    new={
+                        "path": path,
+                        "reasons": reasons,
+                        "crossed": [_fmt(m) for m in crossed],
+                        "release_data": data["_source"],
+                    },
+                    heuristics=tuple(
+                        sorted(
+                            {
+                                HEURISTIC
+                                if lts_info[m].source == data["_source"]
+                                else "hops.lts-from-release-docs"
+                                for m in hops
+                                if m in lts
+                            }
+                            | ({HEURISTIC} if any(m in boundaries for m in hops) else set())
+                            | (
+                                {"hops.step-size"}
+                                if any(m not in lts and m not in boundaries for m in hops)
+                                else set()
+                            )
+                        )
+                    ),
                 )
             )
         return AnalyzerResult(findings)

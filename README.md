@@ -101,6 +101,23 @@ pytest -m network         # plan fixture (clones modules; ~1 minute)
 ruff check zmig tests && mypy
 ```
 
+Fixtures:
+
+- `tests/fixtures/app` (native_sim, v3.6.0 → v3.7.0) and `tests/fixtures/xapp`
+  (qemu_cortex_m0 with sysbuild + MCUboot, cross-compiled, v4.4.0 → v4.5.0-rc3): see
+  each README.
+- The fork workspace for `plan` is generated, not committed. It is built from real
+  v3.6.0..v3.7.0 history with fixed identities and dates, so it is identical on every
+  machine (a test regenerates it and compares):
+
+  ```sh
+  python tests/fixtures/make_fork.py /tmp/fork-ws ~/.cache/zmig/mirrors/github.com_zephyrproject-rtos_zephyr.git
+  zmig plan --from v3.6.0 --to v3.7.0 --workspace /tmp/fork-ws
+  ```
+
+  `expected.json` in the generated workspace lists the classification each commit
+  should get.
+
 If your shell sets `PYTHONPATH` (ROS does), unset it for pytest: `env -u PYTHONPATH pytest`.
 zmig itself unsets it for builds.
 

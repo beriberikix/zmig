@@ -245,6 +245,7 @@ class ForksAnalyzer:
             up_sha, up_subj = c.upstream
             ev.append(git_commit("upstream", up_sha, up_subj))
             new["upstream"] = up_sha
+            new["match"] = c.match
             if c.match == "patch-id":
                 return _finding(
                     scope,
@@ -257,23 +258,47 @@ class ForksAnalyzer:
                     tuple(ev),
                     new,
                 )
+            kept = (
+                f" Kept as is, it conflicts in {_files_note(c.conflict_files)}."
+                if c.conflict_files
+                else " Kept as is, it applies cleanly."
+            )
+            new["match"], new["similarity"], new["signals"] = c.match, c.similarity, c.signals
+            sim = f"{c.similarity:.2f}" if c.similarity is not None else "?"
+            if c.match == "subject" and c.signals == "agree":
+                title = (
+                    f"{label} {short} matches upstream {up_sha[:12]} by subject, and the "
+                    f"changed lines largely agree (similarity {sim})"
+                )
+                conf = Confidence.MEDIUM
+                heur: tuple[str, ...] = ("fork.subject-match", "fork.content-similarity")
+            elif c.match == "subject":
+                title = (
+                    f"{label} {short} has the subject of upstream {up_sha[:12]}, but its "
+                    f"changed lines differ (similarity {sim})"
+                )
+                conf = Confidence.LOW
+                heur = ("fork.subject-match", "fork.content-similarity", "fork.signals-disagree")
+            else:
+                title = (
+                    f"{label} {short} makes nearly the same change as upstream "
+                    f'{up_sha[:12]} "{up_subj}" under a different subject '
+                    f"(similarity {sim})"
+                )
+                conf = Confidence.LOW
+                heur = ("fork.content-similarity", "fork.signals-disagree")
             return _finding(
                 scope,
                 "upstreamed",
                 subject,
-                f"{label} {short} matches an upstream commit by subject only",
+                title,
                 Severity.RISKY,
-                Confidence.MEDIUM,
-                f'Compare with upstream {up_sha[:12]} "{up_subj}"; the content '
-                f"differs, so check nothing local is lost before dropping it."
-                + (
-                    f" Kept as is, it conflicts in {_files_note(c.conflict_files)}."
-                    if c.conflict_files
-                    else " Kept as is, it applies cleanly."
-                ),
+                conf,
+                f'Compare with upstream {up_sha[:12]} "{up_subj}" and drop the local commit '
+                f"only if nothing local is lost." + kept,
                 tuple(ev),
                 new,
-                ("fork.subject-match",),
+                heur,
             )
         if c.state == "conflicts":
             ev.append(git_conflict(label, c.sha, list(c.conflict_files)))

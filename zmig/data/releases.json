@@ -1,12 +1,9 @@
 {
-  "_comment": "Hand-maintained. Zephyr's git history does not mark LTS releases or contract-breaking boundaries, so findings derived from this file carry the 'hops.release-data' heuristic. Sources: docs.zephyrproject.org/latest/releases/index.html (supported releases and the release cadence table), checked 2026-10-27.",
+  "_comment": "Fallback and policy data for `zmig plan` hop suggestions. LTS facts are read from Zephyr's own docs first (doc/releases/index.rst at the target ref, and each release's notes); the 'lts' list here is used only for releases those don't state, and findings say which source was used. 'boundaries' (contract-breaking releases) has no machine-readable source in Zephyr and is maintained here. Override the whole file with --release-data or $ZMIG_RELEASE_DATA.",
   "lts": {
     "1.14": "LTS1",
     "2.7": "LTS2",
     "3.7": "LTS3"
-  },
-  "planned_lts": {
-    "4.6": "LTS4 (planned, April 2027)"
   },
   "boundaries": {
     "3.7": {
@@ -15,5 +12,6 @@
       "evidence": "boards/deprecated.cmake at v3.7.0"
     }
   },
-  "max_minor_gap": 2
+  "max_minor_gap": 2,
+  "checked": "2026-10-27"
 }

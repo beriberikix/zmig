@@ -30,14 +30,30 @@ from zmig.scan import ScanContext
 TOP_FILES = 15
 
 
+def _norm(module: str) -> str:
+    """One spelling for module names: west uses `hal_nordic`, SPDX IDs can't contain '_',
+    and package names vary across Zephyr versions."""
+    return module.replace("_", "-")
+
+
 class SbomAnalyzer:
     name: ClassVar[str] = "sbom"
     kind: ClassVar[Literal["build"]] = "build"
     requires: ClassVar[frozenset[Artifact]] = frozenset({Artifact.SPDX})
 
     def analyze(self, ctx: ScanContext) -> AnalyzerResult:
-        old = compiled_sources(read_spdx_dir(ctx.old.artifact(Artifact.SPDX).parent))
-        new = compiled_sources(read_spdx_dir(ctx.new.artifact(Artifact.SPDX).parent))
+        old = {
+            _norm(k): v
+            for k, v in compiled_sources(
+                read_spdx_dir(ctx.old.artifact(Artifact.SPDX).parent)
+            ).items()
+        }
+        new = {
+            _norm(k): v
+            for k, v in compiled_sources(
+                read_spdx_dir(ctx.new.artifact(Artifact.SPDX).parent)
+            ).items()
+        }
         findings: list[Finding] = []
 
         def add(
@@ -67,8 +83,8 @@ class SbomAnalyzer:
                 )
             )
 
-        old_mods = {m.name.replace("_", "-"): m.sha for m in ctx.old.workspace.modules(ctx.runner)}
-        new_mods = {m.name.replace("_", "-"): m.sha for m in ctx.new.workspace.modules(ctx.runner)}
+        old_mods = {_norm(m.name): m.sha for m in ctx.old.workspace.modules(ctx.runner)}
+        new_mods = {_norm(m.name): m.sha for m in ctx.new.workspace.modules(ctx.runner)}
         for mod in sorted(old.keys() - new.keys() - {"zephyr"}):
             add(
                 "module-dropped",

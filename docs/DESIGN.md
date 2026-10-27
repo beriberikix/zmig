@@ -206,7 +206,10 @@ A build at ref X needs modules at X's manifest revisions. For each ref:
 ### 4.3 Build context (`buildctx.py`)
 
 Each context is keyed by `(ref sha, board, app tree hash, extra conf/overlay
-hashes, mode, sysbuild)`, at `<cache>/builds/<key>/`.
+hashes, mode, sysbuild)`, at `<cache>/builds/<key>/`. The key also covers module SHAs,
+the zmig version, and the Python environment that runs Zephyr's scripts: interpreter path,
+venv prefix, version, and a digest of installed distributions.
+- P0 found why the environment matters: a build that failed for want of a package (MCUboot's imgtool needs `cryptography`) was served from cache after the package was installed.
 
 - **Modes:**
   - `full` (default): configure and build. Produces the ELF, map file, object files (for `nm`-based API usage), and build warnings.
@@ -307,6 +310,10 @@ class BuildAnalyzer(Protocol):              # used by `scan`
 3. Classify each commit, first match wins:
    - **upstreamed**: its `git patch-id --stable` matches a commit in `base..target-upstream`. Confidence high. If only the normalized subject line matches, confidence is medium.
      - A subject-only match is still trial-applied, like a rebase would. The finding then says whether keeping the commit would conflict. Found in M2: a real rebase stops on such a commit when its content differs.
+     - **Content similarity** (P0) is a second signal next to the subject. It is the Jaccard index over the multiset of changed lines, by file and whitespace-normalized text, ignoring context and line numbers.
+       - Subject match with similarity ≥ 0.5: the signals agree, medium confidence.
+       - Subject match below 0.5: the signals disagree, low confidence, `fork.signals-disagree`.
+       - No subject match, but an upstream commit touching the same files has similarity ≥ 0.8: upstreamed by content under a different subject, low confidence, flagged as a disagreement. This catches the same change applied on different context, which patch-id cannot match.
      - The replay is sequential, onto the target plus the previously applied local commits, so it mirrors `git rebase --onto <target>`. The M2 tests compare it against a real rebase.
    - **applies-cleanly**: `git merge-tree --write-tree --merge-base=<c>^ <target> <c>` produces no conflicts. This emulates a cherry-pick with **no worktree at all** (git ≥ 2.38; this machine has 2.53).
    - **conflicts**: the same command, but it reports conflicted paths. We list those files.
@@ -324,6 +331,12 @@ class BuildAnalyzer(Protocol):              # used by `scan`
 - Count the releases between the two refs using tags and `VERSION`.
 - If the gap spans more than N minor releases (default 2), or crosses a flagged boundary, suggest hops. Prefer a hop at an LTS release.
 - **LTS knowledge is a small data file in zmig**, `zmig/data/releases.json`: 1.14, 2.7, and 3.7, with 4.6 planned. It was sourced from the Zephyr releases page on 2026-10-27. Zephyr git doesn't mark LTS, so this is a maintained list, and findings that use it carry the `hops.release-data` heuristic.
+- **LTS facts come from Zephyr's own docs first** (P0):
+  - `doc/releases/index.rst` at the target ref: released "X.Y.Z (LTSn)", the older prose form "LTSn (X.Y.x)", and planned rows of the cadence table;
+  - then each crossed release's own notes ("… will be the next Long Term Support (LTS) release").
+  - The data file is only a fallback. It is dated (`checked`), and `--release-data` or `$ZMIG_RELEASE_DATA` overrides it.
+  - Findings cite the source of every LTS fact, with heuristic `hops.lts-from-release-docs` or `hops.release-data`.
+  - Boundaries and the step size stay in the data file: Zephyr has no machine-readable source for them.
 - **Hop path:** stop at every LTS or boundary release crossed, then add filler stops so no step crosses more than `max_minor_gap` (2) minors. Each stop is the latest patch release of that minor. The suggested path is `risky` (one jump across more minors than the gap is the risk); each boundary crossed is `info`.
 - **Flagged boundaries** are also a data file, e.g. "3.7: Hardware Model v2". Any guide section that changes the board or toolchain contract can add one.
 
@@ -368,6 +381,7 @@ class BuildAnalyzer(Protocol):              # used by `scan`
 - Target configure and compile failures, quoting the real errors.
 - **New warnings** (compiler, Kconfig, CMake) at the target that the source build didn't have. Identity is the source, the path relative to `<zephyr>`/`<app>`/`<build>`, and the message; line numbers are ignored. Risky when the warning is in app code or is a deprecation; info otherwise. Resolved warnings are listed too.
 - **ROM/RAM** from the ELFs by section flags (pyelftools), matching binutils `size` exactly on the fixture. Per-symbol deltas come from the ELF symbol table. The finding is risky above +1 KiB and +5%.
+- For boards that run on the host (`CONFIG_ARCH_POSIX=y` in the build, so not decided by board name), the footprint is marked `host_runtime_inflated`, with `[host-runtime-inflated]` in the title, heuristic `build.host-runtime-inflated`, and medium confidence. Deltas are comparable; absolute numbers include host runtime.
 
 **sbom** (implemented in M5)
 

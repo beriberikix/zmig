@@ -23,7 +23,13 @@ from zmig.plan import PlanContext
 from zmig.refs import ResolvedRef, resolve_ref
 from zmig.report import render
 from zmig.scan import ScanContext
-from zmig.tools import Runner, check_zephyr_python, find_tool, tool_version
+from zmig.tools import (
+    Runner,
+    check_mcuboot_python,
+    check_zephyr_python,
+    find_tool,
+    tool_version,
+)
 from zmig.usage import scan as usage_scan
 from zmig.workspace import materialize
 
@@ -76,6 +82,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="NAME=URL",
         help="upstream URL for a project, overriding upstream Zephyr's manifest",
+    )
+    plan.add_argument(
+        "--release-data",
+        type=Path,
+        default=None,
+        help="release data JSON (boundaries, step size, fallback LTS list); default: "
+        "$ZMIG_RELEASE_DATA or the bundled file",
     )
     plan.add_argument(
         "--analyzers",
@@ -183,6 +196,8 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     for tool in ("git", "cmake", "ninja", "dtc"):
         find_tool(tool)
     check_zephyr_python()
+    if "mcuboot" in args.modules:
+        check_mcuboot_python()
     app: Path = args.app
     if not (app / "CMakeLists.txt").is_file():
         raise ZmigError(f"{app} is not a Zephyr application (no CMakeLists.txt)")
@@ -341,6 +356,7 @@ def cmd_plan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         new_manifest=load_manifest(new_ws.root),
         user=user,
         upstream_overrides=overrides,
+        release_data_path=args.release_data,
     )
     report = Report(
         command="plan",

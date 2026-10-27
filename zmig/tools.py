@@ -61,6 +61,26 @@ def find_tool(name: str, explicit: str | None = None) -> Path:
     raise ToolMissing(f"{name} not found; {hint}")
 
 
+# MCUboot's imgtool, run by sysbuild when an image includes MCUboot.
+MCUBOOT_PY_MODULES: dict[str, str] = {
+    "cryptography": "cryptography",
+    "intelhex": "intelhex",
+    "click": "click",
+    "cbor2": "cbor2",
+}
+
+
+def check_mcuboot_python() -> None:
+    missing = [
+        pkg for mod, pkg in MCUBOOT_PY_MODULES.items() if importlib.util.find_spec(mod) is None
+    ]
+    if missing:
+        raise ToolMissing(
+            f"MCUboot's imgtool needs Python packages missing from {sys.executable}: "
+            f"{', '.join(missing)}. Install them with `pip install 'zmig[mcuboot]'`."
+        )
+
+
 def check_zephyr_python() -> None:
     """Fail clearly if zmig's interpreter can't run Zephyr's build scripts."""
     missing = [

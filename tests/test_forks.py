@@ -186,3 +186,59 @@ def test_guess_version_tag(tmp_path: Path) -> None:
     )
     g = guess_version_tag(tmp_path)
     assert g.tag is None and "development snapshot" in g.reason
+
+
+def test_subject_and_content_signals(tmp_path: Path, cache: Cache, runner: Runner) -> None:
+    """Content similarity corroborates or contradicts a subject match, and finds the same
+    change under a different subject when patch-id can't (different context)."""
+    up = tmp_path / "up2"
+    up.mkdir()
+    git(up, "init", "-q", "-b", "main")
+    write(up, "f.txt", "len = 1\nkeep\n")
+    write(up, "h.txt", "ctx1\nctx2\ntimeout = 10\nctx3\nctx4\n")
+    write(up, "k.txt", "a\nb\nc\nd\n")
+    commit(up, "initial")
+    git(up, "tag", "v1")
+    u_agree = commit_after(up, "k.txt", "a\nB\nC\nd\n", "lib: fix the k table values")
+    u_dis = commit_after(up, "f.txt", "len = 2\nkeep\n", "net: fix the buffer length")
+    u_content = commit_after(
+        up,
+        "h.txt",
+        "ctx1\nctx2\ntimeout = 20\nctx3\nctx4\n",
+        "drivers: handle the timeout properly",
+    )
+    git(up, "tag", "v2")
+
+    fork = tmp_path / "fork2"
+    git(tmp_path, "clone", "-q", str(up), str(fork))
+    git(fork, "checkout", "-q", "-b", "product", "v1")
+    # Same subject, 2 of 3 changed lines in common: the signals agree.
+    agree = commit_after(fork, "k.txt", "a\nB\nC\nD\n", "lib: fix the k table values")
+    # Same subject, unrelated content: the signals disagree.
+    dis = commit_after(fork, "g.txt", "something else entirely\n", "net: fix the buffer length")
+    # Change the context first, then make upstream's exact +/- change under another
+    # subject: patch-id differs (context is hashed), content is identical.
+    commit_after(fork, "h.txt", "ctx1\nctx2-local\ntimeout = 10\nctx3\nctx4\n", "local: tweak")
+    content = commit_after(
+        fork, "h.txt", "ctx1\nctx2-local\ntimeout = 20\nctx3\nctx4\n", "my driver: bump the timeout"
+    )
+
+    m = Mirror(up.as_uri(), cache, runner)
+    m.ensure()
+    res = classify(m, m.fetch_path(fork), m.resolve("v1")[0], m.resolve("v2")[0])
+    by = {r.sha: r for r in res.commits}
+    a, d, c = by[agree], by[dis], by[content]
+    assert (a.match, a.signals, a.upstream and a.upstream[0]) == ("subject", "agree", u_agree)
+    assert a.similarity is not None and 0.5 <= a.similarity < 1
+    assert (d.match, d.signals, d.similarity) == ("subject", "disagree", 0.0)
+    assert d.upstream is not None and d.upstream[0] == u_dis
+    assert (c.state, c.match, c.signals, c.similarity) == ("upstreamed", "content", "disagree", 1.0)
+    assert c.upstream is not None and c.upstream[0] == u_content
+    up_pid = subprocess.run(
+        ["git", "-C", str(up), "patch-id", "--stable"],
+        input=git(up, "show", u_content) + "\n",
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()[0]
+    assert c.patch_id and c.patch_id != up_pid  # patch-id alone would have missed it

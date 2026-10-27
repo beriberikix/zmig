@@ -28,6 +28,16 @@ zephyr = [
     "reuse>=6.0.0",
 ]
 
+# MCUboot's imgtool (bootloader/mcuboot/scripts/requirements.txt), for sysbuild builds
+# that include MCUboot.
+mcuboot = [
+    "cryptography>=40.0.0",
+    "intelhex",
+    "click",
+    "cbor2",
+    "pyyaml",
+]
+
 [project.scripts]
 zmig = "zmig.cli:main"
 
@@ -69,5 +79,6 @@ testpaths = ["tests"]
 markers = [
     "build: runs real Zephyr builds (slow, needs the zephyr mirror and host gcc)",
     "network: needs network access to clone or fetch",
+    "sdk: needs the Zephyr SDK (>= 1.0, arm-zephyr-eabi) for cross builds",
 ]
-addopts = "-m 'not build and not network'"
+addopts = "-m 'not build and not network and not sdk'"

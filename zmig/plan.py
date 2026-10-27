@@ -29,6 +29,7 @@ class PlanContext:
     new_manifest: dict[str, ProjectInfo]
     user: UserWorkspace | None
     upstream_overrides: dict[str, str] = field(default_factory=dict)
+    release_data_path: Path | None = None
     _mirrors: dict[str, Mirror] = field(default_factory=dict)
 
     @property

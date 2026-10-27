@@ -28,12 +28,15 @@ _UNDEF = re.compile(
     r"'(?P<value>[^']*)' to the undefined symbol (?P<sym>\w+)",
     re.M,
 )
+# Kconfig wraps this warning at ~100 columns in some logs (sysbuild child images), so
+# every space in the fixed wording may be a newline.
 _NOT_TAKEN = re.compile(
-    r"warning: (?:CONFIG_)?(?P<sym>\w+) \(defined at [^)]*\) was assigned the value "
-    r"'(?P<value>[^']*)' but got the value '(?P<got>[^']*)'\.(?P<rest>.*?)(?:\n\n|\Z)",
+    r"warning:\s+(?:CONFIG_)?(?P<sym>\w+)\s+\(defined\s+at\s+[^)]*\)\s+was\s+assigned\s+"
+    r"the\s+value\s+'(?P<value>[^']*)'\s+but\s+got\s+the\s+value\s+'(?P<got>[^']*)'\."
+    r"(?P<rest>.*?)(?:\n\n|\Z)",
     re.S,
 )
-_DEPS = re.compile(r"Check these unsatisfied dependencies: (?P<deps>.*?)\. ", re.S)
+_DEPS = re.compile(r"Check\s+these\s+unsatisfied\s+dependencies:\s+(?P<deps>.*?)\.\s", re.S)
 _PROMPTLESS = re.compile(
     r"error: (?:CONFIG_)?(?P<sym>\w+) \(defined at [^)]*\) is assigned in a configuration "
     r"file, but is not directly user-configurable",

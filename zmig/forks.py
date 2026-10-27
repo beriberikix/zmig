@@ -6,9 +6,12 @@ application uses `git merge-tree --write-tree` (git >= 2.38), which merges in
 memory and writes only into the mirror's object store.
 
 Classification of each local, non-merge commit, first match wins:
-  upstreamed  same `git patch-id --stable` as a commit in merge-base..target (high),
-              or same normalized subject line (medium); subject-only matches are still
-              trial-applied, and record conflict_files if keeping them would conflict
+  upstreamed  same `git patch-id --stable` as a commit in merge-base..target (high);
+              else same normalized subject line, corroborated or contradicted by a
+              content-similarity check of the changed lines (signals agree: medium;
+              disagree: low); else nearly the same changed lines as an upstream commit
+              under a different subject (low). These are still trial-applied, and record
+              conflict_files if keeping them would conflict
   applies     merges cleanly onto target plus the previously applied local commits
   conflicts   merge-tree reports conflicted paths
 Independently, `overlap` lists files the commit touches that upstream also changed.
@@ -20,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -59,12 +63,16 @@ class CommitResult:
     files: tuple[str, ...]
     patch_id: str
     state: CommitState
-    match: Literal["patch-id", "subject"] | None = None
+    match: Literal["patch-id", "subject", "content"] | None = None
     upstream: tuple[str, str] | None = None  # (sha, subject) when upstreamed
     conflict_files: tuple[str, ...] = ()
     overlap: tuple[str, ...] = ()
     overlap_commits: tuple[tuple[str, str], ...] = ()
     unpushed: bool = False
+    # Content similarity (0..1) to the upstream commit named in `upstream`, for matches
+    # that aren't patch-id identical; and whether subject and content agree.
+    similarity: float | None = None
+    signals: Literal["agree", "disagree"] | None = None
 
 
 @dataclass(frozen=True)
@@ -180,14 +188,34 @@ def classify(
         tree, conflicted = _trial_apply(git, cur, c)
         if tree is not None:
             cur = _commit_tree(git, tree, cur, c)
+        mine = changed_lines(git, c)
         if (norm := normalize_subject(subject)) in subjects:
+            by_subject = subjects[norm]
+            sim = similarity(mine, changed_lines(git, by_subject[0]))
             results.append(
                 replace(
                     res,
                     state="upstreamed",
                     match="subject",
-                    upstream=subjects[norm],
+                    upstream=by_subject,
                     conflict_files=conflicted,
+                    similarity=round(sim, 2),
+                    signals="agree" if sim >= SUBJECT_CONTENT_AGREE else "disagree",
+                )
+            )
+            continue
+        best = _most_similar(git, mine, mb, target, files)
+        if best is not None and best[2] >= CONTENT_MATCH:
+            sha, subj, sim = best
+            results.append(
+                replace(
+                    res,
+                    state="upstreamed",
+                    match="content",
+                    upstream=(sha, subj),
+                    conflict_files=conflicted,
+                    similarity=round(sim, 2),
+                    signals="disagree",
                 )
             )
         elif tree is not None:
@@ -195,6 +223,64 @@ def classify(
         else:
             results.append(replace(res, state="conflicts", conflict_files=conflicted))
     return ForkResult(head, base, target, mb, tuple(results), merges)
+
+
+# A subject match is corroborated when at least half of the changed lines agree; a
+# different-subject commit counts as the same change only when nearly all of them do.
+SUBJECT_CONTENT_AGREE = 0.5
+CONTENT_MATCH = 0.8
+MAX_CONTENT_CANDIDATES = 200
+
+ChangedLines = Counter[tuple[str, str, str]]
+
+
+def changed_lines(git: _Git, sha: str) -> ChangedLines:
+    """Multiset of (+/-, file, whitespace-normalized text) of a commit's changed lines.
+    Context lines and line numbers are ignored, so the same change applied to slightly
+    different surroundings still compares equal (unlike patch-id)."""
+    out: ChangedLines = Counter()
+    path = ""
+    for line in git.out("show", "--format=", "--no-color", "--no-renames", "-U0", sha).splitlines():
+        if line.startswith("--- "):
+            path = line[6:] if line.startswith("--- a/") else ""
+        elif line.startswith("+++ "):
+            path = line[6:] if line.startswith("+++ b/") else path
+        elif line.startswith(("diff ", "index ", "@@", "new file", "deleted file", "similarity")):
+            continue
+        elif line[:1] in ("+", "-") and path:
+            out[(line[0], path, " ".join(line[1:].split()))] += 1
+    return out
+
+
+def similarity(a: ChangedLines, b: ChangedLines) -> float:
+    """Jaccard index of two multisets of changed lines."""
+    union = sum((a | b).values())
+    return sum((a & b).values()) / union if union else 0.0
+
+
+def _most_similar(
+    git: _Git, mine: ChangedLines, mb: str, target: str, files: tuple[str, ...]
+) -> tuple[str, str, float] | None:
+    """The upstream commit in mb..target, touching the same files, whose changed lines are
+    most similar to `mine`."""
+    if not files or not mine:
+        return None
+    best: tuple[str, str, float] | None = None
+    log = git.out(
+        "log",
+        "--no-merges",
+        "--format=%H%x00%s",
+        f"-{MAX_CONTENT_CANDIDATES}",
+        f"{mb}..{target}",
+        "--",
+        *files,
+    )
+    for line in log.splitlines():
+        sha, subj = line.split("\0", 1)
+        sim = similarity(mine, changed_lines(git, sha))
+        if best is None or sim > best[2]:
+            best = (sha, subj, sim)
+    return best
 
 
 def _trial_apply(git: _Git, onto: str, c: str) -> tuple[str | None, tuple[str, ...]]:

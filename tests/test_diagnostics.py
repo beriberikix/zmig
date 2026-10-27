@@ -77,3 +77,24 @@ def test_deprecated_boards(tmp_path: Path) -> None:
         "nrf52dk_nrf52832": "nrf52dk/nrf52832",
     }
     assert deprecated_boards(tmp_path / "nope") == {}
+
+
+# Verbatim from the MCUboot image of a v4.4.0 sysbuild for qemu_cortex_m0 (wrapped).
+WRAPPED_LOG = """\
+warning: QEMU_ICOUNT_SHIFT (defined at boards/Kconfig:81) was assigned the value '6' but got the
+value ''. Check these unsatisfied dependencies: QEMU_ICOUNT (=n). See
+http://docs.zephyrproject.org/latest/kconfig.html#CONFIG_QEMU_ICOUNT_SHIFT and/or look up
+QEMU_ICOUNT_SHIFT in the menuconfig/guiconfig interface.
+
+"""
+
+
+def test_value_not_taken_wrapped() -> None:
+    (d,) = parse_log(WRAPPED_LOG).diagnostics
+    assert (d.kind, d.symbol, d.value, d.got, d.deps) == (
+        "kconfig-not-taken",
+        "QEMU_ICOUNT_SHIFT",
+        "6",
+        "",
+        "QEMU_ICOUNT (=n)",
+    )

@@ -198,3 +198,13 @@ def test_untracked_from_tree(mirror: Path, tmp_path: Path) -> None:
     mism = [f for f in report["findings"] if f["kind"] == "content-mismatch"]
     assert len(mism) == 1 and mism[0]["new"]["modified"] == ["kernel/sched.c"]
     assert mism[0]["confidence"] == "medium"
+
+
+def test_fork_fixture_is_deterministic(
+    fork_ws: tuple[Path, dict[str, Any]], tmp_path: Path, mirror: Path
+) -> None:
+    """Regenerating the fork fixture gives the same commits (and so the same expected
+    classifications) on any machine: fixed identities and dates, pinned upstream refs."""
+    _, expected = fork_ws
+    again = build_fork(tmp_path / "ws", mirror)
+    assert again == expected
