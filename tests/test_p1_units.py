@@ -157,3 +157,67 @@ def test_role_hits_must_be_compiled() -> None:
     assert not _counts("boot/zephyr/Kconfig", compiled)
     # No SBOM: every hit counts (and the provenance says so).
     assert _counts("boot/zephyr/boot_serial_extension_zephyr_basic.c", None)
+
+
+# --- MCUboot category units ------------------------------------------------------------
+
+
+def test_c_condition_evaluator() -> None:
+    from zmig.analyzers.mcuboot import _c_condition
+
+    env = {"num_sectors_pri": 118, "num_sectors_sec": 118}
+    # swap_offset.c:316 at the v4.3.0 pin
+    cond = "num_sectors_pri != num_sectors_sec && (num_sectors_pri + 1) != num_sectors_sec"
+    assert _c_condition(cond, env) == (False, None)
+    assert _c_condition("(num_sectors_pri + 1) != num_sectors_sec", env) == (True, None)
+    assert _c_condition("!(num_sectors_pri > num_sectors_sec)", env) == (True, None)
+    # Unknown names, calls and non-integers are never evaluated.
+    assert _c_condition("num_sectors_pri > BOOT_MAX_IMG_SECTORS", env)[0] is None
+    assert _c_condition("x != f(state, i)", {"x": 1})[0] is None
+    assert _c_condition("__import__('os')", env)[0] is None
+
+
+def test_srcdiff_extended_and_decl() -> None:
+    from zmig.srcdiff import Definition, Seed, compare
+
+    seed = Seed("define-prefix", "BOOT_STATUS_", "")
+    old = [Definition("BOOT_STATUS_OP_SWAP", "define-prefix", "2", "a.h", 81)]
+    new = [
+        Definition("BOOT_STATUS_OP_SWAP", "define-prefix", "1", "a.h", 85),
+        Definition("BOOT_STATUS_OP_SWAP", "define-prefix", "2", "a.h", 88),
+    ]
+    # A new conditional variant, the old one kept: reported, not "changed".
+    assert compare(seed, old, new, "o", "n").status == "extended"
+    assert compare(seed, new, old, "o", "n").status == "changed"
+    s = Seed("struct", "image_header", "")
+    m = (("uint32_t", "ih_magic", ""),)
+    a = Definition("image_header", "struct", "uint32_t ih_magic;", "i.h", 1, m, "STRUCT_PACKED")
+    b = Definition("image_header", "struct", "uint32_t ih_magic;", "i.h", 1, m, "struct")
+    d = compare(s, [a], [b], "o", "n")
+    assert d.status == "unchanged"
+    assert d.names[0]["decl_changed"] == {"old": "STRUCT_PACKED", "new": "struct"}
+
+
+def test_struct_locate_accepts_packing_macro(tmp_path: Path) -> None:
+    """MCUboot's image.h at older pins declares `STRUCT_PACKED image_header {`."""
+    import subprocess
+
+    from zmig.srcdiff import Seed, Source
+    from zmig.tools import Runner
+
+    repo = tmp_path / "r"
+    (repo / "inc").mkdir(parents=True)
+    (repo / "inc" / "image.h").write_text(
+        "#define STRUCT_PACKED struct __attribute__((__packed__))\n"
+        "STRUCT_PACKED image_tlv {\n    uint16_t it_type;\n    uint16_t it_len;\n};\n"
+        '_Static_assert(sizeof(struct image_tlv) == 4, "x");\n'
+    )
+    git = ["git", "-C", str(repo)]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "add", "."], check=True)
+    subprocess.run(
+        [*git, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], check=True
+    )
+    (d,) = Source(repo, "HEAD", Runner()).locate(Seed("struct", "image_tlv", ""), ["inc"])
+    assert d.decl == "STRUCT_PACKED"
+    assert d.members == (("uint16_t", "it_type", ""), ("uint16_t", "it_len", ""))

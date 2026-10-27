@@ -54,7 +54,7 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["zmig"]
-artifacts = ["zmig/data/*.json", "zmig/schema/*.json"]
+artifacts = ["zmig/data/*.json", "zmig/data/*.yaml", "zmig/schema/*.json"]
 
 [tool.ruff]
 line-length = 100

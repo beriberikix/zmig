@@ -281,3 +281,11 @@ def test_salvage_under_sysbuild(tmp_path: Path) -> None:
     assert [(e["path"], e["line"]) for e in boot[0]["evidence"] if e["type"] == "file_line"] == [
         ("sysbuild/mcuboot.conf", 1)
     ]
+
+
+def test_mcuboot_category_has_no_hazard(report: dict[str, Any]) -> None:
+    """v4.4.0 -> v4.5.0-rc3: same mode (swap-using-offset) and format; implementation only."""
+    hazards = [f for f in of(report, None, "mcuboot") if f.get("remedy")]
+    assert hazards == []
+    (impl,) = of(report, None, "mcuboot", "implementation-changed")
+    assert impl["confidence"] == "medium" and impl["new"]["files"]

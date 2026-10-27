@@ -73,6 +73,7 @@ def _builtin(kind: str) -> list[type[Any]]:
     from zmig.analyzers.images import ImagesAnalyzer
     from zmig.analyzers.kconfig import KconfigAnalyzer
     from zmig.analyzers.layout import LayoutAnalyzer
+    from zmig.analyzers.mcuboot import McubootAnalyzer
     from zmig.analyzers.sbom import SbomAnalyzer
     from zmig.analyzers.sysbuild import SysbuildAnalyzer
 
@@ -87,6 +88,7 @@ def _builtin(kind: str) -> list[type[Any]]:
         CrossImageAnalyzer,
         SysbuildAnalyzer,
         LayoutAnalyzer,
+        McubootAnalyzer,
         GuideAnalyzer,
     ]
 

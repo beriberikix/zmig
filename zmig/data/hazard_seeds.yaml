@@ -1,0 +1,50 @@
+# Starting points for the hazard checks (docs/DESIGN-P1.md §3): the identifiers whose
+# definitions decide a format. This is the only Zephyr/MCUboot knowledge zmig brings in.
+# Every seed is located in the source at each ref (git grep at the pinned SHA, under
+# `paths`); a seed that isn't found makes the checks that use it unknown at that ref.
+#
+# kinds:
+#   define         `#define NAME value` (every definition, including conditional ones)
+#   define-prefix  every `#define` whose name starts with NAME
+#   struct/union   the member list of `struct NAME { ... }` / `union NAME { ... }`
+#   initializer    the initializer text of a variable definition `... NAME = { ... };`
+
+mcuboot:
+  paths: [boot/bootutil]
+  groups:
+    image-format:
+      reason: >-
+        What a bootloader checks when it reads an image: header layout and magic, TLV
+        area magics, TLV type IDs, image flags. Used by direction (a), by the signed-image
+        parser, and to read the source image with the target bootloader (direction b).
+      seeds:
+        - {kind: define, name: IMAGE_MAGIC, reason: header magic the bootloader requires}
+        - {kind: define, name: IMAGE_HEADER_SIZE, reason: struct image_header size}
+        - {kind: define, name: IMAGE_TLV_INFO_MAGIC, reason: unprotected TLV area magic}
+        - {kind: define, name: IMAGE_TLV_PROT_INFO_MAGIC, reason: protected TLV area magic}
+        - {kind: define-prefix, name: IMAGE_TLV_, reason: TLV type IDs}
+        - {kind: define-prefix, name: IMAGE_F_, reason: image header flags}
+        - {kind: struct, name: image_header, reason: header layout}
+        - {kind: struct, name: image_version, reason: version field layout}
+        - {kind: struct, name: image_tlv_info, reason: TLV area header layout}
+        - {kind: struct, name: image_tlv, reason: TLV entry header layout}
+    boot-state:
+      reason: >-
+        What a bootloader reads from the image trailer and swap status to decide whether
+        an update or a swap is pending. A change means a newer bootloader can misread
+        state an older one wrote (direction b).
+      seeds:
+        - {kind: union, name: boot_img_magic_t, reason: trailer magic representation}
+        - {kind: initializer, name: boot_img_magic, reason: trailer magic bytes}
+        - {kind: define-prefix, name: BOOT_MAGIC_, reason: trailer magic size and states}
+        - {kind: define, name: BOOT_MAX_ALIGN, reason: trailer field alignment}
+        - {kind: define-prefix, name: BOOT_FLAG_, reason: image-ok and copy-done values}
+        - {kind: define-prefix, name: BOOT_SWAP_TYPE_, reason: swap type values}
+        - {kind: define-prefix, name: BOOT_STATUS_, reason: swap status layout}
+        - {kind: struct, name: boot_swap_state, reason: trailer state fields}
+
+imgtool:
+  # Module-level literal constants (ast.literal_eval, never executed).
+  files: [scripts/imgtool/image.py]
+  # The click option whose default is the image byte order.
+  endian_option: {file: scripts/imgtool/main.py, option: --endian}

@@ -126,6 +126,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated analyzers to run, or 'none' (default: all)",
     )
     scan.add_argument(
+        "--deployed-image",
+        type=Path,
+        default=None,
+        help="signed app image (.bin) read from a field device: the MCUboot checks compare "
+        "the target build's image with it instead of the source build's",
+    )
+    scan.add_argument(
         "--sdk",
         type=Path,
         default=None,
@@ -296,6 +303,7 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         salvage=salvage.edits,
         board_mapping=mapping,
         all_guide_entries=args.all_guide_entries,
+        deployed_image=args.deployed_image.expanduser().resolve() if args.deployed_image else None,
     )
     report.findings, report.analyzers, report.not_checked = analyzers.run_build_analyzers(
         selected, ctx

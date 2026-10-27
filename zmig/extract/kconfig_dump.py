@@ -36,6 +36,27 @@ def choice_id(sym):
     return prompts[0] if prompts else "<choice>"
 
 
+def choice_prompt(sym):
+    c = sym.choice
+    if c is None:
+        return None
+    prompts = [n.prompt[0] for n in c.nodes if n.prompt]
+    return prompts[0] if prompts else None
+
+
+def menu(sym):
+    """The prompt of the nearest enclosing menu (or menuconfig symbol), if any."""
+    node = sym.nodes[0].parent if sym.nodes else None
+    while node is not None and node.parent is not None:
+        is_menu = node.item is kconfiglib.MENU or (
+            isinstance(node.item, kconfiglib.Symbol) and node.is_menuconfig
+        )
+        if is_menu and node.prompt:
+            return node.prompt[0]
+        node = node.parent
+    return None
+
+
 def deprecated(sym):
     selects = {sel[0].name for sel in sym.selects}
     deps = kconfiglib.expr_str(sym.direct_dep)
@@ -62,6 +83,8 @@ def main():
             "locations": [f"{rel(n.filename)}:{n.linenr}" for n in sym.nodes],
             # The choice the symbol is a member of (name, or its prompt when unnamed).
             "choice": choice_id(sym),
+            "choice_prompt": choice_prompt(sym),
+            "menu": menu(sym),
         }
     with open(sys.argv[3], "w") as f:
         json.dump({"symbols": out}, f, sort_keys=True)

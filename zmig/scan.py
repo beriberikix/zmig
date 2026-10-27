@@ -47,6 +47,9 @@ class ScanContext:
     # Findings of the analyzers that already ran (the guide analyzer links to them).
     prior: list[Finding] = field(default_factory=list)
     all_guide_entries: bool = False
+    # A signed app image read from a field device (--deployed-image): replaces the source
+    # build's signed image as the "old" side of the measured image checks.
+    deployed_image: Path | None = None
     # Caches shared by the contexts of all images of one scan.
     shared: dict[str, Any] = field(default_factory=dict)
 
