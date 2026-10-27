@@ -55,6 +55,8 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 strict = true
 python_version = "3.12"
 packages = ["zmig"]
+# Run as standalone scripts against each Zephyr tree's own (untyped) libraries.
+exclude = ["zmig/extract/"]
 
 [[tool.mypy.overrides]]
 module = ["west.*"]

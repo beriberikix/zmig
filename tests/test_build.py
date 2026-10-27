@@ -15,7 +15,7 @@ import pytest
 from zmig.cli import main
 
 ROOT = Path(__file__).parents[1]
-APP = ROOT / "tests" / "fixtures" / "app"
+APP = ROOT / "tests" / "fixtures" / "hello"
 SCHEMA = json.loads((ROOT / "zmig/schema/report-1.json").read_text())
 
 pytestmark = [pytest.mark.build, pytest.mark.network]

@@ -41,7 +41,10 @@ def _evidence(ev: dict[str, Any]) -> str:
         return f"{ev['repo']}@{ev['sha'][:12]}"
     if t == "git_conflict":
         return "conflicts in " + ", ".join(f"`{f}`" for f in ev["files"])
-    return str(ev.get("invocation", t))
+    if t == "tool_output":
+        excerpt = " ".join(str(ev["excerpt"]).split())
+        return f"{ev['invocation']}: `{excerpt[:200]}`"
+    return str(t)
 
 
 def _item(f: Finding) -> list[str]:

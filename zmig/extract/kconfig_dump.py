@@ -1,0 +1,54 @@
+"""Dump Kconfig symbol metadata for one build as JSON.
+
+Usage: kconfig_dump.py <zephyr>/scripts/kconfig <Kconfig root> <out.json>
+The environment must be the one Zephyr's build used for its Kconfig targets.
+"""
+
+import json
+import os
+import sys
+
+sys.path.insert(0, sys.argv[1])
+import kconfiglib
+
+srctree = os.environ.get("srctree", "")  # noqa: SIM112 (Zephyr's own name)
+
+
+def rel(path):
+    return os.path.relpath(path, srctree) if srctree and os.path.isabs(path) else path
+
+
+# Tuple shapes differ across kconfiglib versions (defaults/selects gained a third
+# element after v3.7), so entries are indexed rather than unpacked.
+
+
+def deprecated(sym):
+    selects = {sel[0].name for sel in sym.selects}
+    deps = kconfiglib.expr_str(sym.direct_dep)
+    return "DEPRECATED" in selects or "DEPRECATED" in deps.split()
+
+
+def main():
+    kconf = kconfiglib.Kconfig(sys.argv[2], warn=False)
+    out = {}
+    for sym in kconf.unique_defined_syms:
+        prompts = [n.prompt[0] for n in sym.nodes if n.prompt]
+        helps = [n.help for n in sym.nodes if n.help]
+        out[sym.name] = {
+            "type": kconfiglib.TYPE_TO_STR[sym.type],
+            "prompt": prompts[0] if prompts else None,
+            "help": helps[0] if helps else None,
+            "deprecated": deprecated(sym),
+            "selects": sorted({sel[0].name for sel in sym.selects}),
+            "depends": kconfiglib.expr_str(sym.direct_dep),
+            "defaults": [
+                kconfiglib.expr_str(v) + ("" if c is kconf.y else " if " + kconfiglib.expr_str(c))
+                for v, c in ((d[0], d[1]) for d in sym.defaults)
+            ],
+            "locations": [f"{rel(n.filename)}:{n.linenr}" for n in sym.nodes],
+        }
+    with open(sys.argv[3], "w") as f:
+        json.dump({"symbols": out}, f, sort_keys=True)
+
+
+main()

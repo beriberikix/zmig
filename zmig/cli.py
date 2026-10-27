@@ -8,10 +8,12 @@ import logging
 import os
 import platform
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 from zmig import __version__, analyzers
-from zmig.buildctx import BuildContext, BuildMode, BuildSpec, build, hash_tree
+from zmig.boards import alias_tables, map_board
+from zmig.buildctx import BuildMode, BuildSpec, build, build_with_salvage, hash_tree
 from zmig.cache import Cache, default_cache_root
 from zmig.errors import ZmigError
 from zmig.findings import Category, Confidence, Finding, Report, Severity, plural
@@ -20,7 +22,9 @@ from zmig.manifest import load_manifest, scan_user_workspace
 from zmig.plan import PlanContext
 from zmig.refs import ResolvedRef, resolve_ref
 from zmig.report import render
+from zmig.scan import ScanContext
 from zmig.tools import Runner, check_zephyr_python, find_tool, tool_version
+from zmig.usage import scan as usage_scan
 from zmig.workspace import materialize
 
 log = logging.getLogger("zmig")
@@ -150,6 +154,25 @@ def _emit(report: Report, runner: Runner, args: argparse.Namespace) -> None:
     sys.stdout.write(render(report, args.format))
 
 
+def _historic_alias_tables(old: ResolvedRef, new: ResolvedRef) -> Iterator[tuple[str, str]]:
+    """boards/deprecated.cmake at the latest release of each minor between the refs,
+    newest first."""
+    from zmig.analyzers.hops import ref_version, release_tags
+
+    mirror = old.mirror
+    old_v, _ = ref_version(mirror, old.ref.sha)
+    new_v, _ = ref_version(mirror, new.ref.sha)
+    for minor, tags in sorted(release_tags(mirror).items(), reverse=True):
+        if old_v < minor <= new_v:
+            tag = tags[-1][1]
+            proc = mirror.runner.run(
+                [mirror.git, "--git-dir", mirror.path, "show", f"{tag}:boards/deprecated.cmake"],
+                check=False,
+            )
+            if proc.returncode == 0:
+                yield tag, proc.stdout
+
+
 def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     for tool in ("git", "cmake", "ninja", "dtc"):
         find_tool(tool)
@@ -162,49 +185,92 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         None if args.analyzers is None else [] if args.analyzers == ["none"] else args.analyzers,
     )
 
-    to_board = args.to_board or args.board  # automatic HWMv2 mapping lands in M3
     mode: BuildMode = "fast" if args.fast else "full"
-    contexts: list[BuildContext] = []
-    refs = []
-    for spec, board in ((args.from_ref, args.board), (args.to_ref, to_board)):
-        resolved = resolve_ref(spec, cache, runner)
-        refs.append(resolved.ref)
-        ws = materialize(resolved, cache, runner, args.modules)
-        log.warning("building %s for %s at %s (%s)...", app, board, spec, mode)
-        ctx = build(
-            ws,
-            BuildSpec(
-                app=app,
-                board=board,
-                mode=mode,
-                sysbuild=args.sysbuild,
-                cmake_args=tuple(args.cmake_args),
-            ),
-            cache,
-            runner,
+    old_r = resolve_ref(args.from_ref, cache, runner)
+    new_r = resolve_ref(args.to_ref, cache, runner)
+    old_ws = materialize(old_r, cache, runner, args.modules)
+    new_ws = materialize(new_r, cache, runner, args.modules)
+    table = new_ws.zephyr / "boards" / "deprecated.cmake"
+    mapping = map_board(
+        args.board,
+        args.to_board,
+        alias_tables(
+            args.to_ref,
+            table.read_text() if table.is_file() else "",
+            lambda: _historic_alias_tables(old_r, new_r),
+        ),
+    )
+    to_board = mapping.target
+    if mapping.how == "deprecated.cmake":
+        log.warning(
+            "board %s was renamed (boards/deprecated.cmake at %s); building it as %s at %s",
+            args.board,
+            mapping.tag,
+            to_board,
+            args.to_ref,
         )
-        log.warning("  %s: %s", spec, ctx.status)
-        contexts.append(ctx)
-    old, new = contexts
 
+    def spec(board: str) -> BuildSpec:
+        return BuildSpec(
+            app=app,
+            board=board,
+            mode=mode,
+            sysbuild=args.sysbuild,
+            cmake_args=tuple(args.cmake_args),
+        )
+
+    log.warning("building %s for %s at %s (%s)...", app, args.board, args.from_ref, mode)
+    old = build(old_ws, spec(args.board), cache, runner)
+    log.warning("  %s: %s", args.from_ref, old.status)
+    log.warning("building %s for %s at %s (%s)...", app, to_board, args.to_ref, mode)
+    salvage = build_with_salvage(new_ws, spec(to_board), cache, runner)
+    # Tool messages quote absolute app paths; report them relative to the app.
+    runner.redactions[str(app.resolve())] = "<app>"
+    if salvage.salvaged is not None:
+        runner.redactions[str(salvage.salvaged.spec.app.resolve())] = "<app>"
+    log.warning(
+        "  %s: %s%s",
+        args.to_ref,
+        salvage.original.status,
+        f" (salvaged by disabling {len(salvage.edits)} line(s): {salvage.effective.status})"
+        if salvage.salvaged
+        else "",
+    )
+
+    contexts = [old.to_json(), salvage.original.to_json()]
+    if salvage.salvaged is not None:
+        contexts.append(
+            {
+                **salvage.salvaged.to_json(),
+                "salvage_of": salvage.original.key,
+                "salvage_edits": [e.to_json() for e in salvage.edits],
+            }
+        )
     report = Report(
         command="scan",
         zmig_version=__version__,
         inputs={
-            "from": refs[0].to_json(),
-            "to": refs[1].to_json(),
+            "from": old_r.ref.to_json(),
+            "to": new_r.ref.to_json(),
             "app": str(app),
             "app_tree_hash": hash_tree(app),
-            "board": {"from": args.board, "to": to_board},
+            "board": mapping.to_json(),
             "build_mode": mode,
             "sysbuild": args.sysbuild,
         },
         environment=_environment(runner),
-        contexts=[c.to_json() for c in contexts],
+        contexts=contexts,
     )
-    report.findings, report.analyzers = analyzers.run_build_analyzers(
-        selected, old, new, usage=None
+    ctx = ScanContext(
+        runner=runner,
+        old=old,
+        new=salvage.effective,
+        new_raw=salvage.original,
+        usage=usage_scan(app),
+        salvage=salvage.edits,
+        board_mapping=mapping,
     )
+    report.findings, report.analyzers = analyzers.run_build_analyzers(selected, ctx)
     _emit(report, runner, args)
     return EXIT_OK
 

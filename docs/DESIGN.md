@@ -218,7 +218,12 @@ hashes, mode, sysbuild)`, at `<cache>/builds/<key>/`.
   - Two `edtlib`/`kconfiglib` versions can't coexist in one process.
   - The pickle in `edt.pickle` is only valid for the edtlib that wrote it.
   - It gives exact parity with the real build.
-- **Kconfig environment.** Kconfiglib needs the same environment variables the build used. Known keys include `srctree`, `ARCH`, `BOARD_DIR`, `KCONFIG_BINARY_DIR`, `ZEPHYR_*_MODULE_DIR`, and `TOOLCHAIN_*`. We recover them from the build directory: Zephyr writes the environment for menuconfig/guiconfig there. **The exact location must be verified per version in M3 — this is the riskiest extraction step.**
+- **Kconfig environment.** Kconfiglib needs the same environment variables the build used. Resolved in M3: Zephyr's `build.ninja` carries that exact environment on the `menuconfig` target's command line (`cmake -E env K=V … menuconfig.py <Kconfig root>`). This was verified at v3.6.0, v3.7.0, and v4.4.2, so it is parsed rather than reconstructed.
+- **Extractor robustness:** the extractors index kconfiglib's tuples instead of unpacking them, because their shapes changed after v3.7.
+- **Phandles** are recorded by the target's label when it has one, so renaming the target doesn't show up as a change in every node that references it.
+- **Salvage** (added in M3). Zephyr turns every Kconfig warning and devicetree binding violation into a configure error, so a real migration's target configure normally fails.
+  - zmig parses Zephyr's own messages into high-confidence findings. It then disables exactly the offending lines in a cache copy of the app, recording each one, and configures again, up to 4 rounds.
+  - The analyzers compare against the salvaged build. The report lists every edit, and the user's app is never touched.
 
 ### 4.4 External tools (`tools.py`)
 
@@ -265,8 +270,9 @@ class WorkspaceAnalyzer(Protocol):          # used by `plan`
 class BuildAnalyzer(Protocol):              # used by `scan`
     name: ClassVar[str]
     requires: ClassVar[frozenset[Artifact]]  # e.g. {Artifact.CONFIG, Artifact.EDT}
-    def analyze(self, old: BuildContext, new: BuildContext,
-                usage: ProjectUsage) -> AnalyzerResult: ...
+    def analyze(self, ctx: ScanContext) -> AnalyzerResult: ...
+    # ScanContext (zmig/scan.py): old build, new build (salvaged if needed), the raw
+    # target build, ProjectUsage, salvage edits, board mapping, and memoized snapshots.
 ```
 
 - **Registry:** built-in analyzers come first, then third-party ones via the `zmig.analyzers` entry-point group. That entry point is the extension slot for the out-of-scope work: DWARF API/ABI, MCUboot/flash layout, settings storage, advisories.
@@ -322,6 +328,9 @@ class BuildAnalyzer(Protocol):              # used by `scan`
 **board**
 
 - Resolve `--board` at the source ref. At the target ref, if the same name no longer resolves, zmig **maps it automatically** and builds with the mapped name, e.g. `native_sim_64` → `native_sim/native/64`.
+  - Zephyr drops aliases a few releases after a rename: `native_sim_64` was listed through v4.0.0. So when the target's table lacks the board, the `deprecated.cmake` of each release between the refs is searched, newest first.
+  - The finding is `risky` if the alias still works at the target and `breaking` if it's gone.
+- The applied app files (overlays and conf fragments, from the CMake log) are compared only when both configures got far enough to report them.
   - The primary mapping source is the target ref's `boards/deprecated.cmake` (`<old>_DEPRECATED` → new target). Zephyr itself uses it to redirect old names with a CMake warning; this was verified at v3.7.0, where `native_sim_64` → `native_sim/native/64`. That gives `high` confidence. The resolved `CONFIG_BOARD_TARGET` in the target `.config` confirms the result.
   - When no deprecation entry exists, a fallback uses the target's `list_boards.py` output plus the migration guide, at `medium` confidence.
   - The mapping is reported as a `board` finding: `risky` when the old name only works through the deprecation alias, which upstream removes in a later release; `info` when zmig had to map it.

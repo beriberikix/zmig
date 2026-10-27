@@ -17,8 +17,9 @@ from zmig.errors import ZmigError
 from zmig.findings import AnalyzerStatus, Finding
 
 if TYPE_CHECKING:
-    from zmig.buildctx import Artifact, BuildContext
+    from zmig.buildctx import Artifact
     from zmig.plan import PlanContext
+    from zmig.scan import ScanContext
 
 Status = Literal["ok", "skipped", "error"]
 
@@ -36,13 +37,13 @@ class AnalyzerResult:
 
 @runtime_checkable
 class BuildAnalyzer(Protocol):
-    """Used by `scan`: compares two builds of the same app."""
+    """Used by `scan`: compares two builds of the same app (see zmig.scan.ScanContext)."""
 
     name: ClassVar[str]
     kind: ClassVar[Literal["build"]]
     requires: ClassVar[frozenset[Artifact]]
 
-    def analyze(self, old: BuildContext, new: BuildContext, usage: object) -> AnalyzerResult: ...
+    def analyze(self, ctx: ScanContext) -> AnalyzerResult: ...
 
 
 @runtime_checkable
@@ -63,7 +64,13 @@ def _builtin(kind: str) -> list[type[Any]]:
         from zmig.analyzers.manifest import ManifestAnalyzer
 
         return [ManifestAnalyzer, ForksAnalyzer, HopsAnalyzer]
-    return []  # M3: board, kconfig, devicetree; M4: guide; M5: sbom, buildlog
+    from zmig.analyzers.board import BoardAnalyzer
+    from zmig.analyzers.buildlog import BuildlogAnalyzer
+    from zmig.analyzers.devicetree import DevicetreeAnalyzer
+    from zmig.analyzers.kconfig import KconfigAnalyzer
+
+    # M4: guide; M5: sbom, buildlog warnings and size
+    return [BoardAnalyzer, KconfigAnalyzer, DevicetreeAnalyzer, BuildlogAnalyzer]
 
 
 def _plugins(kind: str) -> list[type[Any]]:
@@ -91,20 +98,20 @@ def select(kind: Literal["build", "workspace"], names: Iterable[str] | None) -> 
 
 
 def run_build_analyzers(
-    classes: list[type[Any]], old: BuildContext, new: BuildContext, usage: object
+    classes: list[type[Any]], ctx: ScanContext
 ) -> tuple[list[Finding], list[AnalyzerStatus]]:
     """Run analyzers, turning missing artifacts and exceptions into a reported status."""
     findings: list[Finding] = []
     statuses: list[AnalyzerStatus] = []
     for cls in classes:
-        missing = sorted(a.value for a in cls.requires if not (old.has(a) and new.has(a)))
+        missing = sorted(a.value for a in cls.requires if not (ctx.old.has(a) and ctx.new.has(a)))
         if missing:
             statuses.append(
                 AnalyzerStatus(cls.name, "skipped", f"missing artifacts: {', '.join(missing)}")
             )
             continue
         try:
-            res: AnalyzerResult = cls().analyze(old, new, usage)
+            res: AnalyzerResult = cls().analyze(ctx)
         except ZmigError as e:
             statuses.append(AnalyzerStatus(cls.name, "error", str(e)))
             continue
