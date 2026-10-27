@@ -78,6 +78,7 @@ def _builtin(kind: str) -> list[type[Any]]:
     from zmig.analyzers.sbom import SbomAnalyzer
     from zmig.analyzers.storage import StorageAnalyzer
     from zmig.analyzers.sysbuild import SysbuildAnalyzer
+    from zmig.analyzers.wire import WireAnalyzer
 
     # The guide analyzer runs last: it links its findings to the ones before it.
     return [
@@ -93,6 +94,7 @@ def _builtin(kind: str) -> list[type[Any]]:
         McubootAnalyzer,
         StorageAnalyzer,
         BleAnalyzer,
+        WireAnalyzer,
         GuideAnalyzer,
     ]
 

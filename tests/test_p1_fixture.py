@@ -336,3 +336,31 @@ def test_d_ble_keys_match_linked_handlers(reports: dict[str, dict[str, Any]]) ->
 def test_no_ble_findings_without_bluetooth(reports: dict[str, dict[str, Any]]) -> None:
     for n in ("A", "B", "C"):
         assert not of(reports[n], "ble")
+
+
+# --- wire format -------------------------------------------------------------------------------
+
+
+def test_wire_shipped_allowlist(reports: dict[str, dict[str, Any]]) -> None:
+    # No shipped entry changes in A-D; every entry exists at their refs.
+    for r in reports.values():
+        assert not of(r, "wire")
+
+
+def test_wire_user_allowlist(tmp_path: Path) -> None:
+    _, board, frm, to, extra = FIXTURES["D"]
+    args = ["scan", "--app", str(ROOT / "tests/fixtures/p1-ble"), "--board", board]
+    args += ["--from", frm, "--to", to, "--sdk", str(SDK), "--analyzers", "wire"]
+    args += ["--wire-allowlist", str(ROOT / "tests/fixtures/p1-ble-wire.yaml")]
+    for m in COMMON + extra:
+        args += ["--module", m]
+    args += ["--format", "json", "--out", str(tmp_path)]
+    assert main(args) == 0
+    r = json.loads((tmp_path / "report.json").read_text())
+    (ch,) = of(r, "wire", "wire-value-changed")
+    assert ch["subject"] == "CONFIG_BT_AUTO_PHY_UPDATE"
+    assert (ch["old"], ch["new"]) == ("y", "n")
+    assert ch["title"].startswith("[USER-AUTO-PHY]")
+    assert "(user)" in ch["provenance"]["evidence_source"]
+    (nf,) = of(r, "wire", "allowlist-entry-not-found")
+    assert nf["new"] == ["USER-ACL-RX-COUNT (CONFIG_BT_BUF_ACL_RX_COUNT not defined at v4.3.0)"]

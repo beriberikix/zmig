@@ -285,6 +285,12 @@ Files compiled into the bootloader, or used by an enabled storage backend, whose
 - **Findings:** any allowlisted symbol or property whose resolved value differs, in any image, referencing the entry id.
 - **Clean** only means "no allowlisted item changed". The verdict counts this category as checked, with that caveat in the report.
 
+**Implementation notes (from running §7 wire):**
+- **The shipped allowlist** (`zmig/data/wire_format.yaml`, v1) has 12 entries: SMP framing and sizes, BLE MTU/ACL/name/appearance, USB VID/PID/strings, and the console baud rate. All were verified to exist at v4.0.0 through v4.5.0-rc3.
+- **`dt` entries** select a node by `chosen` or by `compatible`. This extends the `compatible/property` form planned above, because the console baud rate lives on whichever node `zephyr,console` names.
+- **A changed value counts only if a `.c` file compiled into that image (SBOM) references `CONFIG_<sym>` at either ref.** Regression: xapp's MCUboot has `USB_DEVICE_PRODUCT="MCUBOOT"` at v4.4.0 and unset at v4.5.0-rc3, with no USB stack at either ref. Such changes are listed as `changed_but_unused` in the category.
+- **User entries** (`--wire-allowlist`) are tagged in provenance. Fixture D's test file finds `BT_AUTO_PHY_UPDATE` y→n (deprecated at v4.3.0, read by `host/conn.c` at v4.2.2) and reports `BT_BUF_ACL_RX_COUNT` (gone at v4.3.0) as an entry not found.
+
 ---
 
 ## 8. Upgrade-path verdict (report section `upgrade_path`)

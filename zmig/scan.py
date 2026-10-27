@@ -50,6 +50,8 @@ class ScanContext:
     # A signed app image read from a field device (--deployed-image): replaces the source
     # build's signed image as the "old" side of the measured image checks.
     deployed_image: Path | None = None
+    # User wire-format allowlist entries (--wire-allowlist), added to the shipped ones.
+    wire_allowlist: Path | None = None
     # Caches shared by the contexts of all images of one scan.
     shared: dict[str, Any] = field(default_factory=dict)
 

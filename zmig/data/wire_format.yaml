@@ -1,0 +1,64 @@
+# Wire-format allowlist (docs/DESIGN-P1.md §7): options whose value is seen by a peer
+# (phone app, gateway, host PC, mcumgr client). A change can break communication with
+# deployed peers even when the device itself works.
+#
+# This is a small, documented starting set, not a complete list. Every entry is checked to
+# exist at the refs being compared (a missing one is reported, not silently skipped); add
+# your own with --wire-allowlist <file> in the same format.
+#
+#   id        stable identifier, used in findings
+#   kconfig   a Kconfig symbol (without CONFIG_)
+#   dt        {property, chosen | compatible}: the property of the node a chosen entry
+#             names, or of every enabled node with that compatible
+#   reason    why a peer sees it
+#   source    where it is defined (a path in the Zephyr tree; verified per ref)
+version: 1
+entries:
+  - id: WIRE-SMP-ORIGINAL
+    kconfig: MCUMGR_SMP_SUPPORT_ORIGINAL_PROTOCOL
+    reason: SMP version 1 vs 2 framing; older mcumgr clients only speak version 1
+    source: subsys/mgmt/mcumgr/smp/Kconfig
+  - id: WIRE-SMP-NETBUF
+    kconfig: MCUMGR_TRANSPORT_NETBUF_SIZE
+    reason: largest SMP frame the device accepts; clients size uploads to it
+    source: subsys/mgmt/mcumgr/transport/Kconfig
+  - id: WIRE-SMP-BT-REASSEMBLY
+    kconfig: MCUMGR_TRANSPORT_BT_REASSEMBLY
+    reason: whether SMP requests may span several BLE writes
+    source: subsys/mgmt/mcumgr/transport/Kconfig.bluetooth
+  - id: WIRE-BT-L2CAP-MTU
+    kconfig: BT_L2CAP_TX_MTU
+    reason: ATT MTU offered to peers
+    source: subsys/bluetooth/host/Kconfig.l2cap
+  - id: WIRE-BT-ACL-RX
+    kconfig: BT_BUF_ACL_RX_SIZE
+    reason: largest ACL payload accepted from peers
+    source: subsys/bluetooth/common/Kconfig
+  - id: WIRE-BT-NAME
+    kconfig: BT_DEVICE_NAME
+    reason: advertised/GAP name that apps and users find the device by
+    source: subsys/bluetooth/host/Kconfig
+  - id: WIRE-BT-APPEARANCE
+    kconfig: BT_DEVICE_APPEARANCE
+    reason: GAP appearance peers filter on
+    source: subsys/bluetooth/host/Kconfig
+  - id: WIRE-USB-VID
+    kconfig: USB_DEVICE_VID
+    reason: USB vendor ID host drivers bind to
+    source: subsys/usb/device/Kconfig
+  - id: WIRE-USB-PID
+    kconfig: USB_DEVICE_PID
+    reason: USB product ID host drivers bind to
+    source: subsys/usb/device/Kconfig
+  - id: WIRE-USB-PRODUCT
+    kconfig: USB_DEVICE_PRODUCT
+    reason: USB product string host tooling matches on
+    source: subsys/usb/device/Kconfig
+  - id: WIRE-USB-MANUFACTURER
+    kconfig: USB_DEVICE_MANUFACTURER
+    reason: USB manufacturer string host tooling matches on
+    source: subsys/usb/device/Kconfig
+  - id: WIRE-CONSOLE-BAUD
+    dt: {chosen: "zephyr,console", property: current-speed}
+    reason: console UART baud rate a host terminal or tool expects
+    source: dts/bindings/serial/uart-controller.yaml

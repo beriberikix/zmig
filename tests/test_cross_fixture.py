@@ -289,3 +289,9 @@ def test_mcuboot_category_has_no_hazard(report: dict[str, Any]) -> None:
     assert hazards == []
     (impl,) = of(report, None, "mcuboot", "implementation-changed")
     assert impl["confidence"] == "medium" and impl["new"]["files"]
+
+
+def test_wire_ignores_values_no_compiled_code_reads(report: dict[str, Any]) -> None:
+    """Regression: CONFIG_USB_DEVICE_PRODUCT in MCUboot goes "MCUBOOT" -> unset, but the USB
+    stack isn't built at either ref, so nothing reaches a host."""
+    assert not [f for f in report["findings"] if f["category"] == "wire"]

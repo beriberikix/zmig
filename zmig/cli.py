@@ -126,6 +126,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated analyzers to run, or 'none' (default: all)",
     )
     scan.add_argument(
+        "--wire-allowlist",
+        type=Path,
+        default=None,
+        help="YAML file of extra wire-format entries (same format as zmig/data/wire_format.yaml)",
+    )
+    scan.add_argument(
         "--deployed-image",
         type=Path,
         default=None,
@@ -304,6 +310,7 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         board_mapping=mapping,
         all_guide_entries=args.all_guide_entries,
         deployed_image=args.deployed_image.expanduser().resolve() if args.deployed_image else None,
+        wire_allowlist=args.wire_allowlist.expanduser().resolve() if args.wire_allowlist else None,
     )
     report.findings, report.analyzers, report.not_checked = analyzers.run_build_analyzers(
         selected, ctx

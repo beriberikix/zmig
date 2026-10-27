@@ -1,0 +1,10 @@
+# User wire-format entries for tests/test_p1_fixture.py (fixture D, v4.2.2 -> v4.3.0).
+entries:
+  - id: USER-AUTO-PHY
+    kconfig: BT_AUTO_PHY_UPDATE
+    reason: whether the peripheral starts a PHY update; peers observe the PHY procedure
+    source: subsys/bluetooth/host/Kconfig
+  - id: USER-ACL-RX-COUNT
+    kconfig: BT_BUF_ACL_RX_COUNT
+    reason: removed at v4.3.0; exercises "allowlist entry not found"
+    source: subsys/bluetooth/common/Kconfig
