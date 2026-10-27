@@ -36,7 +36,10 @@ FIXTURES = {
     "A": ("p1-layout", "nucleo_h753zi", "v4.2.2", "v4.3.0", ["hal_stm32"]),
     "B": ("p1-mode", "nrf52840dk/nrf52840", "v4.2.2", "v4.3.0", ["hal_nordic", "segger"]),
     "C": ("p1-rename", "nrf52840dk/nrf52840", "v4.0.0", "v4.1.0", ["hal_nordic", "segger"]),
+    # A bonding BLE peripheral, plain build (no bootloader): exercises the BLE category.
+    "D": ("p1-ble", "nrf52840dk/nrf52840", "v4.2.2", "v4.3.0", ["hal_nordic", "segger"]),
 }
+SYSBUILD = {"A", "B", "C"}
 
 pytestmark = [
     pytest.mark.sdk,
@@ -49,7 +52,8 @@ def _scan(name: str, out: Path) -> dict[str, Any]:
     app, board, frm, to, extra = FIXTURES[name]
     os.environ.pop("PYTHONPATH", None)
     args = ["scan", "--app", str(ROOT / "tests/fixtures" / app), "--board", board]
-    args += ["--from", frm, "--to", to, "--sysbuild", "--sdk", str(SDK)]
+    args += ["--from", frm, "--to", to, "--sdk", str(SDK)]
+    args += ["--sysbuild"] if name in SYSBUILD else []
     for m in COMMON + extra:
         args += ["--module", m]
     args += ["--format", "json", "--out", str(out)]
@@ -183,7 +187,7 @@ def test_signed_image_parser_matches_imgtool_dumpinfo(
     reports: dict[str, dict[str, Any]],
 ) -> None:
     """Oracle: imgtool's own dumpinfo, at the same MCUboot pin, on the same files."""
-    for r in reports.values():
+    for r in (reports[n] for n in sorted(SYSBUILD)):
         (d,) = of(r, "mcuboot", "signed-image-diff")
         for side, ref in (("old", r["inputs"]["from"]["sha"]), ("new", r["inputs"]["to"]["sha"])):
             img = d[side]
@@ -286,3 +290,49 @@ def test_a_storage_links_layout_stranding(reports: dict[str, dict[str, Any]]) ->
 
 def test_b_has_no_storage(reports: dict[str, dict[str, Any]]) -> None:
     assert not of(reports["B"], "storage")
+
+
+# --- BLE -----------------------------------------------------------------------------------
+
+
+def _elf_handlers(elf_path: Path) -> set[str]:
+    """Oracle: the settings handlers the build linked, read from the ELF (the first field
+    of struct settings_handler_static is the subtree name)."""
+    from elftools.elf.elffile import ELFFile
+
+    with elf_path.open("rb") as f:
+        elf = ELFFile(f)
+
+        def read(addr: int, n: int) -> bytes:
+            for sec in elf.iter_sections():
+                a = sec["sh_addr"]
+                if a and a <= addr < a + sec["sh_size"] and sec["sh_type"] != "SHT_NOBITS":
+                    return bytes(sec.data()[addr - a : addr - a + n])
+            raise AssertionError(f"0x{addr:x} not in a loaded section")
+
+        out = set()
+        symtab = elf.get_section_by_name(".symtab")
+        for sym in symtab.iter_symbols():  # type: ignore[union-attr]
+            if sym.name.startswith("settings_handler_") and sym["st_info"]["type"] == "STT_OBJECT":
+                ptr = int.from_bytes(read(sym["st_value"], 4), "little")
+                out.add(read(ptr, 64).split(b"\0")[0].decode())
+        return out
+
+
+def test_d_ble_keys_match_linked_handlers(reports: dict[str, dict[str, Any]]) -> None:
+    r = reports["D"]
+    (st,) = of(r, "ble", "ble-persisted-state")
+    for side, ctx in (("old", 0), ("new", 1)):
+        handlers = {k for k, via in st[side].items() if via == "handler"}
+        elf = CACHE / "builds" / r["contexts"][ctx]["key"] / "zephyr" / "zephyr.elf"
+        assert handlers == _elf_handlers(elf)
+        # Identity and bond leaves the root handler reads (host/settings.c).
+        assert {"bt/id", "bt/irk", "bt/name"} <= set(st[side])
+    assert not [f for f in of(r, "ble") if f.get("remedy")]
+    # Plain build: no bootloader, so no MCUboot findings.
+    assert not of(r, "mcuboot")
+
+
+def test_no_ble_findings_without_bluetooth(reports: dict[str, dict[str, Any]]) -> None:
+    for n in ("A", "B", "C"):
+        assert not of(reports[n], "ble")

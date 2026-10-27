@@ -78,3 +78,33 @@ storage:
       trees: [subsys/fs]
       exclude: [subsys/fs/nvs, subsys/fs/zms]
       seeds: []
+
+ble:
+  # Persisted Bluetooth state is settings entries. Key names come from the compiled files
+  # under `trees` at each ref: settings handler registrations and the host's store calls.
+  trees: [subsys/bluetooth]
+  handler_macros:
+    # name -> how the key path is formed; `prefix_from` names the macro whose definition
+    # gives the prefix it prepends (read at each ref, e.g. "bt/" _subtree).
+    BT_SETTINGS_DEFINE: {path_arg: 1, prefix_from: BT_SETTINGS_DEFINE}
+    SETTINGS_STATIC_HANDLER_DEFINE: {path_arg: 1}
+    SETTINGS_STATIC_HANDLER_DEFINE_WITH_CPRIO: {path_arg: 1}
+  store_functions:
+    # Host helpers whose first argument is a key under the "bt" subtree
+    # (bt_settings_encode_key in subsys/bluetooth/host/settings.c); verified to exist.
+    bt_settings_store: {prefix: "bt/"}
+    bt_settings_delete: {prefix: "bt/"}
+  # Leaf names the root "bt" handler compares against (strncmp(name, "x", ...)).
+  root_handler_file: subsys/bluetooth/host/settings.c
+  seeds:
+    - {kind: struct, name: bt_keys, reason: bond keys persisted under bt/keys}
+    - {kind: define, name: BT_KEYS_STORAGE_LEN, reason: persisted length of struct bt_keys}
+    - {kind: struct, name: bt_ltk, reason: long term key layout}
+    - {kind: struct, name: bt_irk, reason: identity resolving key layout}
+    - {kind: struct, name: bt_csrk, reason: signing key layout}
+  identity_symbols:
+    - {name: BT_ID_MAX, reason: number of local identities}
+    - {name: BT_PRIVACY, reason: RPA use; changes the identity a peer sees}
+    - {name: BT_MAX_PAIRED, reason: bond slots; fewer drops bonds}
+    - {name: BT_SETTINGS, reason: whether bonds persist at all}
+    - {name: BT_KEYS_OVERWRITE_OLDEST, reason: bond eviction policy}

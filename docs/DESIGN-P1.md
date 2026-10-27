@@ -269,6 +269,15 @@ Files compiled into the bootloader, or used by an enabled storage backend, whose
   - an identity-affecting option changed means the identity address may change (risky).
 - **Unknown** when the handler macros or persisted structs can't be found at a ref.
 
+**Implementation notes (from running §7 BLE):**
+- **Seeds** are in `hazard_seeds.yaml` (`ble`). Key names come from the compiled files under `subsys/bluetooth` (app SBOM), each tagged with its source:
+  - `handler`: `BT_SETTINGS_DEFINE`, whose `"bt/"` prefix is read from the macro's definition at each ref, and `SETTINGS_STATIC_HANDLER_DEFINE*`;
+  - `store`: the first argument of `bt_settings_store/delete`;
+  - `root-leaf`: the `strncmp(name, "x")` leaves of the root handler in `host/settings.c`, prefixed with the path that file registers.
+- **Oracle:** the settings handlers the build linked, read from `zephyr.elf` (the first field of `struct settings_handler_static` is the subtree name). These equal the `handler` keys at both refs for fixture D (`tests/fixtures/p1-ble`: a bonding peripheral, plain build, v4.2.2→v4.3.0).
+- **Heuristic:** `store` and `root-leaf` keys come from compiled files, but the calls may sit under `#if` branches that aren't compiled. A removed key is therefore medium confidence.
+- **Fixture D result:** 11 keys at each ref, the persisted structs (`bt_keys`, `BT_KEYS_STORAGE_LEN`, `bt_ltk`/`bt_irk`/`bt_csrk`) unchanged, and the identity options unchanged, so the category is clean (medium). Fixtures A, B and C and xapp are not-applicable.
+
 ### Wire format
 - **Allowlist:** `zmig/data/wire_format.yaml`, shipped defaults plus `--wire-allowlist <path>` for user entries. Each entry has an id, `kconfig: SYMBOL` or `dt: compatible/property`, a reason, and a source link.
   - Shipped defaults are a **small, documented starting set**, and every entry is verified to exist at the refs being compared. Missing at a ref means "allowlist entry not found", info.
