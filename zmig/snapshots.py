@@ -123,3 +123,29 @@ def edt(ctx: BuildContext, runner: Runner) -> dict[str, Any]:
         )
 
     return _cached(ctx, "edt", produce)
+
+
+def app_undefined_symbols(ctx: BuildContext, app: Path, runner: Runner) -> set[str] | None:
+    """Symbols the app's own object files reference but don't define (`nm -u`): the
+    Zephyr APIs it actually calls. None when there are no objects (a --fast build)."""
+    cc = ctx.app_dir / "compile_commands.json"
+    if not cc.is_file():
+        return None
+    root = str(app.resolve()) + "/"
+    objects = []
+    for entry in json.loads(cc.read_text()):
+        if not str(entry.get("file", "")).startswith(root) or "output" not in entry:
+            continue
+        obj = Path(entry["directory"]) / entry["output"]
+        if obj.is_file():
+            objects.append(obj)
+    if not objects:
+        return None
+    nm = "nm"
+    cache_txt = ctx.app_dir / "CMakeCache.txt"
+    if cache_txt.is_file() and (
+        m := re.search(r"^CMAKE_NM:\w+=(.+)$", cache_txt.read_text(), re.M)
+    ):
+        nm = m[1].strip() or nm
+    out = runner.run([nm, "-u", *sorted(objects)]).stdout
+    return {line.split()[-1] for line in out.splitlines() if line.strip().startswith("U ")}

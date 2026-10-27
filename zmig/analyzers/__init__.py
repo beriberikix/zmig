@@ -9,7 +9,7 @@ entry-point group and declare `kind = "build"` or `kind = "workspace"`.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol, runtime_checkable
 
@@ -67,10 +67,12 @@ def _builtin(kind: str) -> list[type[Any]]:
     from zmig.analyzers.board import BoardAnalyzer
     from zmig.analyzers.buildlog import BuildlogAnalyzer
     from zmig.analyzers.devicetree import DevicetreeAnalyzer
+    from zmig.analyzers.guide import GuideAnalyzer
     from zmig.analyzers.kconfig import KconfigAnalyzer
 
-    # M4: guide; M5: sbom, buildlog warnings and size
-    return [BoardAnalyzer, KconfigAnalyzer, DevicetreeAnalyzer, BuildlogAnalyzer]
+    # The guide analyzer runs last: it links its findings to the ones before it.
+    # M5: sbom, buildlog warnings and size.
+    return [BoardAnalyzer, KconfigAnalyzer, DevicetreeAnalyzer, BuildlogAnalyzer, GuideAnalyzer]
 
 
 def _plugins(kind: str) -> list[type[Any]]:
@@ -100,7 +102,8 @@ def select(kind: Literal["build", "workspace"], names: Iterable[str] | None) -> 
 def run_build_analyzers(
     classes: list[type[Any]], ctx: ScanContext
 ) -> tuple[list[Finding], list[AnalyzerStatus]]:
-    """Run analyzers, turning missing artifacts and exceptions into a reported status."""
+    """Run analyzers in order, turning missing artifacts and exceptions into a reported
+    status, then make `related` links symmetric."""
     findings: list[Finding] = []
     statuses: list[AnalyzerStatus] = []
     for cls in classes:
@@ -110,6 +113,7 @@ def run_build_analyzers(
                 AnalyzerStatus(cls.name, "skipped", f"missing artifacts: {', '.join(missing)}")
             )
             continue
+        ctx.prior = list(findings)
         try:
             res: AnalyzerResult = cls().analyze(ctx)
         except ZmigError as e:
@@ -117,7 +121,18 @@ def run_build_analyzers(
             continue
         findings += res.findings
         statuses.append(AnalyzerStatus(cls.name, res.status, res.reason))
-    return findings, statuses
+    return link_related(findings), statuses
+
+
+def link_related(findings: list[Finding]) -> list[Finding]:
+    """If A lists B as related, B lists A too."""
+    back: dict[str, set[str]] = {}
+    for f in findings:
+        for r in f.related:
+            back.setdefault(r, set()).add(f.id)
+    return [
+        replace(f, related=tuple(sorted(set(f.related) | back.get(f.id, set())))) for f in findings
+    ]
 
 
 def run_workspace_analyzers(

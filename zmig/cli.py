@@ -114,6 +114,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated analyzers to run, or 'none' (default: all)",
     )
     scan.add_argument(
+        "--all-guide-entries",
+        action="store_true",
+        help="also list migration-guide entries that don't match the app",
+    )
+    scan.add_argument(
         "--cmake-arg",
         dest="cmake_args",
         action="append",
@@ -269,6 +274,7 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         usage=usage_scan(app),
         salvage=salvage.edits,
         board_mapping=mapping,
+        all_guide_entries=args.all_guide_entries,
     )
     report.findings, report.analyzers = analyzers.run_build_analyzers(selected, ctx)
     _emit(report, runner, args)

@@ -64,6 +64,23 @@ def rename_candidates(sym: str, old: Symbols, new: Symbols) -> list[tuple[str, s
     return sorted(((n, why, c) for n, (why, c) in out.items()), key=lambda x: x[0])
 
 
+def guide_renames(ctx: ScanContext, sym: str, new: Symbols) -> list[tuple[str, str, Confidence]]:
+    """Replacements the migration guides name for a removed symbol ("X was renamed to Y"),
+    if Y exists at the target."""
+    out = []
+    for _, entry in ctx.guide_entries:
+        for r in entry.renames:
+            if r.kind == "kconfig" and r.old == sym and r.new in new:
+                out.append(
+                    (
+                        r.new,
+                        f"the {entry.version} migration guide says so ({entry.id})",
+                        Confidence.MEDIUM,
+                    )
+                )
+    return list({c[0]: c for c in out}.values())
+
+
 def _locs(locs: list[Loc]) -> tuple[JSON, ...]:
     return tuple(file_line(loc.path, loc.line, loc.text) for loc in locs)
 
@@ -125,7 +142,11 @@ class KconfigAnalyzer:
             d = diags.get(sym)
             dev = (tool_output("target configure", ctx.runner.redact(d.message)),) if d else ()
             if sym not in nk:
-                cands = rename_candidates(sym, ok, nk)
+                cands = guide_renames(ctx, sym, nk) + [
+                    c
+                    for c in rename_candidates(sym, ok, nk)
+                    if c[0] not in {g[0] for g in guide_renames(ctx, sym, nk)}
+                ]
                 if cands:
                     best = cands[0]
                     hint = f"Replace it with CONFIG_{best[0]} ({best[1]})." + (

@@ -15,15 +15,18 @@ def test_fixture_app_usage() -> None:
         u.kconfig_set["ASSERT"][0][0].path,
         u.kconfig_set["ASSERT"][0][0].line,
     ) == ("boards/native_sim_64.conf", 1)
-    assert [loc.line for loc in u.kconfig_read["BOARD"]] == [9]
+    assert [loc.line for loc in u.kconfig_read["BOARD"]] == [13]
     refs = {(r, loc.path, loc.line) for r, loc in u.dt_nodes}
-    assert (NodeRef("tokens", "gpio_800"), "src/main.c", 4) in refs
-    assert (NodeRef("label", "can0"), "src/main.c", 5) in refs
+    assert (NodeRef("tokens", "gpio_800"), "src/main.c", 6) in refs
+    assert (NodeRef("label", "can0"), "src/main.c", 7) in refs
     assert (NodeRef("label", "can0"), "boards/native_sim_64.overlay", 1) in refs
     # DT_PROP(CAN_NODE, ...) resolves the #define to DT_NODELABEL(can0).
     assert [(r, p, loc.line) for r, p, loc in u.dt_props_read] == [
-        (NodeRef("label", "can0"), "sample_point", 13)
+        (NodeRef("label", "can0"), "sample_point", 17)
     ]
+    assert [loc.line for loc in u.includes["version.h"]] == [4]
+    assert [loc.line for loc in u.identifiers["can_recover"]] == [19]
+    assert "KERNEL_VERSION_STRING" in u.identifiers and "DT_PATH" not in u.identifiers
     assert [(r, p, loc.line) for r, p, loc in u.dt_props_set] == [
         (NodeRef("label", "can0"), "bus-speed", 2)
     ]

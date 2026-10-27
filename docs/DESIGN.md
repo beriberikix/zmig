@@ -376,38 +376,52 @@ class BuildAnalyzer(Protocol):              # used by `scan`
 
 ## 6. Migration-guide parsing
 
-**Sources:** `doc/releases/migration-guide-X.Y.rst` for every release in
-`(from, to]`, plus the `release-notes-X.Y.rst` "Removed / Deprecated APIs"
-sections, all read from the **target** ref.
+Implemented in M4 (`zmig/guides.py`, `zmig/analyzers/guide.py`).
+
+**Sources:**
+- `doc/releases/migration-guide-X.Y.rst` for every release in `(from, to]`, plus the target's own version if it is an unreleased snapshot.
+- The "Removed …" and "Deprecated …" sections of `release-notes-X.Y.rst`.
+- Each document is read from the target tree, or from the release's tag if the target no longer has it. The report records which ref each document came from.
 
 **Parsing:**
+- A heuristic reStructuredText reader, not docutils. It understands underlined headings, top-level `*` bullets with indented continuations and nested lists, and directives (skipped).
+- **Entries:** each top-level bullet or paragraph becomes an entry `MG-<ver>-<nnnn>` (`RN-…` for release notes), with its heading path.
+- **Mentions:** each mention is typed and located to its own doc line:
 
-- A small RST walker: section headings, and bullet items with their continuation lines.
-- We don't depend on docutils. Zephyr guides are predictable lists, and the inline roles are what matter.
-- Each bullet becomes an entry: `MG-<ver>-<nnnn>`, with its heading path (e.g. `Boards > Hardware Model v2`) and source line.
-
-**Extraction**, deterministic where Zephyr's Sphinx roles make it so:
-
-| Role / pattern | Extracted as | Confidence of a match |
+| Role / pattern | Kind | Strength |
 |---|---|---|
-| ``:kconfig:option:`CONFIG_X` `` | Kconfig symbol | medium |
-| ``:dtcompatible:`vnd,x` `` | DT compatible | medium |
-| ``:c:func:`f` ``, ``:c:macro:``, ``:c:struct:``, ``:c:type:`` | C identifier | medium |
-| ``:zephyr_file:`path` `` | file / header | medium |
-| bare `CONFIG_\w+`, ``` ``identifier`` ```, `#include <…>` | token | low |
+| ``:kconfig:option:`CONFIG_X` `` | kconfig | role (medium) |
+| ``:dtcompatible:`vnd,x` `` | compat | role (medium) |
+| ``:c:func:`` ``:c:macro:`` ``:c:struct:`` ``:c:type:`` … | ident | role (medium) |
+| ``:zephyr_file:`include/….h` `` | header | role (medium) |
+| ``CONFIG_X`` (in a literal or bare), ``x.h``, ``vnd,name`` | kconfig / header / compat | literal (low) |
+| other ``literal`` | literal (matched against DT property names, underscore identifiers, board names) | literal (low) |
 
-A rename is inferred from patterns like `X has been renamed to Y` or `replace X with Y` (low confidence).
+**Severity:**
+- Taken from the wording of the mention's sentence, else the lead sentences of enclosing bullets, else the entry as a whole.
+- "Removed / renamed / no longer / must …" → breaking. "Deprecated" → risky, and also when a removal is announced for the future. Otherwise info.
+- Always tagged `guide.severity-from-wording`.
 
-**Intersection.** An entry is kept only if one of its extracted items matches
-something in `ProjectUsage`. Each hit becomes a `guide` finding:
+**Renames:** "A … renamed/replaced/moved … B" within one sentence, plus the list form "* ``old`` to :c:struct:`new`" under a lead that says renamed. Renamed Kconfig symbols also feed the Kconfig analyzer's replacement candidates (medium, citing the entry).
 
-- it carries `doc_entry` evidence plus the app's `file_line` evidence;
-- severity comes from the guide section ("removed" / "renamed" → breaking, "deprecated" → risky, everything else → info);
-- confidence is the lower of the match confidence and the extraction confidence.
+**Intersection with the app**, using `ProjectUsage`:
+- Kconfig symbols set or read.
+- Compatibles named in overlays or `DT_DRV_COMPAT`, or carried by nodes the app references.
+- `#include`s: an exact path, or the bare basename (low, `guide.header-basename`).
+- C identifiers. These count as high usage only when `nm -u` on the app's objects from the source build shows them, accepting `z_impl_<name>` for syscalls. Otherwise they're a token scan (low). Inline APIs and calls the compiler eliminated never show up in `nm`.
+- DT property names set or read, and the board name.
 
-Unmatched entries are counted in the report but not listed (`--all-guide-entries` lists them).
+**Gating by build facts:** a match is downgraded to info/low (`guide.gated-by-build`), with the reason in its action, when:
+- every sentence naming the item is conditional ("when / if / only …") on other Kconfig options that neither resolved `.config` enables, rename partners excluded; or
+- it is a compatible reached only through referenced nodes that are disabled in both devicetrees.
 
----
+Verified on v3.6.0 → v4.4.2: a hawkBit entry that mentions `CONFIG_BOARD`, and a CAN-filter entry for a disabled node.
+
+**Output:**
+- One finding per (entry, item), with `doc_entry` evidence at the exact doc lines and `file_line` evidence at the app lines.
+- Confidence is the lower of the guide strength and the usage strength.
+- Findings are `related` to the Kconfig and devicetree findings for the same item. Links are made symmetric after all analyzers run.
+- Unmatched entries are counted in a `coverage` finding; `--all-guide-entries` lists them.
 
 ## 7. Reporting
 

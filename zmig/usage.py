@@ -46,6 +46,8 @@ class ProjectUsage:
     dt_props_set: list[tuple[NodeRef, str, Loc]] = field(default_factory=list)
     dt_props_read: list[tuple[NodeRef, str, Loc]] = field(default_factory=list)
     dt_compats: dict[str, list[Loc]] = field(default_factory=dict)
+    includes: dict[str, list[Loc]] = field(default_factory=dict)  # "zephyr/kernel.h" -> locs
+    identifiers: dict[str, list[Loc]] = field(default_factory=dict)  # C identifiers used
 
 
 def _files(app: Path) -> list[Path]:
@@ -84,6 +86,10 @@ _C_NODE_DEFINE = re.compile(
     re.M,
 )
 _C_COMPAT = re.compile(r"#\s*define\s+DT_DRV_COMPAT\s+(\w+)|\bDT_COMPAT_\w*?\(\s*(\w+)")
+_INCLUDE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]')
+_C_IDENT = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
+_STRING = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'')
+MAX_IDENT_LOCS = 5
 _KCONFIG_READ = re.compile(r"\bCONFIG_([A-Z0-9_]+)\b")
 _CONF_SET = re.compile(r"^\s*CONFIG_(\w+)\s*=\s*(.*?)\s*$")
 
@@ -113,6 +119,15 @@ def _scan_c(rel: str, text: str, u: ProjectUsage) -> None:
             u.dt_compats.setdefault(m[1] or m[2], []).append(loc)
         for m in _KCONFIG_READ.finditer(line):
             u.kconfig_read.setdefault(m[1], []).append(loc)
+        if inc := _INCLUDE.match(line):
+            u.includes.setdefault(inc[1], []).append(loc)
+            continue
+        if line.lstrip().startswith("#"):
+            continue  # other preprocessor lines: names there are macros, not uses
+        for m in _C_IDENT.finditer(_STRING.sub('""', line)):
+            locs = u.identifiers.setdefault(m[0], [])
+            if len(locs) < MAX_IDENT_LOCS and (not locs or locs[-1] != loc):
+                locs.append(loc)
 
 
 def _scan_conf(rel: str, text: str, u: ProjectUsage) -> None:
