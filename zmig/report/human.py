@@ -22,7 +22,10 @@ def render_human(report: Report) -> str:
     lines.append(f"{c['breaking']} breaking, {c['risky']} risky, {c['info']} info")
     if report.top():
         lines += ["", "Do these first:"]
-        lines += [f"  {i}. {f.title}{_where(f)}" for i, f in enumerate(report.top(), 1)]
+        lines += [
+            f"  {i}. {'[' + f.image + '] ' if f.image else ''}{f.title}{_where(f)}"
+            for i, f in enumerate(report.top(), 1)
+        ]
     lines.append("")
     for f in report.sorted_findings():
         if f.severity is not Severity.INFO:

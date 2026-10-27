@@ -103,9 +103,10 @@ ruff check zmig tests && mypy
 
 Fixtures:
 
-- `tests/fixtures/app` (native_sim, v3.6.0 → v3.7.0) and `tests/fixtures/xapp`
-  (qemu_cortex_m0 with sysbuild + MCUboot, cross-compiled, v4.4.0 → v4.5.0-rc3): see
-  each README.
+- `tests/fixtures/app` (native_sim, v3.6.0 → v3.7.0); `tests/fixtures/xapp`
+  (nrf52840dk/nrf52840 with sysbuild + MCUboot, cross-compiled, v4.4.0 → v4.5.0-rc3),
+  `xapp-mismatch` (app and bootloader disagree on a partition: the cross-image true
+  positive) and `xapp-salvage` (a removed symbol per image): see each README.
 - The fork workspace for `plan` is generated, not committed. It is built from real
   v3.6.0..v3.7.0 history with fixed identities and dates, so it is identical on every
   machine (a test regenerates it and compares):

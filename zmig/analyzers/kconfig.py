@@ -299,7 +299,7 @@ class KconfigAnalyzer:
                     (),
                     new=items,
                 )
-        if ctx.salvage:
+        if ctx.salvage and ctx.is_app:
             findings.append(
                 Finding(
                     category=Category.KCONFIG,

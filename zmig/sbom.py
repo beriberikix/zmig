@@ -53,12 +53,19 @@ def read_spdx_dir(path: Path) -> dict[str, SpdxDocument]:
 ZEPHYR_PACKAGES = {"zephyr-sources", "zephyr"}
 
 
+APP_PACKAGE = "app"
+
+
 def compiled_sources(docs: dict[str, SpdxDocument]) -> dict[str, dict[str, str]]:
-    """{package (zephyr or module name): {file: sha1}} from the zephyr document."""
+    """{package: {file: sha1}}: "zephyr", each module, and "app" (the image's own sources
+    from app.spdx; for an MCUboot image that is MCUboot's boot/zephyr)."""
     zdoc = docs.get("zephyr")
     if zdoc is None:
         return {}
     out: dict[str, dict[str, str]] = {}
+    if (adoc := docs.get("app")) is not None:
+        for pkg in adoc.packages.values():
+            out.setdefault(APP_PACKAGE, {}).update(pkg.files)
     for name, pkg in zdoc.packages.items():
         key = "zephyr" if name in ZEPHYR_PACKAGES else name.removesuffix("-sources")
         out.setdefault(key, {}).update(pkg.files)

@@ -1,0 +1,4 @@
+/* Bootloader image only: a different console speed, and the board's own partitions. */
+&uart0 {
+	current-speed = <9600>;
+};

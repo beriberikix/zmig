@@ -82,7 +82,7 @@
       "properties": {
         "id": {"$ref": "#/$defs/id"},
         "category": {"enum": ["manifest", "fork", "hop", "board", "kconfig", "devicetree",
-                              "build", "guide", "sbom"]},
+                              "build", "guide", "sbom", "images", "crossimage"]},
         "kind": {"type": "string", "pattern": "^[a-z0-9-]+$"},
         "subject": {"type": "string"},
         "title": {"type": "string"},
@@ -94,7 +94,8 @@
         "action": {"type": "string"},
         "related": {"type": "array", "items": {"type": "string"}},
         "analyzer": {"type": "string"},
-        "heuristics": {"type": "array", "items": {"type": "string"}}
+        "heuristics": {"type": "array", "items": {"type": "string"}},
+        "image": {"type": "string", "description": "sysbuild image (since 1.1); absent = the app image"}
       }
     },
     "evidence": {

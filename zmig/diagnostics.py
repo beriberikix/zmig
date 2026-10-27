@@ -173,7 +173,9 @@ _W_COMPILER = re.compile(
     r"(?: \[(?P<flag>-W[^\]]+)\])?$",
     re.M,
 )
-_W_PLAIN = re.compile(r"^warning: (?P<msg>.+)$", re.M)
+# Kconfig wraps long warnings: a message continues on following non-blank lines until
+# the next "warning:"/"error:" or a blank line.
+_W_PLAIN = re.compile(r"^warning: (?P<msg>.+(?:\n(?!warning:|error:|-- |\[\d)[^\n]+)*)", re.M)
 _W_CMAKE = re.compile(
     r"^CMake (?:Deprecation )?Warning(?: \(dev\))? at (?P<file>\S+):(?P<line>\d+) \([\w]+\):\n"
     r"(?P<body>(?:(?:  .*)?\n)+)",
@@ -207,7 +209,9 @@ def parse_warnings(text: str) -> list[BuildWarning]:
         BuildWarning("compiler", m["file"], int(m["line"]), m["msg"].strip(), m["flag"] or "")
         for m in _W_COMPILER.finditer(text)
     ]
-    out += [BuildWarning("kconfig", "", 0, m["msg"].strip()) for m in _W_PLAIN.finditer(text)]
+    out += [
+        BuildWarning("kconfig", "", 0, " ".join(m["msg"].split())) for m in _W_PLAIN.finditer(text)
+    ]
     out += [
         BuildWarning("cmake", m["file"], int(m["line"]), " ".join(m["body"].split()))
         for m in _W_CMAKE.finditer(text)

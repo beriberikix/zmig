@@ -66,8 +66,10 @@ def _builtin(kind: str) -> list[type[Any]]:
         return [ManifestAnalyzer, ForksAnalyzer, HopsAnalyzer]
     from zmig.analyzers.board import BoardAnalyzer
     from zmig.analyzers.buildlog import BuildlogAnalyzer
+    from zmig.analyzers.crossimage import CrossImageAnalyzer
     from zmig.analyzers.devicetree import DevicetreeAnalyzer
     from zmig.analyzers.guide import GuideAnalyzer
+    from zmig.analyzers.images import ImagesAnalyzer
     from zmig.analyzers.kconfig import KconfigAnalyzer
     from zmig.analyzers.sbom import SbomAnalyzer
 
@@ -78,6 +80,8 @@ def _builtin(kind: str) -> list[type[Any]]:
         DevicetreeAnalyzer,
         BuildlogAnalyzer,
         SbomAnalyzer,
+        ImagesAnalyzer,
+        CrossImageAnalyzer,
         GuideAnalyzer,
     ]
 
@@ -107,33 +111,44 @@ def select(kind: Literal["build", "workspace"], names: Iterable[str] | None) -> 
 
 
 def run_build_analyzers(
-    classes: list[type[Any]], ctx: ScanContext
+    classes: list[type[Any]], base: ScanContext
 ) -> tuple[list[Finding], list[AnalyzerStatus]]:
-    """Run analyzers in order, turning missing artifacts and exceptions into a reported
-    status, then make `related` links symmetric."""
+    """Run analyzers in order. Per-image analyzers (the default; a class can set
+    `per_image = False`) run once for every image both builds have, and their findings
+    carry that image unless it is the app. Missing artifacts and errors become a reported
+    status. `related` links are made symmetric at the end."""
+    from zmig.scan import ScanContext as _Ctx
+
+    names = [i.name for i in base.old.images if base.new.image(i.name) is not None]
+    multi = len(names) > 1
     findings: list[Finding] = []
     statuses: list[AnalyzerStatus] = []
     for cls in classes:
-        missing = [
-            f"{side} ({spec}): {b.missing_reason(art)}"
-            for art in sorted(cls.requires, key=lambda x: x.value)
-            for side, b, spec in (
-                ("source", ctx.old, ctx.old_spec),
-                ("target", ctx.new, ctx.new_spec),
-            )
-            if not b.has(art)
-        ]
-        if missing:
-            statuses.append(AnalyzerStatus(cls.name, "skipped", "; ".join(missing)))
-            continue
-        ctx.prior = list(findings)
-        try:
-            res: AnalyzerResult = cls().analyze(ctx)
-        except ZmigError as e:
-            statuses.append(AnalyzerStatus(cls.name, "error", str(e)))
-            continue
-        findings += res.findings
-        statuses.append(AnalyzerStatus(cls.name, res.status, res.reason))
+        per_image = getattr(cls, "per_image", True)
+        ctxs = [c for n in names if (c := _Ctx.for_image(base, n))] if per_image else [base]
+        for ctx in ctxs:
+            label = f"{cls.name}@{ctx.image}" if per_image and multi else cls.name
+            missing = [
+                f"{side} ({spec}): {img.missing_reason(art)}"
+                for art in sorted(cls.requires, key=lambda x: x.value)
+                for side, img, spec in (
+                    ("source", ctx.old_img, ctx.old_spec),
+                    ("target", ctx.new_img, ctx.new_spec),
+                )
+                if not img.has(art)
+            ]
+            if missing:
+                statuses.append(AnalyzerStatus(label, "skipped", "; ".join(missing)))
+                continue
+            ctx.prior = list(findings)
+            try:
+                res: AnalyzerResult = cls().analyze(ctx)
+            except ZmigError as e:
+                statuses.append(AnalyzerStatus(label, "error", str(e)))
+                continue
+            tag = None if (not per_image or ctx.is_app) else ctx.image
+            findings += [replace(f, image=tag) if tag else f for f in res.findings]
+            statuses.append(AnalyzerStatus(label, res.status, res.reason))
     return link_related(findings), statuses
 
 

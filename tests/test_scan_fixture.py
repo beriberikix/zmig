@@ -214,7 +214,9 @@ def test_large_gap_v442(tmp_path: Path) -> None:
         "board": "ok",
         "buildlog": "ok",
         "devicetree": "ok",
+        "crossimage": "ok",
         "guide": "ok",
+        "images": "ok",
         "kconfig": "ok",
         "sbom": "ok",
     }

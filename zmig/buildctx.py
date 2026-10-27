@@ -18,15 +18,15 @@ import sys
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from zmig.cache import Cache
 from zmig.errors import ArtifactMissing
-from zmig.tools import Runner
+from zmig.tools import Runner, find_tool
 from zmig.workspace import Module, RefWorkspace, west_argv
 
 # Bump when the build recipe changes in a way that invalidates cached builds.
-RECIPE_VERSION = 7
+RECIPE_VERSION = 10
 
 BuildMode = Literal["full", "fast"]
 BuildStatus = Literal["ok", "configure-failed", "build-failed"]
@@ -77,52 +77,77 @@ class BuildSpec:
     cmake_args: tuple[str, ...] = ()
 
 
+ImageRole = Literal["app", "bootloader", "other"]
+
+
+@dataclass(frozen=True)
+class ImageContext:
+    """One Zephyr image of a build. A plain build has exactly one (the app); a sysbuild
+    build has one per entry in domains.yaml (app, MCUboot, ...)."""
+
+    name: str
+    role: ImageRole
+    role_source: str  # how the role was determined
+    dir: Path  # this image's CMake build directory
+    log: Path  # this image's configure and build output only
+    status: BuildStatus
+    mode: BuildMode
+    board: str
+    ref: str  # spec of the ref it was built from, for messages
+
+    def has(self, a: Artifact) -> bool:
+        return (self.dir / a.value).is_file()
+
+    def missing_reason(self, a: Artifact) -> str:
+        """Why an artifact is missing, quoting the producing tool when it said."""
+        if a is Artifact.SPDX:
+            spdx_log = self.dir / "zmig-spdx.log"
+            text = spdx_log.read_text() if spdx_log.is_file() else ""
+            errors = [ln.strip() for ln in text.splitlines() if ln.strip().startswith("ERROR:")]
+            if errors:
+                return f"west spdx: {errors[0].removeprefix('ERROR:').strip()}"
+            if self.status != "ok":
+                return f"the build {self.status.replace('-', ' ')}; west spdx needs a full build"
+        if a in BUILD_ONLY and self.mode == "fast":
+            return f"{a.value} needs a full build (rerun without --fast)"
+        return f"{a.value} missing"
+
+    def artifact(self, a: Artifact) -> Path:
+        p = self.dir / a.value
+        if p.is_file():
+            return p
+        raise ArtifactMissing(
+            f"{a.value} missing for image {self.name} at {self.ref}: {self.missing_reason(a)}"
+        )
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "role": self.role,
+            "role_source": self.role_source,
+            "status": self.status,
+            "board": self.board,
+        }
+
+
 @dataclass(frozen=True)
 class BuildContext:
     workspace: RefWorkspace
     spec: BuildSpec
     key: str
     dir: Path
-    status: BuildStatus
-    log: Path
+    status: BuildStatus  # worst over the images and the sysbuild steps
+    log: Path  # everything, in order (configure, each image, sysbuild)
     # The copy of the app that was built (inside the workspace; see app_source()).
     src: Path
+    images: tuple[ImageContext, ...] = ()
 
     @property
-    def app_dir(self) -> Path:
-        """Directory of the application image's build (differs under sysbuild)."""
-        return self.dir / self.spec.app.resolve().name if self.spec.sysbuild else self.dir
+    def app(self) -> ImageContext:
+        return next(i for i in self.images if i.role == "app")
 
-    def has(self, a: Artifact) -> bool:
-        return (self.app_dir / a.value).is_file()
-
-    def missing_reason(self, a: Artifact) -> str:
-        """Why an artifact is missing, quoting the producing tool when it said."""
-        if a is Artifact.SPDX and self.log.is_file():
-            text = self.log.read_text()
-            tail = text[text.rfind(" spdx -d ") :] if " spdx -d " in text else ""
-            errors = [ln.strip() for ln in tail.splitlines() if ln.strip().startswith("ERROR:")]
-            if errors:
-                return f"west spdx: {errors[0].removeprefix('ERROR:').strip()}"
-            if self.status != "ok":
-                return f"the build {self.status.replace('-', ' ')}; west spdx needs a full build"
-        if a in BUILD_ONLY and self.spec.mode == "fast":
-            return f"{a.value} needs a full build (rerun without --fast)"
-        return f"{a.value} missing"
-
-    def artifact(self, a: Artifact) -> Path:
-        p = self.app_dir / a.value
-        if p.is_file():
-            return p
-        if a in BUILD_ONLY and self.spec.mode == "fast":
-            why = "it is only produced by a full build; rerun without --fast"
-        elif self.status != "ok":
-            why = f"the build {self.status.replace('-', ' ')} (see {self.log})"
-        else:
-            why = "the build did not produce it"
-        raise ArtifactMissing(
-            f"{a.value} missing for {self.spec.board} at {self.workspace.resolved.ref.spec}: {why}"
-        )
+    def image(self, name: str) -> ImageContext | None:
+        return next((i for i in self.images if i.name == name), None)
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -132,6 +157,7 @@ class BuildContext:
             "sysbuild": self.spec.sysbuild,
             "status": self.status,
             "key": self.key,
+            "images": [i.to_json() for i in self.images],
         }
 
 
@@ -197,8 +223,79 @@ def _copy_app(src: Path, dest: Path) -> None:
     tmp.rename(dest)
 
 
+_BANNER = re.compile(r"^\s*\*\s+Running CMake for (?P<image>\S+)\s+\*\s*$", re.M)
+_WRITTEN = re.compile(r"^-- Build files have been written to: (?P<dir>.+)$", re.M)
+SYSBUILD_SEGMENT = "sysbuild"
+
+
+def discover_images(bdir: Path, spec: BuildSpec) -> list[tuple[str, Path]]:
+    """(name, build dir) of every image, in flash order, from sysbuild's domains.yaml (the
+    file `west flash` reads). A plain build has no domains.yaml: one image, built in
+    bdir itself. A sysbuild configure that failed before writing domains.yaml falls back
+    to the image directories CMake created."""
+    import yaml
+
+    domains = bdir / "domains.yaml"
+    name = spec.app.resolve().name
+    if domains.is_file():
+        d = yaml.safe_load(domains.read_text())
+        dirs = {x["name"]: Path(x["build_dir"]) for x in d.get("domains", [])}
+        order = d.get("flash_order") or list(dirs)
+        return [(n, dirs[n]) for n in order if n in dirs] + [
+            (n, p) for n, p in dirs.items() if n not in order
+        ]
+    if not spec.sysbuild:
+        return [(name, bdir)]
+    found = sorted(
+        (p.name, p) for p in bdir.iterdir() if p.is_dir() and (p / "CMakeCache.txt").is_file()
+    )
+    # Configure stopped before the app image existed: keep it, as configure-failed.
+    return found if any(n == name for n, _ in found) else [*found, (name, bdir / name)]
+
+
+def split_configure_log(text: str, images: list[tuple[str, Path]]) -> dict[str, str]:
+    """Attribute merged configure output to images. Sysbuild announces each image with a
+    "Running CMake for <image>" banner; output before the first one is sysbuild's own.
+    Without banners (a plain build, or a version that doesn't print them), a segment
+    belongs to the image whose build directory it mentions most."""
+    names = {n for n, _ in images}
+    if len(images) == 1 and not _BANNER.search(text):
+        return {images[0][0]: text}
+    out: dict[str, str] = {}
+    starts = [(m.start(), m["image"]) for m in _BANNER.finditer(text) if m["image"] in names]
+    if starts:
+        out[SYSBUILD_SEGMENT] = text[: starts[0][0]]
+        for (pos, name), nxt in zip(starts, [*starts[1:], (len(text), "")], strict=True):
+            out[name] = out.get(name, "") + text[pos : nxt[0]]
+        return out
+    for seg in re.split(r"(?<=\n)(?=-- Application: )", text):
+        counts = {n: seg.count(str(d) + "/") + seg.count(str(d) + "\n") for n, d in images}
+        best = max(counts, key=lambda n: counts[n]) if counts else ""
+        key = best if counts.get(best) else SYSBUILD_SEGMENT
+        out[key] = out.get(key, "") + seg
+    return out
+
+
+def _role(name: str, d: Path, default: str) -> tuple[ImageRole, str]:
+    if name == default:
+        return "app", "the default image (domains.yaml), or the only image"
+    cfg = d / Artifact.CONFIG.value
+    if cfg.is_file() and re.search(r"^CONFIG_MCUBOOT=y$", cfg.read_text(), re.M):
+        return "bootloader", "CONFIG_MCUBOOT=y in the image's .config"
+    return "other", "neither the default image nor MCUboot"
+
+
 def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> BuildContext:
-    """Configure (fast) or build (full) `spec` in an isolated, cached directory."""
+    """Configure (fast) or build (full) `spec` in an isolated, cached directory.
+
+    Steps, each logged on its own so output is attributed to the image that printed it:
+      1. configure everything (`west build --cmake-only`), stdout+stderr merged in order;
+      2. full mode: build each image separately (`cmake --build <image dir>`, in flash
+         order);
+      3. sysbuild: build the top level, which signs and merges what step 2 produced;
+      4. generate SPDX per image with this ref's `west spdx`.
+    A plain build is the one-image case of the same steps.
+    """
     modules = ws.modules(runner)
     key = build_key(ws, spec, modules)
     src = app_source(ws, spec)
@@ -206,22 +303,23 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
     marker = cache.builds / f"{key}.json"
     log = cache.builds / f"{key}.log"
     if marker.is_file() and bdir.is_dir():
-        status: BuildStatus = json.loads(marker.read_text())["status"]
+        meta = json.loads(marker.read_text())
         runner.redactions.setdefault(str(bdir), f"$BUILD[{key}]")
-        return BuildContext(ws, spec, key, bdir, status, log, src)
+        images = tuple(_image_from_json(x, bdir, spec, ws) for x in meta["images"])
+        return BuildContext(ws, spec, key, bdir, meta["status"], log, src, images)
 
     shutil.rmtree(bdir, ignore_errors=True)
     src.parent.mkdir(parents=True, exist_ok=True)
     _copy_app(spec.app.resolve(), src)
+    logs = bdir / "zmig-logs"
+    logs.mkdir(parents=True)
     # Ask CMake for its file-based API reply (codemodel), which `west spdx` reads. This
     # empty query file is what `west spdx --init` creates on every version from v3.6
-    # to v4.4, so zmig creates it directly instead of branching per version.
-    # Under sysbuild each image is its own CMake build; the app image's is <bdir>/<app>.
-    image_dirs = [bdir] + ([bdir / spec.app.resolve().name] if spec.sysbuild else [])
-    for d in image_dirs:
-        query = d / ".cmake" / "api" / "v1" / "query" / "codemodel-v2"
-        query.parent.mkdir(parents=True, exist_ok=True)
-        query.touch()
+    # to v4.4. Under sysbuild every image is its own CMake build, but image directories
+    # are only known after configure, so the app's is pre-created here; the others get
+    # one after configure, followed by a CMake re-run on that image (step 2).
+    for d in [bdir] + ([bdir / spec.app.resolve().name] if spec.sysbuild else []):
+        _cmake_query(d)
     env = {"ZEPHYR_BASE": str(ws.zephyr)}
     if is_host_board(spec.board):
         env["ZEPHYR_TOOLCHAIN_VARIANT"] = "host"
@@ -237,10 +335,7 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
         "-s",
         str(src),
         "--sysbuild" if spec.sysbuild else "--no-sysbuild",
-    ]
-    if spec.mode == "fast":
-        argv.append("--cmake-only")
-    argv += [
+        "--cmake-only",
         "--",
         f"-DPython3_EXECUTABLE={sys.executable}",
         "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
@@ -254,28 +349,87 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
         argv.append("-DZEPHYR_MODULES=" + ";".join(str(m.path) for m in modules))
     # PYTHONPATH from the user's shell (e.g. ROS) can shadow the packages Zephyr's
     # scripts import; the build must see only zmig's interpreter environment.
-    proc = runner.run(argv, cwd=ws.root, env=env, unset_env=["PYTHONPATH"], check=False)
-    log.write_text(f"$ {' '.join(argv)}\n{proc.stdout}\n{proc.stderr}")
+    run_env = {"env": env, "unset_env": ["PYTHONPATH"], "check": False, "merge_output": True}
+    conf = runner.run(argv, cwd=ws.root, **run_env)  # type: ignore[arg-type]
+    configure_text = f"$ {' '.join(argv)}\n{conf.stdout}"
+    found = discover_images(bdir, spec)
+    segments = split_configure_log(configure_text, found)
+    default = _default_image(bdir, spec)
+    parts = [configure_text]
+    statuses: dict[str, BuildStatus] = {}
+    build_text: dict[str, str] = {}
+    cmake = str(find_tool("cmake"))
+    for name, d in found:
+        configured = (d / "build.ninja").is_file() and (d / Artifact.CONFIG.value).is_file()
+        statuses[name] = "ok" if configured else "configure-failed"
+        if conf.returncode != 0 and not configured:
+            continue
+        if spec.mode == "full" and configured:
+            # Images whose directories didn't exist before configure have no file-API
+            # reply yet; re-running CMake on the existing cache generates it.
+            # Sysbuild forwards -DCONFIG_BUILD_OUTPUT_META only to the default image, but
+            # every image needs it for `west spdx` (set on both refs, so it never shows up
+            # as a difference).
+            no_meta = not re.search(
+                r"^CONFIG_BUILD_OUTPUT_META=y$", (d / Artifact.CONFIG.value).read_text(), re.M
+            )
+            if no_meta or not (d / ".cmake" / "api" / "v1" / "reply").is_dir():
+                _cmake_query(d)
+                proc = runner.run([cmake, "-DCONFIG_BUILD_OUTPUT_META=y", str(d)], cwd=d, **run_env)  # type: ignore[arg-type]
+                build_text[name] = f"$ cmake -DCONFIG_BUILD_OUTPUT_META=y {d}\n{proc.stdout}"
+            proc = runner.run([cmake, "--build", str(d)], **run_env)  # type: ignore[arg-type]
+            build_text[name] = build_text.get(name, "") + f"$ cmake --build {d}\n{proc.stdout}"
+            parts.append(build_text[name])
+            if proc.returncode != 0:
+                statuses[name] = "build-failed"
+    overall: BuildStatus = "ok"
+    if conf.returncode != 0:
+        overall = "configure-failed"
+    elif any(s == "build-failed" for s in statuses.values()):
+        overall = "build-failed"
+    if spec.sysbuild and spec.mode == "full" and overall == "ok":
+        proc = runner.run([cmake, "--build", str(bdir)], **run_env)  # type: ignore[arg-type]
+        top = f"$ cmake --build {bdir}\n{proc.stdout}"
+        parts.append(top)
+        segments[SYSBUILD_SEGMENT] = segments.get(SYSBUILD_SEGMENT, "") + top
+        if proc.returncode != 0:
+            overall = "build-failed"
+    log.write_text("\n".join(parts))
+    if segments.get(SYSBUILD_SEGMENT):
+        (logs / f"{SYSBUILD_SEGMENT}.log").write_text(segments[SYSBUILD_SEGMENT])
 
-    if proc.returncode == 0:
-        status = "ok"
-    else:
-        configured = (
-            (bdir / Artifact.CONFIG.value).is_file()
-            if not spec.sysbuild
-            else (bdir / spec.app.resolve().name / Artifact.CONFIG.value).is_file()
+    built: list[ImageContext] = []
+    for name, d in found:
+        ilog = logs / f"{name}.log"
+        ilog.write_text(segments.get(name, "") + build_text.get(name, ""))
+        if spec.mode == "full" and statuses[name] == "ok":
+            _spdx(ws, d, env, runner)
+        role, why = _role(name, d, default)
+        # The image's own board target: in multi-core sysbuild an image can be built for
+        # another core's board target than the one passed with -b.
+        board = spec.board
+        cfg = d / Artifact.CONFIG.value
+        if cfg.is_file() and (
+            bt := re.search(r'^CONFIG_BOARD_TARGET="([^"]+)"$', cfg.read_text(), re.M)
+        ):
+            board = bt[1]
+        built.append(
+            ImageContext(
+                name,
+                role,
+                why,
+                d,
+                ilog,
+                statuses[name],
+                spec.mode,
+                board,
+                ws.resolved.ref.spec,
+            )
         )
-        status = (
-            "build-failed"
-            if configured and (bdir / "build.ninja").is_file()
-            else "configure-failed"
-        )
-    if status != "configure-failed":
-        _spdx(ws, spec, bdir, env, runner, log)
     marker.write_text(
         json.dumps(
             {
-                "status": status,
+                "status": overall,
                 "spec": {
                     "app": str(spec.app),
                     "board": spec.board,
@@ -284,12 +438,44 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
                     "cmake_args": list(spec.cmake_args),
                 },
                 "ref": ws.resolved.ref.to_json(),
+                "images": [{**i.to_json(), "dir": str(i.dir), "log": str(i.log)} for i in built],
             },
             indent=2,
         )
     )
     runner.redactions.setdefault(str(bdir), f"$BUILD[{key}]")
-    return BuildContext(ws, spec, key, bdir, status, log, src)
+    return BuildContext(ws, spec, key, bdir, overall, log, src, tuple(built))
+
+
+def _default_image(bdir: Path, spec: BuildSpec) -> str:
+    import yaml
+
+    domains = bdir / "domains.yaml"
+    if domains.is_file():
+        return str(yaml.safe_load(domains.read_text()).get("default", ""))
+    return spec.app.resolve().name
+
+
+def _image_from_json(
+    x: dict[str, Any], bdir: Path, spec: BuildSpec, ws: RefWorkspace
+) -> ImageContext:
+    return ImageContext(
+        x["name"],
+        x["role"],
+        x["role_source"],
+        Path(x["dir"]),
+        Path(x["log"]),
+        x["status"],
+        spec.mode,
+        x.get("board", spec.board),
+        ws.resolved.ref.spec,
+    )
+
+
+def _cmake_query(d: Path) -> None:
+    query = d / ".cmake" / "api" / "v1" / "query" / "codemodel-v2"
+    query.parent.mkdir(parents=True, exist_ok=True)
+    query.touch()
 
 
 # --- Salvage -------------------------------------------------------------------------
@@ -405,8 +591,13 @@ def build_with_salvage(
     all_edits: list[SalvageEdit] = []
     current = original
     for _ in range(MAX_SALVAGE_ROUNDS):
-        # Paths in the log point at whichever app copy that build used.
-        edits = locate_salvage_edits(current.log.read_text(), current.src)
+        # Each image's own log: under sysbuild, errors in one image's configure name
+        # files of the app copy that build used (prj.conf, sysbuild/<image>.conf, ...).
+        edits = []
+        for img in current.images:
+            edits += locate_salvage_edits(img.log.read_text(), current.src)
+        if not current.images:
+            edits = locate_salvage_edits(current.log.read_text(), current.src)
         new_edits = [
             e for e in edits if (e.file, e.line) not in {(a.file, a.line) for a in all_edits}
         ]
@@ -419,18 +610,19 @@ def build_with_salvage(
             break
     if not all_edits:
         return SalvageResult(original, None, ())
-    return SalvageResult(original, current, tuple(all_edits))
+    return SalvageResult(
+        original, current, tuple(sorted(all_edits, key=lambda e: (e.file, e.line)))
+    )
 
 
-def _spdx(
-    ws: RefWorkspace, spec: BuildSpec, bdir: Path, env: dict[str, str], runner: Runner, log: Path
-) -> None:
-    """Generate SPDX documents with this ref's own `west spdx` (best effort: a failure is
-    logged and leaves the SPDX artifact missing, which the sbom analyzer reports). The
+def _spdx(ws: RefWorkspace, image_dir: Path, env: dict[str, str], runner: Runner) -> None:
+    """SPDX documents for one image with this ref's own `west spdx` (best effort: a
+    failure leaves the artifact missing, and missing_reason() quotes spdx's error). The
     exit status isn't trusted: v3.6's spdx exits 0 after "bailing"."""
-    app_dir = bdir / spec.app.resolve().name if spec.sysbuild else bdir
-    out = app_dir / "spdx"
-    argv = [*west_argv(), "spdx", "-d", str(app_dir), "-s", str(out)]
-    proc = runner.run(argv, cwd=ws.root, env=env, unset_env=["PYTHONPATH"], check=False)
-    with log.open("a") as f:
-        f.write(f"\n$ {' '.join(argv)}\nexit {proc.returncode}\n{proc.stdout}\n{proc.stderr}")
+    argv = [*west_argv(), "spdx", "-d", str(image_dir), "-s", str(image_dir / "spdx")]
+    proc = runner.run(
+        argv, cwd=ws.root, env=env, unset_env=["PYTHONPATH"], check=False, merge_output=True
+    )
+    (image_dir / "zmig-spdx.log").write_text(
+        f"$ {' '.join(argv)}\nexit {proc.returncode}\n{proc.stdout}"
+    )

@@ -12,6 +12,7 @@ can't place is ignored rather than guessed.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -186,11 +187,15 @@ def _scan_overlay(rel: str, text: str, u: ProjectUsage) -> None:
             break
 
 
-def scan(app: Path) -> ProjectUsage:
+def scan(app: Path, include: Callable[[str], bool] | None = None) -> ProjectUsage:
+    """Index the app's references; `include` (on app-relative paths) limits which files
+    count, e.g. to the files one sysbuild image applies."""
     app = app.resolve()
     u = ProjectUsage(app)
     for p in _files(app):
         rel = p.relative_to(app).as_posix()
+        if include is not None and not include(rel):
+            continue
         try:
             text = p.read_text()
         except UnicodeDecodeError:

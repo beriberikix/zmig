@@ -137,7 +137,10 @@ class Runner:
         unset_env: Sequence[str] = (),
         check: bool = True,
         input: str | None = None,
+        merge_output: bool = False,
     ) -> subprocess.CompletedProcess[str]:
+        """Run a command. With merge_output, stderr is interleaved into stdout in the
+        order the tool wrote them (needed to attribute warnings), and stderr is empty."""
         args = [str(a) for a in argv]
         inv_id = f"cmd-{len(self.invocations) + 1:03d}"
         full_env = dict(os.environ)
@@ -151,10 +154,13 @@ class Runner:
             cwd=cwd,
             env=full_env,
             input=input,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT if merge_output else subprocess.PIPE,
             text=True,
             errors="replace",
         )
+        if proc.stderr is None:
+            proc.stderr = ""
         duration = time.monotonic() - start
 
         log_rel = ""

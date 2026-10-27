@@ -56,7 +56,7 @@ class BoardAnalyzer:
             )
 
         m = ctx.board_mapping
-        if m is not None and m.how == "deprecated.cmake":
+        if ctx.is_app and m is not None and m.how == "deprecated.cmake":
             ev: list[JSON] = [
                 file_line(
                     f"<zephyr {m.tag}>/boards/deprecated.cmake",
@@ -64,7 +64,7 @@ class BoardAnalyzer:
                     f"set({m.source.split('@')[0]}_DEPRECATED {m.target})",
                 )
             ]
-            if ctx.new.has(Artifact.CONFIG) and (t := ctx.new_config.get("BOARD_TARGET")):
+            if ctx.new_img.has(Artifact.CONFIG) and (t := ctx.new_config.get("BOARD_TARGET")):
                 ev.append(
                     artifact_diff(
                         "zephyr/.config",
@@ -115,7 +115,7 @@ class BoardAnalyzer:
 
         # Compare the app files each build applied, only when both configures got far
         # enough to report them (a failed configure lists nothing, which proves nothing).
-        if "configure-failed" in (ctx.old.status, ctx.new.status):
+        if "configure-failed" in (ctx.old_img.status, ctx.new_img.status):
             return AnalyzerResult(findings)
         old_inputs = set(app_relative(ctx.old_facts.overlays, ctx.old.src)) | set(
             app_relative(ctx.old_facts.configs, ctx.old.src)

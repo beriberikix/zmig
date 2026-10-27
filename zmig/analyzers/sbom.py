@@ -24,7 +24,7 @@ from zmig.findings import (
     file_line,
     plural,
 )
-from zmig.sbom import compiled_sources, read_spdx_dir
+from zmig.sbom import APP_PACKAGE, compiled_sources, read_spdx_dir
 from zmig.scan import ScanContext
 
 TOP_FILES = 15
@@ -45,13 +45,13 @@ class SbomAnalyzer:
         old = {
             _norm(k): v
             for k, v in compiled_sources(
-                read_spdx_dir(ctx.old.artifact(Artifact.SPDX).parent)
+                read_spdx_dir(ctx.old_img.artifact(Artifact.SPDX).parent)
             ).items()
         }
         new = {
             _norm(k): v
             for k, v in compiled_sources(
-                read_spdx_dir(ctx.new.artifact(Artifact.SPDX).parent)
+                read_spdx_dir(ctx.new_img.artifact(Artifact.SPDX).parent)
             ).items()
         }
         findings: list[Finding] = []
@@ -85,11 +85,16 @@ class SbomAnalyzer:
 
         old_mods = {_norm(m.name): m.sha for m in ctx.old.workspace.modules(ctx.runner)}
         new_mods = {_norm(m.name): m.sha for m in ctx.new.workspace.modules(ctx.runner)}
-        for mod in sorted(old.keys() - new.keys() - {"zephyr"}):
+        not_modules = {"zephyr", APP_PACKAGE}
+        # Only modules that compile files into this image: a module's package can be
+        # present with no files (it's in the workspace, the image doesn't use it).
+        old = {k: v for k, v in old.items() if v or k in not_modules}
+        new = {k: v for k, v in new.items() if v or k in not_modules}
+        for mod in sorted(old.keys() - new.keys() - not_modules):
             add(
                 "module-dropped",
                 mod,
-                f"Module {mod} is no longer compiled at {ctx.new_spec}",
+                f"Module {mod} is no longer compiled into {ctx.image} at {ctx.new_spec}",
                 Severity.RISKY,
                 "Check whether its functionality moved or must be enabled "
                 "differently (Kconfig) at the target.",
@@ -100,34 +105,38 @@ class SbomAnalyzer:
                     ),
                 ),
             )
-        for mod in sorted(new.keys() - old.keys() - {"zephyr"}):
+        for mod in sorted(new.keys() - old.keys() - not_modules):
             add(
                 "module-added",
                 mod,
-                f"Module {mod} is newly compiled at {ctx.new_spec}",
+                f"Module {mod} is newly compiled into {ctx.image} at {ctx.new_spec}",
                 Severity.INFO,
                 "Review its license and footprint.",
                 new_v=new_mods.get(mod),
             )
-        for mod in sorted((old.keys() & new.keys()) - {"zephyr"}):
+        for mod in sorted((old.keys() & new.keys()) - not_modules):
             if old_mods.get(mod) != new_mods.get(mod):
                 changed = sorted(
                     f for f in old[mod].keys() & new[mod].keys() if old[mod][f] != new[mod][f]
                 )
+                added = sorted(new[mod].keys() - old[mod].keys())
+                removed = sorted(old[mod].keys() - new[mod].keys())
+                n = len(changed) + len(added) + len(removed)
                 add(
                     "module-repinned",
                     mod,
                     f"Module {mod} moves from {(old_mods.get(mod) or '?')[:12]} to "
-                    f"{(new_mods.get(mod) or '?')[:12]}; "
-                    f"{plural(len(changed), 'compiled file')} changed",
-                    Severity.RISKY if changed else Severity.INFO,
+                    f"{(new_mods.get(mod) or '?')[:12]}; {plural(n, 'file')} compiled into "
+                    f"{ctx.image} changed ({len(changed)} modified, {len(added)} added, "
+                    f"{len(removed)} removed)",
+                    Severity.RISKY if n else Severity.INFO,
                     "Read the module's changelog for that range.",
                     old_v=old_mods.get(mod),
                     new_v={
                         "sha": new_mods.get(mod),
                         "changed": changed,
-                        "added": sorted(new[mod].keys() - old[mod].keys()),
-                        "removed": sorted(old[mod].keys() - new[mod].keys()),
+                        "added": added,
+                        "removed": removed,
                     },
                 )
 

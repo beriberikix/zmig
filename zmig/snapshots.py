@@ -19,12 +19,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from zmig.buildctx import Artifact, BuildContext
+from zmig.buildctx import Artifact, ImageContext
 from zmig.errors import ArtifactMissing, ZmigError
 from zmig.tools import Runner
+from zmig.workspace import RefWorkspace
 
 EXTRACT = Path(__file__).parent / "extract"
-SNAPSHOT_VERSION = 2
+SNAPSHOT_VERSION = 3
 
 ConfigValues = dict[str, str]
 
@@ -40,8 +41,8 @@ def parse_dotconfig(text: str) -> ConfigValues:
     return out
 
 
-def config_values(ctx: BuildContext) -> ConfigValues:
-    return parse_dotconfig(ctx.artifact(Artifact.CONFIG).read_text())
+def config_values(img: ImageContext) -> ConfigValues:
+    return parse_dotconfig(img.artifact(Artifact.CONFIG).read_text())
 
 
 def menuconfig_env(build_ninja: Path) -> tuple[dict[str, str], Path]:
@@ -67,8 +68,8 @@ def menuconfig_env(build_ninja: Path) -> tuple[dict[str, str], Path]:
     )
 
 
-def _cached(ctx: BuildContext, name: str, produce: Any) -> dict[str, Any]:
-    path = ctx.app_dir / f"zmig-{name}.json"
+def _cached(img: ImageContext, name: str, produce: Any) -> dict[str, Any]:
+    path = img.dir / f"zmig-{name}.json"
     if path.is_file():
         data: dict[str, Any] = json.loads(path.read_text())
         if data.get("_v") == SNAPSHOT_VERSION:
@@ -80,12 +81,13 @@ def _cached(ctx: BuildContext, name: str, produce: Any) -> dict[str, Any]:
     return data
 
 
-def kconfig_symbols(ctx: BuildContext, runner: Runner) -> dict[str, dict[str, Any]]:
-    ninja = ctx.app_dir / "build.ninja"
+def kconfig_symbols(
+    img: ImageContext, ws: RefWorkspace, runner: Runner
+) -> dict[str, dict[str, Any]]:
+    ninja = img.dir / "build.ninja"
     if not ninja.is_file():
         raise ArtifactMissing(
-            f"build.ninja missing for {ctx.spec.board} at "
-            f"{ctx.workspace.resolved.ref.spec} (configure failed)"
+            f"build.ninja missing for image {img.name} at {img.ref} (configure failed)"
         )
 
     def produce(out: Path) -> None:
@@ -94,7 +96,7 @@ def kconfig_symbols(ctx: BuildContext, runner: Runner) -> dict[str, dict[str, An
             [
                 sys.executable,
                 EXTRACT / "kconfig_dump.py",
-                ctx.workspace.zephyr / "scripts" / "kconfig",
+                ws.zephyr / "scripts" / "kconfig",
                 root,
                 out,
             ],
@@ -102,33 +104,33 @@ def kconfig_symbols(ctx: BuildContext, runner: Runner) -> dict[str, dict[str, An
             unset_env=["PYTHONPATH"],
         )
 
-    syms: dict[str, dict[str, Any]] = _cached(ctx, "kconfig", produce)["symbols"]
+    syms: dict[str, dict[str, Any]] = _cached(img, "kconfig", produce)["symbols"]
     return syms
 
 
-def edt(ctx: BuildContext, runner: Runner) -> dict[str, Any]:
-    pickle_path = ctx.artifact(Artifact.EDT)
+def edt(img: ImageContext, ws: RefWorkspace, runner: Runner) -> dict[str, Any]:
+    pickle_path = img.artifact(Artifact.EDT)
 
     def produce(out: Path) -> None:
         runner.run(
             [
                 sys.executable,
                 EXTRACT / "edt_dump.py",
-                ctx.workspace.zephyr / "scripts" / "dts" / "python-devicetree" / "src",
+                ws.zephyr / "scripts" / "dts" / "python-devicetree" / "src",
                 pickle_path,
-                ctx.workspace.root,
+                ws.root,
                 out,
             ],
             unset_env=["PYTHONPATH"],
         )
 
-    return _cached(ctx, "edt", produce)
+    return _cached(img, "edt", produce)
 
 
-def app_undefined_symbols(ctx: BuildContext, app: Path, runner: Runner) -> set[str] | None:
+def app_undefined_symbols(img: ImageContext, app: Path, runner: Runner) -> set[str] | None:
     """Symbols the app's own object files reference but don't define (`nm -u`): the
     Zephyr APIs it actually calls. None when there are no objects (a --fast build)."""
-    cc = ctx.app_dir / "compile_commands.json"
+    cc = img.dir / "compile_commands.json"
     if not cc.is_file():
         return None
     root = str(app.resolve()) + "/"
@@ -142,7 +144,7 @@ def app_undefined_symbols(ctx: BuildContext, app: Path, runner: Runner) -> set[s
     if not objects:
         return None
     nm = "nm"
-    cache_txt = ctx.app_dir / "CMakeCache.txt"
+    cache_txt = img.dir / "CMakeCache.txt"
     if cache_txt.is_file() and (
         m := re.search(r"^CMAKE_NM:\w+=(.+)$", cache_txt.read_text(), re.M)
     ):

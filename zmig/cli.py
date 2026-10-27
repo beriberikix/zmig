@@ -30,7 +30,6 @@ from zmig.tools import (
     find_tool,
     tool_version,
 )
-from zmig.usage import scan as usage_scan
 from zmig.workspace import materialize
 
 log = logging.getLogger("zmig")
@@ -280,7 +279,9 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         old=old,
         new=salvage.effective,
         new_raw=salvage.original,
-        usage=usage_scan(app),
+        old_img=old.app,
+        new_img=salvage.effective.app,
+        new_raw_img=salvage.original.app,
         salvage=salvage.edits,
         board_mapping=mapping,
         all_guide_entries=args.all_guide_entries,

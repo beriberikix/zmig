@@ -1,14 +1,22 @@
-"""Inputs shared by the `scan` analyzers."""
+"""Inputs shared by the `scan` analyzers.
+
+A ScanContext compares one image of the source build with the same image of the target
+build. A plain build has one image (the app); a sysbuild build is analyzed once per image
+present on both sides (app, MCUboot, ...). Analyzers that look at the build as a whole
+(the guide, image-set and cross-image analyzers) receive the app image's context and use
+`old` / `new` (the BuildContexts) for the rest.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property
+from pathlib import Path
 from typing import Any
 
 from zmig.boards import BoardMapping
-from zmig.buildctx import BuildContext, SalvageEdit
-from zmig.diagnostics import LogFacts, parse_log
+from zmig.buildctx import BuildContext, ImageContext, SalvageEdit
+from zmig.diagnostics import LogFacts, app_relative, parse_log
 from zmig.findings import Finding
 from zmig.guides import NOTES_SECTION, Document, Entry, load_documents, parse
 from zmig.snapshots import (
@@ -20,6 +28,9 @@ from zmig.snapshots import (
 )
 from zmig.tools import Runner
 from zmig.usage import ProjectUsage
+from zmig.usage import scan as usage_scan
+
+SYSBUILD_DIR = "sysbuild"  # per-image sysbuild configuration inside an app
 
 
 @dataclass
@@ -28,20 +39,45 @@ class ScanContext:
     old: BuildContext
     new: BuildContext  # what analyzers compare: the salvaged build if salvage was needed
     new_raw: BuildContext  # the target build of the app as the user wrote it
-    usage: ProjectUsage
+    old_img: ImageContext
+    new_img: ImageContext
+    new_raw_img: ImageContext | None
     salvage: tuple[SalvageEdit, ...] = ()
     board_mapping: BoardMapping | None = None
     # Findings of the analyzers that already ran (the guide analyzer links to them).
     prior: list[Finding] = field(default_factory=list)
     all_guide_entries: bool = False
+    # Caches shared by the contexts of all images of one scan.
+    shared: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def for_image(cls, base: ScanContext, name: str) -> ScanContext | None:
+        """The context for image `name`, if both builds have it."""
+        o, n = base.old.image(name), base.new.image(name)
+        if o is None or n is None:
+            return None
+        return replace(
+            base, old_img=o, new_img=n, new_raw_img=base.new_raw.image(name), prior=base.prior
+        )
+
+    @property
+    def image(self) -> str:
+        return self.old_img.name
+
+    @property
+    def is_app(self) -> bool:
+        return self.old_img.role == "app"
 
     @property
     def scope(self) -> tuple[str, ...]:
-        return (
+        """Identity of the comparison, for finding ids. The app image adds nothing, so
+        ids of single-image builds are unchanged."""
+        base = (
             self.old.workspace.resolved.ref.sha,
             self.new.workspace.resolved.ref.sha,
             self.old.spec.board,
         )
+        return base if self.is_app else (*base, self.image)
 
     @property
     def old_spec(self) -> str:
@@ -51,59 +87,99 @@ class ScanContext:
     def new_spec(self) -> str:
         return self.new.workspace.resolved.ref.spec
 
+    # --- what the user's app contributes to this image --------------------------------
+
+    @cached_property
+    def usage(self) -> ProjectUsage:
+        """References from the app's files that apply to this image. For the app image:
+        everything except per-image sysbuild configuration (sysbuild/, sysbuild.conf).
+        For other images: the app files that image's build applied (from its log)."""
+        app = self.old.spec.app.resolve()
+        if self.is_app:
+
+            def keep(rel: str) -> bool:
+                return not (rel.startswith(SYSBUILD_DIR + "/") or rel == "sysbuild.conf")
+
+            return usage_scan(app, include=keep)
+        applied = set(app_relative(self.old_facts.overlays + self.old_facts.configs, self.old.src))
+        return usage_scan(app, include=lambda rel: rel in applied)
+
+    @property
+    def app_usage(self) -> ProjectUsage:
+        if "app_usage" not in self.shared:
+            self.shared["app_usage"] = usage_scan(self.old.spec.app.resolve())
+        usage: ProjectUsage = self.shared["app_usage"]
+        return usage
+
+    # --- snapshots of this image -------------------------------------------------------
+
     @cached_property
     def old_config(self) -> ConfigValues:
-        return config_values(self.old)
+        return config_values(self.old_img)
 
     @cached_property
     def new_config(self) -> ConfigValues:
-        return config_values(self.new)
+        return config_values(self.new_img)
 
     @cached_property
     def old_kconfig(self) -> dict[str, dict[str, Any]]:
-        return kconfig_symbols(self.old, self.runner)
+        return kconfig_symbols(self.old_img, self.old.workspace, self.runner)
 
     @cached_property
     def new_kconfig(self) -> dict[str, dict[str, Any]]:
-        return kconfig_symbols(self.new, self.runner)
+        return kconfig_symbols(self.new_img, self.new.workspace, self.runner)
 
     @cached_property
     def old_edt(self) -> dict[str, Any]:
-        return edt(self.old, self.runner)
+        return edt(self.old_img, self.old.workspace, self.runner)
 
     @cached_property
     def new_edt(self) -> dict[str, Any]:
-        return edt(self.new, self.runner)
+        return edt(self.new_img, self.new.workspace, self.runner)
 
     @cached_property
     def old_facts(self) -> LogFacts:
-        return parse_log(self.old.log.read_text())
+        return parse_log(self.old_img.log.read_text())
 
     @cached_property
     def new_facts(self) -> LogFacts:
-        return parse_log(self.new.log.read_text())
+        return parse_log(self.new_img.log.read_text())
 
     @cached_property
     def new_raw_facts(self) -> LogFacts:
-        """Diagnostics from the target build of the unmodified app."""
-        return parse_log(self.new_raw.log.read_text())
+        """Diagnostics from this image in the target build of the unmodified app."""
+        if self.new_raw_img is None:
+            return LogFacts()
+        return parse_log(self.new_raw_img.log.read_text())
+
+    @property
+    def raw_src(self) -> Path:
+        return self.new_raw.src
 
     @cached_property
     def app_linked_symbols(self) -> set[str] | None:
         """Undefined symbols of the app's objects in the source build (see nm)."""
-        if self.old.status != "ok":
+        if self.old.app.status != "ok":
             return None
-        return app_undefined_symbols(self.old, self.old.src, self.runner)
+        return app_undefined_symbols(self.old.app, self.old.src, self.runner)
 
-    @cached_property
+    # --- migration guides (shared by every image) -------------------------------------
+
+    @property
     def guide_documents(self) -> list[Document]:
-        return load_documents(self.old, self.new)
+        if "guide_documents" not in self.shared:
+            self.shared["guide_documents"] = load_documents(self.old, self.new)
+        docs: list[Document] = self.shared["guide_documents"]
+        return docs
 
-    @cached_property
+    @property
     def guide_entries(self) -> list[tuple[Document, Entry]]:
         """Parsed entries of every guide and release-notes document crossed."""
-        out: list[tuple[Document, Entry]] = []
-        for d in self.guide_documents:
-            prefix, filt = ("MG", None) if d.kind == "guide" else ("RN", NOTES_SECTION)
-            out += [(d, e) for e in parse(d.text, d.path, d.version, prefix, filt)]
-        return out
+        if "guide_entries" not in self.shared:
+            out: list[tuple[Document, Entry]] = []
+            for d in self.guide_documents:
+                prefix, filt = ("MG", None) if d.kind == "guide" else ("RN", NOTES_SECTION)
+                out += [(d, e) for e in parse(d.text, d.path, d.version, prefix, filt)]
+            self.shared["guide_entries"] = out
+        entries: list[tuple[Document, Entry]] = self.shared["guide_entries"]
+        return entries

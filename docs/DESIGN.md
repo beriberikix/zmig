@@ -232,6 +232,39 @@ venv prefix, version, and a digest of installed distributions.
   - zmig parses Zephyr's own messages into high-confidence findings. It then disables exactly the offending lines in a cache copy of the app, recording each one, and configures again, up to 4 rounds.
   - The analyzers compare against the salvaged build. The report lists every edit, and the user's app is never touched.
 
+### 4.3a Images (P0.5)
+
+A build is a list of **images**. `ImageContext` holds the image's name, role (`app`,
+`bootloader`, or `other`), role source, build directory, its own log, and its status.
+`BuildContext.images` holds the list.
+- **Plain builds** are the one-image case, with the image built in the build directory itself.
+- **Sysbuild builds:** images come from sysbuild's `domains.yaml` (names, build directories, flash order, default image). No directory names are assumed.
+- **Roles:** the default image is `app`. An image whose own `.config` has `CONFIG_MCUBOOT=y` is `bootloader`. Anything else is `other`.
+
+The build runs in steps, so every line of output is attributed to the image that printed it:
+1. **Configure** with `west build --cmake-only`, stdout and stderr merged in order. The output is split per image at sysbuild's "Running CMake for <image>" banners. Without banners, a segment goes to the image whose build directory it references. Text before the first banner is sysbuild's own.
+2. **Build each image** with `cmake --build <image dir>`, in flash order, into its own log. An image without a CMake file-API reply first gets the query and a CMake re-run on its existing cache.
+3. **Sysbuild finish:** the top-level build signs and merges.
+4. **SPDX per image.**
+
+**Analyzers:**
+- **Per-image analyzers** (`per_image = True`, the default) run once per image that both builds have: board, kconfig, devicetree, buildlog, and sbom. Each gets a `ScanContext` for that image pair, whose `usage` is what the app contributes to that image: the app's files for the app image (without `sysbuild/` and `sysbuild.conf`), and the app files that image applied for the others (for example `sysbuild/mcuboot.conf`).
+- **Build-wide analyzers** (`per_image = False`) run once: guide, images, and crossimage.
+- **The `image` field:** findings of non-app images carry `image` (schema 1.1, optional). Absent means the app image or the whole build, so plain-build reports and IDs are unchanged. Non-app images also add their name to the finding-ID scope.
+- **Reports** group findings by image when there is more than one.
+
+**`images` analyzer:** reports images added, removed, or changing role; a per-image summary of build status and changed compiled files (from each image's SBOM); and MCUboot's revision at both refs (module SHA and `git describe`). It also counts the changed MCUboot files compiled into the bootloader image: the image's own sources (`app.spdx`, which for MCUboot is `boot/zephyr`) plus the `mcuboot` module package.
+
+**`crossimage` analyzer:** checks agreement between images in the target build. It also checks the source build, to label an existing disagreement, which stays breaking.
+- **Partitions:** children of `fixed-partitions` must have the same `reg` in every image's final devicetree. Findings cite each image's `zephyr.dts` line and the user's overlay line.
+- **Settings:** `BOARD_TARGET`, `SOC`, `FLASH_SIZE`, and `FLASH_BASE_ADDRESS` must match.
+- **Option pairs:** derived at each ref from `share/sysbuild/image_configurations/{MAIN,BOOTLOADER}_image_default.cmake` (`zmig/sysbuild_rules.py`). An app option and a bootloader option switched on by the same `SB_CONFIG_*` symbol form a pair.
+  - If sysbuild's resolved config enables the trigger, both options must be on.
+  - Independently, an MCUboot-integration option (`CONFIG_MCUBOOT_*`) on one side needs a partner on the other.
+  - Generic options (e.g. `CONFIG_REBOOT`) are not checked without the trigger.
+
+**Salvage under sysbuild:** salvage locates errors in each image's own log, so it edits files such as `prj.conf` (app) and `sysbuild/mcuboot.conf` (MCUboot). The `xapp-salvage` fixture tests it.
+
 ### 4.4 External tools (`tools.py`)
 
 Every subprocess goes through one wrapper. It:

@@ -43,6 +43,11 @@ def norm(val):
     return repr(val)
 
 
+def dts_text(prop):
+    text = str(prop)
+    return text.split("=", 1)[1].strip().rstrip(";") if "=" in text else ""
+
+
 def specs(node):
     binding = getattr(node, "_binding", None)
     p2s = getattr(binding, "prop2specs", None) or {}
@@ -72,6 +77,9 @@ def main():
             "binding": rel(node.binding_path),
             "props": {k: norm(p.val) for k, p in node.props.items()},
             "raw_props": sorted(raw.props) if raw is not None else [],
+            # The property as the DTS writes it (dtlib's rendering, phandles as &labels),
+            # independent of what the node's binding declares or defaults.
+            "raw_values": {k: dts_text(p) for k, p in raw.props.items()} if raw is not None else {},
             "specs": specs(node),
         }
     chosen = {}

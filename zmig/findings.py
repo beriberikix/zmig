@@ -13,7 +13,7 @@ from enum import StrEnum
 from typing import Any
 
 SCHEMA_URI = "https://zmig.dev/schema/report/1"
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 
 class Severity(StrEnum):
@@ -38,6 +38,8 @@ class Category(StrEnum):
     BUILD = "build"
     GUIDE = "guide"
     SBOM = "sbom"
+    IMAGES = "images"
+    CROSSIMAGE = "crossimage"
 
 
 _SEV_ORDER = {Severity.BREAKING: 0, Severity.RISKY: 1, Severity.INFO: 2}
@@ -122,6 +124,9 @@ class Finding:
     new: Any = None
     related: tuple[str, ...] = ()
     heuristics: tuple[str, ...] = ()
+    # Sysbuild image the finding is about; None means the app image (or the build as a
+    # whole), which keeps reports of plain builds unchanged.
+    image: str | None = None
 
     @property
     def id(self) -> str:
@@ -151,6 +156,7 @@ class Finding:
             "related": sorted(self.related),
             "analyzer": self.analyzer,
             "heuristics": sorted(self.heuristics),
+            **({"image": self.image} if self.image else {}),
         }
 
 

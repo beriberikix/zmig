@@ -1,0 +1,4 @@
+/* App image only: move the secondary slot (MCUboot doesn't see this overlay). */
+&slot1_partition {
+	reg = <0x84000 0x74000>;
+};

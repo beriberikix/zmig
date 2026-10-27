@@ -57,6 +57,8 @@ SECTION_TITLES = {
     "build": "Build",
     "guide": "Migration guide",
     "sbom": "SBOM",
+    "images": "Images",
+    "crossimage": "Consistency between images",
 }
 _SEV_RANK = {Severity.BREAKING: 0, Severity.RISKY: 1, Severity.INFO: 2}
 PREVIEW = 8
@@ -119,6 +121,30 @@ def _item(f: Finding) -> list[str]:
     return lines
 
 
+def _categories(findings: list[Finding], level: str) -> list[str]:
+    """Findings grouped by category; sections by their worst finding, then name."""
+    by_cat: dict[Category, list[Finding]] = {}
+    for f in findings:
+        by_cat.setdefault(f.category, []).append(f)
+    out: list[str] = []
+    for cat in sorted(
+        by_cat, key=lambda c: (min(_SEV_RANK[f.severity] for f in by_cat[c]), str(c))
+    ):
+        out += [f"{level} {SECTION_TITLES.get(str(cat), str(cat).capitalize())}", ""]
+        for f in by_cat[cat]:
+            out += _item(f)
+        out.append("")
+    return out
+
+
+def _image_roles(report: Report) -> dict[str, str]:
+    roles: dict[str, str] = {}
+    for c in report.contexts:
+        for i in c.get("images", []):
+            roles[i["name"]] = i["role"]
+    return roles
+
+
 def render_markdown(report: Report) -> str:
     inp = report.inputs
     counts = report.counts()
@@ -142,20 +168,25 @@ def render_markdown(report: Report) -> str:
     if report.findings:
         out += ["## Do these first", ""]
         for i, f in enumerate(report.top(), 1):
-            out.append(f"{i}. **{f.severity}**: {f.title} (`{f.id}`)")
+            where = f"[{f.image}] " if f.image else ""
+            out.append(f"{i}. **{f.severity}**: {where}{f.title} (`{f.id}`)")
         out.append("")
-        by_cat: dict[Category, list[Finding]] = {}
+        groups: dict[str | None, list[Finding]] = {}
         for f in report.sorted_findings():
-            by_cat.setdefault(f.category, []).append(f)
-        # Sections by their worst finding (breaking, then risky, then info), then name.
-        for cat in sorted(
-            by_cat,
-            key=lambda c: (min(_SEV_RANK[f.severity] for f in by_cat[c]), str(c)),
-        ):
-            out += [f"## {SECTION_TITLES.get(str(cat), str(cat).capitalize())}", ""]
-            for f in by_cat[cat]:
-                out += _item(f)
-            out.append("")
+            groups.setdefault(f.image, []).append(f)
+        if set(groups) == {None}:
+            out += _categories(groups[None], "##")
+        else:
+            # One section per image: the app (which also holds build-wide findings)
+            # first, then the others in name order.
+            roles = _image_roles(report)
+            app = next((n for n, r in roles.items() if r == "app"), "app")
+            for image in [None, *sorted(k for k in groups if k is not None)]:
+                if image not in groups:
+                    continue
+                name = app if image is None else image
+                out += [f"## Image: {name} ({roles.get(name, 'image')})", ""]
+                out += _categories(groups[image], "###")
         low = [f for f in report.sorted_findings() if f.heuristics]
         if low:
             out += ["## Heuristic and low-confidence findings", ""]

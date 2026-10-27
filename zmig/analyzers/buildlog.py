@@ -128,8 +128,8 @@ class BuildlogAnalyzer:
             )
 
         salvaged = " (after salvage)" if ctx.salvage else ""
-        log = ctx.new.log.read_text()
-        if ctx.new.status == "configure-failed":
+        log = ctx.new_img.log.read_text()
+        if ctx.new_img.status == "configure-failed":
             tail = [
                 ln
                 for ln in log.splitlines()
@@ -146,7 +146,7 @@ class BuildlogAnalyzer:
             )
             return AnalyzerResult(findings)
 
-        if ctx.new.status == "build-failed":
+        if ctx.new_img.status == "build-failed":
             app = str(ctx.new.src)
             errors = build_errors(log)
             ev: list[JSON] = []
@@ -188,16 +188,16 @@ class BuildlogAnalyzer:
                 },
             )
 
-        if ctx.old.status == "ok":
+        if ctx.old_img.status == "ok":
             self._warnings(ctx, add)
-        if ctx.old.has(Artifact.ELF) and ctx.new.has(Artifact.ELF):
+        if ctx.old_img.has(Artifact.ELF) and ctx.new_img.has(Artifact.ELF):
             self._size(ctx, add)
         return AnalyzerResult(findings)
 
     @staticmethod
     def _warnings(ctx: ScanContext, add: Add) -> None:
-        old_w = parse_warnings(ctx.old.log.read_text())
-        new_w = parse_warnings(ctx.new.log.read_text())
+        old_w = parse_warnings(ctx.old_img.log.read_text())
+        new_w = parse_warnings(ctx.new_img.log.read_text())
         old_keys = {w.key(_roots(ctx.old)) for w in old_w}
         new_keys = {w.key(_roots(ctx.new)) for w in new_w}
         fresh: dict[tuple[str, str, str], BuildWarning] = {}
@@ -241,8 +241,8 @@ class BuildlogAnalyzer:
 
     @staticmethod
     def _size(ctx: ScanContext, add: Add) -> None:
-        o = footprint(ctx.old.artifact(Artifact.ELF))
-        n = footprint(ctx.new.artifact(Artifact.ELF))
+        o = footprint(ctx.old_img.artifact(Artifact.ELF))
+        n = footprint(ctx.new_img.artifact(Artifact.ELF))
         deltas = {
             s: n.symbols.get(s, 0) - o.symbols.get(s, 0)
             for s in o.symbols.keys() | n.symbols.keys()
@@ -258,7 +258,7 @@ class BuildlogAnalyzer:
         # From the build itself (POSIX arch = runs on the host), not the board's name.
         host = (
             ctx.new_config.get("ARCH_POSIX") == "y"
-            if ctx.new.has(Artifact.CONFIG)
+            if ctx.new_img.has(Artifact.CONFIG)
             else is_host_board(ctx.new.spec.board)
         )
         add(

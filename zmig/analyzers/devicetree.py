@@ -34,12 +34,7 @@ def _ev(locs: list[Loc]) -> tuple[JSON, ...]:
 def _dts_view(node: dict[str, Any]) -> tuple[Any, ...]:
     """What zephyr.dts shows for a node: labels and the properties written in the DTS.
     edtlib's `props` also holds binding defaults, which change when only a binding does."""
-    raw = set(node["raw_props"])
-    return (
-        sorted(node["labels"]),
-        sorted(raw),
-        {k: v for k, v in node["props"].items() if k in raw},
-    )
+    return (sorted(node["labels"]), node["raw_values"])
 
 
 def _prop_by_token(node: dict[str, Any], token: str) -> str | None:
@@ -177,10 +172,17 @@ class DevicetreeAnalyzer:
                     old_v=o["status"],
                     new_v=n["status"],
                 )
-            changed = {
+            # Properties written in the DTS (either side) vs. binding defaults that
+            # appeared, disappeared or changed with the binding alone.
+            # What the DTS writes (raw text) vs. binding defaults that appeared,
+            # disappeared or changed with the binding alone.
+            ro, rn = o["raw_values"], n["raw_values"]
+            written = ro.keys() | rn.keys()
+            changed = {k: [ro.get(k), rn.get(k)] for k in sorted(written) if ro.get(k) != rn.get(k)}
+            defaults = {
                 k: [o["props"].get(k), n["props"].get(k)]
                 for k in sorted(o["props"].keys() | n["props"].keys())
-                if o["props"].get(k) != n["props"].get(k)
+                if k not in written and o["props"].get(k) != n["props"].get(k)
             }
             if o["binding"] != n["binding"]:
                 changed["(binding)"] = [o["binding"], n["binding"]]
@@ -193,7 +195,20 @@ class DevicetreeAnalyzer:
                     Confidence.HIGH,
                     "Check these property changes against how your code uses the node.",
                     _ev(locs),
-                    new_v=changed,
+                    new_v={**changed, **({"binding_defaults": defaults} if defaults else {})},
+                )
+            elif defaults:
+                add(
+                    "node-binding-defaults",
+                    f"{describe(ref)}:{pn}",
+                    f"{describe(ref)} ({pn}): binding defaults changed, not set in the DTS: "
+                    f"{', '.join(sorted(defaults))}",
+                    Severity.INFO,
+                    Confidence.HIGH,
+                    "Only the binding changed; set the property explicitly if the new default "
+                    "matters to you.",
+                    _ev(locs),
+                    new_v=defaults,
                 )
 
         # Properties the app's overlays set.

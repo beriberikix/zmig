@@ -35,6 +35,23 @@ from zmig.scan import ScanContext
 from zmig.usage import Loc, dt_token, resolve
 
 MAX_APP_LOCS = 10
+GENERIC_DT_PROPERTIES = frozenset(
+    {
+        "reg",
+        "status",
+        "compatible",
+        "label",
+        "ranges",
+        "interrupts",
+        "interrupt-parent",
+        "clocks",
+        "pinctrl-0",
+        "pinctrl-names",
+        "#address-cells",
+        "#size-cells",
+        "reg-names",
+    }
+)
 _SEV = {"breaking": Severity.BREAKING, "risky": Severity.RISKY, "info": Severity.INFO}
 _GATE_WORDS = re.compile(r"\b(when|if|only|unless)\b", re.I)
 _SEV_RANK = {"breaking": 0, "risky": 1, "info": 2}
@@ -47,20 +64,21 @@ def _min_conf(*cs: Confidence) -> Confidence:
 
 class GuideAnalyzer:
     name: ClassVar[str] = "guide"
+    per_image: ClassVar[bool] = False  # matches the whole app against the guides
     kind: ClassVar[Literal["build"]] = "build"
     requires: ClassVar[frozenset[Artifact]] = frozenset()
 
     def analyze(self, ctx: ScanContext) -> AnalyzerResult:
-        u = ctx.usage
+        u = ctx.app_usage
         linked = ctx.app_linked_symbols
         # Compatibles of the nodes the app references, and which of them are enabled in
         # either build (a guide entry about a driver matters if its node is enabled).
         node_compats: dict[str, list[Loc]] = {}
         enabled_compats: set[str] = set()
         sides = []  # old first: node_compats records the app's references at the source
-        if ctx.old.has(Artifact.EDT):
+        if ctx.old_img.has(Artifact.EDT):
             sides.append(ctx.old_edt)
-        if ctx.new.has(Artifact.EDT):
+        if ctx.new_img.has(Artifact.EDT):
             sides.append(ctx.new_edt)
         for i, side in enumerate(sides):
             for ref, loc in u.dt_nodes:
@@ -68,11 +86,11 @@ class GuideAnalyzer:
                     continue
                 node = side["nodes"][p]
                 for c in node["compats"]:
-                    if i == 0 and ctx.old.has(Artifact.EDT):
+                    if i == 0 and ctx.old_img.has(Artifact.EDT):
                         node_compats.setdefault(dt_token(c), []).append(loc)
                     if node["status"] in ("okay", "ok"):
                         enabled_compats.add(dt_token(c))
-        have_config = ctx.old.has(Artifact.CONFIG) and ctx.new.has(Artifact.CONFIG)
+        have_config = ctx.old_img.has(Artifact.CONFIG) and ctx.new_img.has(Artifact.CONFIG)
 
         def enabled(sym: str) -> bool:
             return any(
@@ -145,6 +163,9 @@ class GuideAnalyzer:
                 ]
                 return base, Confidence.LOW, ["guide.header-basename"] if base else []
             # A plain literal: DT property names, underscore identifiers, board names.
+            # Properties every node has are too generic to tie an entry to the app.
+            if value in GENERIC_DT_PROPERTIES:
+                return [], Confidence.HIGH, []
             locs = props_set.get(value, []) + props_read.get(dt_token(value), [])
             if "_" in value and len(value) >= 4:
                 locs += u.identifiers.get(value, [])
