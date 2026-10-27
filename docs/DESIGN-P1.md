@@ -1,6 +1,6 @@
 # zmig P1 design: field-upgrade hazard analyzer
 
-Status: draft for review (2026-10-27). Nothing in this document is implemented yet.
+Status: approved with amendments (2026-10-27 review). Amended: §2.4, §5.3, §5.5, §5.6, §5.7, §8, §9, §10, §11, §13. Nothing is implemented yet.
 
 **Goal:** answer one question with evidence. Can a device that runs the `--from` build
 today receive the `--to` build over the air and keep working? If not, what has to happen
@@ -10,8 +10,7 @@ unknown.
 
 P1 extends the existing model rather than redesigning it: `ImageContext`/`BuildContext`
 (docs/DESIGN.md §4.3a), the analyzer protocol, `Finding`, `zmig/sysbuild_rules.py`, and
-the `images` and `crossimage` analyzers. Nothing blocks the work. One change needs your
-call: the verdict values in §8 (see open question Q1).
+the `images` and `crossimage` analyzers. Nothing blocks the work.
 
 ---
 
@@ -69,7 +68,7 @@ nothing below is hard-coded unless §10 says so.
 - **Severity is not lowered** for pre-existing problems, as you specified.
 - **Reports:** Markdown separates "Introduced by this migration" from "Pre-existing"; top-5 prefers introduced.
 
-### 2.4 Provenance on every hazard finding
+### 2.4 Provenance and remedy on every hazard finding
 
 New optional `provenance` object (schema 1.2):
 
@@ -87,7 +86,7 @@ New optional `provenance` object (schema 1.2):
 | `weak` | inferred indirectly, e.g. from the app's `CONFIG_BOOTLOADER_MCUBOOT=y` without a bootloader image in the build |
 | `unknown` | no evidence, e.g. a plain build with no sysbuild: zmig can't know what bootloader is deployed |
 
-Hazard findings that depend on a weak or unknown role are capped at **low** confidence, and say why.
+Hazard findings that depend on a weak or unknown role are capped at **low** confidence, and say why. Every hazard finding also carries `remedy` (§8.1).
 
 ### 2.5 "Not checked" section
 
@@ -159,26 +158,37 @@ Hazard findings that depend on a weak or unknown role are capped at **low** conf
 - **Format definitions** at the two MCUboot pins, via `srcdiff`: the image header struct and magic, TLV area magic and type IDs, trailer and boot-magic layout. Seeds: `IMAGE_MAGIC`, `struct image_header`, `IMAGE_TLV_INFO_MAGIC`, `IMAGE_TLV_*`, and the trailer and magic identifiers, verified per pin. "N files changed" is replaced by "format definitions changed: X; unchanged: Y; not interpreted: Z", each with `file:line` at both pins.
 - **SBOM:** files compiled into the bootloader whose diffs touch none of those definitions are summarized as "implementation changes, format definitions unchanged". That's medium confidence, because behavior can change without the declarations changing.
 
-### 5.3 Would a deployed bootloader accept the new image?
-- **The deployed bootloader** is assumed to be the source build's MCUboot. It is reported as such, with `role_evidence`, and `--deployed-image` refines it (§5.5).
-- **The new app image** is checked against it:
-  - signature type and key match (key file hash at both refs);
-  - header size;
-  - slot size ≥ image size;
-  - alignment;
-  - upgrade mode compatibility (the source bootloader's mode vs. the target app's `MCUBOOT_BOOTLOADER_MODE_*`);
-  - encryption;
-  - the old bootloader's max-sectors limit vs. the new slot geometry.
+### 5.3 Format checks, by direction
 
-  A mismatch is breaking. A check with missing inputs is unknown.
-- **Slot-size requirements per mode**, e.g. swap-using-offset needing a secondary slot one sector larger (fixture B):
-  - derived from MCUboot source at the target pin where it is checked in code (the size or sector-count checks in the mode's swap implementation, cited);
-  - otherwise from the migration guide line (medium);
-  - otherwise unknown.
-  - The check uses the EDT slot sizes and erase-block size.
-- **Is the bootloader itself updatable?** It's unknown unless the build shows a mechanism. "Unknown" is the honest default, and the finding says the hazard is "fatal unless the bootloader can be replaced in the field", rather than claiming either way. Mechanisms to look for, each derived from the build:
-  - an image with a bootloader-updating role, such as a first-stage bootloader in `domains.yaml`;
-  - MCUboot configured to update itself, a Kconfig group in MCUboot's own Kconfig, found by choice/menu, not by name.
+The two directions are reported separately, each with its own status.
+
+**(a) The old bootloader accepts the new app image.** This always applies, because a field device keeps its bootloader unless the bootloader is updated.
+- **The deployed bootloader** is the source build's MCUboot. That is an `assumptions` entry (§8), refined by `--deployed-image`.
+- **Measured checks:** the target's signed app image (§5.5) is compared with what the source bootloader requires:
+  - header size and magic;
+  - signature TLV type, and key (key-file hash, plus the key TLV/hash in the image);
+  - encryption TLVs and flags;
+  - alignment and padding;
+  - image size ≤ the source slot size;
+  - upgrade mode: the source bootloader's mode vs. the target app's `MCUBOOT_BOOTLOADER_MODE_*`;
+  - the source bootloader's max-sectors limit vs. the target slot geometry.
+- **Results:** a mismatch is breaking; a check with missing inputs is unknown.
+
+**(b) The new bootloader reads old images and swap state.** This applies only if the bootloader is updated: either the remedy of some hazard is `bootloader-update`, or the build evidences an updatable bootloader. Otherwise the direction is reported as `not-applicable`, with that reason.
+- **Checks:** `srcdiff` of the trailer and boot-state definitions between the MCUboot pins (magic, swap-status layout, image-OK and copy-done fields), plus header and TLV parsing compatibility for the *source* signed image (measured, §5.5).
+- **Results:** a definition change is breaking, with remedy `reflash` when it means a swap in progress at the time of the bootloader update could be misread.
+
+**Slot-size requirements per mode,** e.g. swap-using-offset wanting a secondary slot one sector larger (fixture B):
+- derived from MCUboot source at the target pin where it is checked in code (the mode's size or sector-count checks, cited);
+- otherwise from the migration guide line (medium);
+- otherwise unknown.
+- The check uses EDT slot sizes and the flash erase-block size.
+
+**Is the bootloader itself updatable?** It's unknown unless the build shows a mechanism:
+- an image with a bootloader-updating role (e.g. a first-stage bootloader in `domains.yaml`);
+- MCUboot configured to update itself, a group in MCUboot's own Kconfig, found by choice/menu.
+
+Unknown updatability makes `bootloader-update` remedies resolve to `reflash` in the verdict (§8.1), with the reason stated.
 
 ### 5.4 Clean / unknown
 - **Clean:** both refs have a bootloader image with a strong role; options, behavior, signing parameters, and format definitions were all compared with no format-affecting delta; and all acceptance checks passed.
@@ -189,10 +199,24 @@ Hazard findings that depend on a weak or unknown role are capped at **low** conf
   - `imgtool` arguments not found in `build.ninja`;
   - a bootloader that isn't MCUboot.
 
-### 5.5 `--deployed-image <path>`
-- **Parsing:** the header and TLV layout are **read from MCUboot's `image.h` at the source pin**: struct member order and sizes from `srcdiff`, magic values from the `#define`s. zmig then parses the given signed `.bin`: magic, header size, image size, version, flags, the protected and unprotected TLV areas, and the TLV types present.
-- **Comparison against the target build:** the expected header size, key and signature TLV type, and encryption.
-- **Parse failures** say exactly which field couldn't be read, and the category becomes unknown. zmig doesn't guess offsets.
+### 5.5 Signed images, measured (default) and `--deployed-image`
+
+- **Default:** zmig always parses the **source build's own signed app image** and the **target build's**, so header, TLV and flag checks are measured, not inferred from configuration. The signed images are located from the `imgtool sign` output path in the app image's `build.ninja`, not by guessing a file name.
+- **The parser:** the header and TLV layout are read from MCUboot's `image.h` at the matching pin: struct member order and sizes via `srcdiff`, magic values and TLV type IDs from the `#define`s. Fields read: magic, header size, image size, protected TLV size, version, flags, and the protected and unprotected TLV areas (type, length, and a hash of each value).
+- **Diff:** source signed image vs. target signed image, field by field. Expected differences such as image size and digest are reported as info. Header layout, flags, and the set of TLV types and their lengths are format evidence.
+- **`--deployed-image <path>`** replaces the source build's image as the "old" side, and removes the "deployed == source build" assumption for the image (not for the bootloader configuration).
+- **Parse failures** name the exact field, and the direction-(a) checks that need it become unknown. zmig doesn't guess offsets.
+
+### 5.6 imgtool, at each MCUboot pin
+
+The image is produced by `scripts/imgtool` at the MCUboot pin, so the tool is diffed too:
+- **Format constants:** imgtool is Python, so its module-level constants and literal tables (magic values, the TLV type map, flag values) are extracted with Python's `ast` from `scripts/imgtool/*.py` at both pins. No regexes and no execution.
+- **The `sign` arguments** each ref's build passes (from `build.ninja`), as before.
+- **Ground truth for both:** the measured signed-image diff of §5.5. A constants change that doesn't show up in the measured output is reported as "tool changed, output unchanged for this build" (info). A measured change is reported whether or not a constant explains it.
+
+### 5.7 Implementation-only changes
+
+Files compiled into the bootloader, or used by an enabled storage backend, whose diffs touch none of the format definitions are reported as "implementation changed, format definitions unchanged" at **medium** confidence. Behavior can change without the declarations changing, so a `direct-ok` verdict that rests on such files names them (§8.2).
 
 ---
 
@@ -234,27 +258,73 @@ Hazard findings that depend on a weak or unknown role are capped at **low** conf
 
 ```json
 "upgrade_path": {
-  "verdict": "needs-intermediate-hop",
+  "verdict": "blocked",
+  "confidence": "high",
   "categories": {
-    "layout":  {"status": "hazard",  "findings": ["…"], "checked": ["…evidence…"]},
-    "mcuboot": {"status": "clean",   "checked": ["…"]},
-    "storage": {"status": "hazard",  "findings": ["…"]},
-    "ble":     {"status": "not-applicable", "checked": ["BT settings not enabled in any image"]},
-    "wire":    {"status": "clean", "checked": ["allowlist v1, 9 entries"]},
-    "sysbuild": {"status": "unknown", "reason": "…"}
+    "layout":   {"status": "hazard", "confidence": "high", "findings": ["…"], "checked": ["…"]},
+    "mcuboot":  {"status": "clean", "confidence": "medium",
+                 "directions": {"old_bootloader_accepts_new_image": "clean",
+                                "new_bootloader_reads_old_state": "not-applicable"},
+                 "implementation_only": ["bootloader: boot/bootutil/src/loader.c", "…"]},
+    "storage":  {"status": "hazard", "confidence": "high", "findings": ["…"]},
+    "ble":      {"status": "not-applicable", "checked": ["BT settings disabled in every image"]},
+    "wire":     {"status": "clean", "checked": ["allowlist v1, 9 entries"]},
+    "sysbuild": {"status": "clean", "checked": ["…"]}
   },
-  "blockers": ["…finding ids that no OTA image can resolve on its own…"]
+  "remedies": {"bootloader-update": ["LAYOUT-…"], "app-change": ["STORAGE-…"]},
+  "assumptions": [
+    "deployed bootloader == the source build's MCUboot (image mcuboot @ v4.2.2)",
+    "deployed app == the source build's signed app image",
+    "bootloader updatability: unknown (no mechanism in the build)"
+  ],
+  "basis": ["…what a direct-ok or a clean category rests on, incl. implementation-only files…"]
 }
 ```
 
-- **Category status** is one of `clean`, `hazard`, `unknown`, or `not-applicable`. `not-applicable` needs positive evidence: e.g. BLE is n/a only if the resolved `.config` shows BLE persistence disabled in every image.
-- **The verdict:**
-  - **direct-OK** only if every category is `clean` or evidenced `not-applicable`, and there's no breaking finding with `introduced_by_migration: true` in any hazard category;
-  - **needs-intermediate-hop** if at least one category has a proven hazard;
-  - **unknown** if no hazard is proven and any category is `unknown`.
-  - If both a hazard and an unknown exist, the verdict is `needs-intermediate-hop` and the unknown categories are listed.
-- **Default:** the verdict starts as unknown and is never defaulted to OK.
-- **`blockers`:** hazards an intermediate application image cannot fix by itself, such as a bootloader incompatibility while bootloader updatability is unknown. See Q1.
+### 8.1 Remedies
+
+Every hazard finding gets a `remedy`, derived from evidence:
+
+| Remedy | When (evidence) |
+|---|---|
+| `config-pin` | the target ref still offers the old behavior through configuration: the old `SB_CONFIG`/Kconfig option (or its value) **exists in the target ref's Kconfig** (checked with the target snapshot) and selecting it restores the source's resolved image options. Example: fixture B, `SB_CONFIG_MCUBOOT_MODE_SWAP_USING_MOVE` defined at v4.3.0 `share/sysbuild/images/bootloader/Kconfig:55` |
+| `app-change` | the app's own files can fix it: an overlay or code in images that reach the device by app OTA, e.g. explicitly enabling a storage backend that was implicitly enabled before |
+| `intermediate-hop` | a one-time image must run in between, e.g. a storage format migration that new code can't do from the old format but an intermediate version can |
+| `bootloader-update` | the bootloader must change, and the build evidences that the bootloader can be updated in the field |
+| `reflash` | the bootloader must change and updatability is unknown or absent, or a change makes old in-progress state unreadable |
+| `unknown` | none of the above can be established from evidence |
+
+Rules that follow from ownership:
+- **Layout:** moved, resized, removed, or reordered partitions that the bootloader uses (slots, scratch, its own) get `bootloader-update`, or `reflash` when updatability isn't evidenced, because the bootloader owns the layout. A partition only the app uses (e.g. storage) gets `app-change` or `intermediate-hop` by the storage rules.
+- **Bootloader options:** an option change gets `config-pin` only after verifying that the old option exists at the target ref and that selecting it yields the source's resolved bootloader options. Otherwise it's `bootloader-update`/`reflash`.
+- **Unproven remedy:** if zmig can't prove a remedy, it's `unknown`, and the finding says what evidence was missing.
+
+### 8.2 Verdict
+
+| Verdict | Meaning |
+|---|---|
+| `blocked` | at least one hazard isn't resolvable by an application OTA alone: remedy `bootloader-update` or `reflash` |
+| `needs-changes` | at least one hazard, all resolvable by OTA: `config-pin`, `app-change`, `intermediate-hop`, or `unknown` (an unknown remedy counts as needs-changes, with the remedy marked unknown) |
+| `unknown` | no hazard proven, and at least one category `unknown` |
+| `direct-ok` | every category `clean` or evidenced `not-applicable`, and no hazard |
+
+- **Precedence:** blocked > needs-changes > unknown > direct-ok. The verdict starts as `unknown` and is computed from categories; it is never defaulted to OK.
+- **`confidence`** is the minimum over categories that are clean or hazardous; a category's confidence is the minimum over its findings and evidence.
+- **`basis`:** when `direct-ok` (or a clean category) rests on implementation-only changes in format-bearing files (MCUboot, NVS/ZMS, settings backends, §5.7), confidence is at most medium, and each file is named in `basis` and in the verdict text.
+
+### 8.3 Pre-existing breaking findings
+
+A breaking finding with `introduced_by_migration: false` in a deployment-relevant category (layout, mcuboot, crossimage, storage) means the source build is itself inconsistent. Example: xapp-mismatch, where app and bootloader disagree on `slot1_partition`.
+
+**Proposal:** both, scoped.
+- **The touched category becomes `unknown`** (reason: "the source build is inconsistent, so the deployed state can't be the source build"), and **the verdict's confidence is capped at `low`**.
+- **Other categories are evaluated normally,** so a proven `blocked` or `needs-changes` elsewhere still stands.
+
+**Why:**
+- **Capping confidence alone isn't enough:** it would still let `direct-ok` through, built on the very assumption the finding disproves.
+- **Forcing the whole verdict to `unknown` throws away valid results:** a layout move proven between the two builds, say, holds whichever half of the inconsistent source is on the device.
+
+The finding and the downgrade are both listed in `assumptions` ("deployed == source build: contradicted by …").
 
 ---
 
@@ -265,7 +335,8 @@ Hazard findings that depend on a weak or unknown role are capped at **low** conf
 | finding | `introduced_by_migration` | bool, optional; always emitted by 1.2 producers |
 | finding | `provenance` | object with `evidence_source`, `role_source`, `role_evidence` |
 | finding | `category` enum | adds `layout`, `mcuboot`, `storage`, `ble`, `wire`, `sysbuild` |
-| report | `upgrade_path` | object (§8) |
+| report | `upgrade_path` | object (§8): verdict (4 values), confidence, categories (status, confidence, directions for mcuboot), remedies, assumptions, basis |
+| finding | `remedy` | one of `config-pin`, `app-change`, `intermediate-hop`, `bootloader-update`, `reflash`, `unknown`; on hazard findings |
 | report | `not_checked` | array (§2.5) |
 | report | `environment.sdk` | `{path, version}`; and the SDK per build context |
 
@@ -275,10 +346,12 @@ Hazard findings that depend on a weak or unknown role are capped at **low** conf
 
 ## 10. SDK handling
 
-- **Install location:** SDK 0.17.4 (minimal bundle, `arm-zephyr-eabi` toolchain, host tools, from the official zephyrproject-rtos/sdk-ng release) goes into `~/.cache/zmig/sdks/zephyr-sdk-0.17.4`, owned by zmig. Your 1.0.1 isn't touched.
-- **Selection:** a new `--sdk <path>` flag, also recorded per fixture. Builds set `ZEPHYR_SDK_INSTALL_DIR` and `ZEPHYR_TOOLCHAIN_VARIANT=zephyr`.
-  - Before relying on it, zmig verifies at each ref that `FindZephyr-sdk.cmake` honors `ZEPHYR_SDK_INSTALL_DIR` ahead of the CMake package registry.
-  - It then checks the configure log's "Found toolchain: zephyr X.Y.Z (path)" line. If the path isn't the selected SDK, the run fails with an actionable error instead of silently using another SDK.
+- **Install:** SDK 0.17.4 (`arm-zephyr-eabi` toolchain and host tools only, from the official zephyrproject-rtos/sdk-ng release) goes into `~/.cache/zmig/sdks/zephyr-sdk-0.17.4`, owned by zmig. Your 1.0.1 isn't touched, and the new SDK is **not** registered in the CMake package registry.
+- **Selection** (`--sdk <path>`, recorded per fixture). Verified at v4.0.0, v4.2.2 and v4.3.0 in `cmake/modules/FindZephyr-sdk.cmake:75-82`: with `ZEPHYR_SDK_INSTALL_DIR` defined, Zephyr calls `find_package(Zephyr-sdk <ver> REQUIRED CONFIG HINTS ${ZEPHYR_SDK_INSTALL_DIR})`. CMake searches HINTS before the user package registry (where 1.0.1 is registered), but after `<Pkg>_ROOT` and `CMAKE_PREFIX_PATH`, and moves on if the hinted SDK fails the version check. So with `--sdk`, zmig:
+  1. sets `ZEPHYR_SDK_INSTALL_DIR` and `ZEPHYR_TOOLCHAIN_VARIANT=zephyr`;
+  2. removes `Zephyr-sdk_ROOT`, `Zephyr-sdk_DIR` and `CMAKE_PREFIX_PATH` from the build environment;
+  3. passes `-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF`, so the registry can't supply another SDK;
+  4. after configure, checks every image's "Found toolchain: zephyr <version> (<path>)" line against the selected SDK, and fails with an actionable error if any image used another one.
 - **Cache key and report:** the SDK path and version join the build key, and are recorded in `environment.sdk` and each context. One SDK per run is kept.
 
 ---
@@ -289,11 +362,11 @@ All refs are asserted by **resolved SHA** (§1), so a retagged ref fails the tes
 
 | Fixture | Pair, board | App contents | Expected (oracle) | Must not report |
 |---|---|---|---|---|
-| **A** `p1-layout` | nucleo_h753zi, v4.2.2→v4.3.0, sysbuild+MCUboot, SDK 0.17.4 | settings on NVS in the storage partition (symbol names verified at both refs before writing it) | layout: slot0 0x40000→0x20000, slot1 0x80000→0x60000, storage 0x20000→0xa0000, scratch removed; storage stranding; verdict needs-intermediate-hop. Oracle: guide 4.3:71-73 + the DTS lines | any MCUboot mode-change finding (`Kconfig:36` keeps swap-using-move for STM32; the resolved bootloader mode is identical) |
-| **B** `p1-mode` | nrf52840dk/nrf52840, v4.2.2→v4.3.0, sysbuild+MCUboot, SDK 0.17.4 | xapp-like | `sb-option-default-changed` for the MCUboot mode; mcuboot behavior changed swap-using-move → swap-using-offset in the bootloader and app `.config`s; slot-size requirement evaluated with sizes; verdict needs-intermediate-hop. Oracle: guide 4.3:485-492 + `Kconfig:36-37` | any layout finding (partitions identical) |
-| **C** `p1-rename` | nrf52840dk/nrf52840, v4.0.0→v4.1.0, sysbuild+MCUboot, SDK 0.17.4 | `sysbuild.conf`: `SB_CONFIG_MCUBOOT_MODE_SWAP_WITHOUT_SCRATCH=y`; app: ITS settings store (verified at both refs) | `sb-option-renamed` with "behavior unchanged" (bootloader mode identical in both resolved `.config`s); storage implicit-enable change citing `Kconfig.its_store:14` (v4.0.0) and `:34` (v4.1.0). Oracle: guide 4.1:31-33, 4.1:725-729 | "mode changed" |
-| **xapp** | regression, v4.4.0→v4.5.0-rc3 | | P0.5 results unchanged; P1 categories evaluated; MCUboot pin change summarized as format-affecting or not | |
-| **xapp-mismatch** | regression | | partition mismatch reported with `introduced_by_migration: false` (present and identical at both refs) | |
+| **A** `p1-layout` | nucleo_h753zi, v4.2.2→v4.3.0, sysbuild+MCUboot, SDK 0.17.4 | settings on NVS in the storage partition (symbol names verified at both refs before writing it) | layout: slot0 0x40000→0x20000, slot1 0x80000→0x60000, storage 0x20000→0xa0000, scratch removed, all with remedy `bootloader-update`/`reflash`; storage stranding; **verdict `blocked`**. Oracle: guide 4.3:71-73 + the DTS lines | any MCUboot mode-change finding (`Kconfig:36` keeps swap-using-move for STM32; resolved bootloader mode identical) |
+| **B** `p1-mode` | nrf52840dk/nrf52840, v4.2.2→v4.3.0, sysbuild+MCUboot, SDK 0.17.4 | xapp-like | `sb-option-default-changed` for the MCUboot mode; behavior changed swap-using-move → swap-using-offset in the bootloader and app `.config`s; slot-size requirement evaluated with sizes; remedy `config-pin` with `SB_CONFIG_MCUBOOT_MODE_SWAP_USING_MOVE`, which the test asserts exists at v4.3.0 `Kconfig:55`; **verdict `needs-changes`**. Oracle: guide 4.3:485-492 + `Kconfig:36-37` | any layout finding (partitions identical) |
+| **C** `p1-rename` | nrf52840dk/nrf52840, v4.0.0→v4.1.0, sysbuild+MCUboot, SDK 0.17.4 | `sysbuild.conf`: `SB_CONFIG_MCUBOOT_MODE_SWAP_WITHOUT_SCRATCH=y`; app: ITS settings store (verified at both refs) | `sb-option-renamed` with "behavior unchanged" (bootloader mode identical in both resolved `.config`s); storage implicit-enable change citing `Kconfig.its_store:14` (v4.0.0) and `:34` (v4.1.0). **The verdict isn't pre-asserted:** the test checks that it follows from the categories by the §8.2 rules. Oracle: guide 4.1:31-33, 4.1:725-729 | "mode changed" |
+| **xapp** | regression, v4.4.0→v4.5.0-rc3 | | P0.5 results unchanged; signed images measured (§5.5); the MCUboot pin change classified as format-affecting or implementation-only | |
+| **xapp-mismatch** | regression | | partition mismatch with `introduced_by_migration: false`; the layout category becomes `unknown`, and verdict confidence is capped at low (§8.3) | |
 
 **Independent oracles, beyond the guide lines:**
 - **Partitions:** read from the `dtc`-normalized `zephyr.dts` of each image (extending `tests/manual_diff.py`).
@@ -314,10 +387,11 @@ All refs are asserted by **resolved SHA** (§1), so a retagged ref fails the tes
 
 ## 13. Risks and open questions
 
-- **Q1, verdict values.** Some hazards can't be fixed by an intermediate *application* image, such as a bootloader mode change when the bootloader can't be updated in the field. Three values make those look like "needs-intermediate-hop". I propose keeping your three values and adding `blockers` (§8) for those cases. Alternatively, add a fourth verdict, `blocked`. Which do you want?
-- **Q2, deployed bootloader.** Without `--deployed-image`, the "deployed bootloader" is the source build's MCUboot configuration. That's right for a device flashed from the source build, wrong for one that shipped differently. The report states the assumption every time.
+- **Q1 (resolved):** four verdicts plus `remedy` on every hazard (§8.1–8.2).
+- **Q2 (resolved):** "deployed == source build" is an explicit `assumptions` entry, and signed images are measured by default (§5.5).
+- **Pre-existing breaking findings** make the touched category unknown and cap verdict confidence at low (§8.3). If you'd rather force the whole verdict to unknown, that's a one-line change in the verdict rule.
 - **Source parsing limits.** `srcdiff` reads declarations, not semantics. A behavior change with no declaration change, e.g. a different CRC algorithm with the same struct, shows up only as "implementation changed" at medium confidence, never as clean format.
 - **Seeds.** The seed identifiers and directories are the one place zmig brings knowledge. They're few, cited, and verified per ref, and missing seeds turn a category to unknown. They will still need maintenance.
 - **Build cost.** A, B, and C add six sysbuild builds, two images each, plus module mirrors (MCUboot, hal_stm32, hal_nordic, crypto) cloned fresh. A first run takes tens of minutes; cached reruns are fast.
-- **SDK selection.** If `ZEPHYR_SDK_INSTALL_DIR` doesn't take precedence over the CMake package registry at some ref, zmig fails loudly. A fallback, registering a CMake package dir per run, would need your approval.
+- **SDK selection.** Precedence was verified in source (§10), and the registry is disabled per build. The post-configure toolchain check stays as the guarantee.
 - **Fixture A's board.** STM32 sysbuild with MCUboot may need modules or Kconfig the fixture discovers by building. If nucleo_h753zi can't build MCUboot at v4.2.2 with SDK 0.17.4, I'll report that before substituting anything.
