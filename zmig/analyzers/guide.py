@@ -287,6 +287,12 @@ class GuideAnalyzer:
         for line in sorted({m.line for m in mentions}):
             sentence = next(m.sentence for m in mentions if m.line == line)
             ev.append(doc_entry(doc.path, line, doc.ref, entry.id, sentence[:300]))
+        quoted = " ".join(m.sentence for m in mentions)
+        if len(entry.full) > len(quoted) + 20:
+            # The rest of the entry often holds the remedy (regression: "…_PORT_1_ENABLE has
+            # been deprecated." was quoted without "Instead users should instantiate …
+            # zephyr,native-pty-uart nodes", docs/DOGFOOD-3-baseline.md M12).
+            ev.append(doc_entry(doc.path, entry.line, doc.ref, entry.id, entry.full[:1200]))
         ev += [file_line(loc.path, loc.line, loc.text) for loc in locs[:MAX_APP_LOCS]]
         return Finding(
             category=Category.GUIDE,

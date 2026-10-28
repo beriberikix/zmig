@@ -360,7 +360,9 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
             "scan",
         )
     )
-    report.upgrade_path = upgrade_path(ctx.shared, report.findings, report.analyzers)
+    report.upgrade_path = upgrade_path(
+        ctx.shared, report.findings, report.analyzers, salvage.effective.status
+    )
     _emit(report, runner, args)
     return EXIT_OK
 

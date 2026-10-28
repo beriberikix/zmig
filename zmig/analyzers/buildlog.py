@@ -15,7 +15,7 @@ from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact, BuildContext, is_host_board, project_path, project_roots
-from zmig.diagnostics import BuildWarning, app_relative, parse_log, parse_warnings
+from zmig.diagnostics import BuildWarning, app_relative, compiler_sites, parse_log, parse_warnings
 from zmig.errors import ArtifactMissing
 from zmig.findings import (
     JSON,
@@ -45,6 +45,8 @@ class BuildError:
     file: str = ""
     line: int = 0
     image: str = ""  # sysbuild image the error came from, when known
+    # The project code behind an error reported inside a header (see BuildWarning.sites).
+    sites: tuple[tuple[str, int], ...] = ()
 
 
 _LINKER = re.compile(
@@ -59,10 +61,14 @@ _IMAGE = re.compile(r"/builds/[0-9a-f]+/(?P<image>[\w.-]+)/zephyr/")
 def build_errors(log: str) -> list[BuildError]:
     """Compiler and linker errors in a build log; ninja's FAILED steps if neither."""
     out: list[BuildError] = []
+    lines = log.splitlines()
     for m in _COMPILER_ERROR.finditer(log):
         img = _IMAGE.search(m["file"])
+        sites = compiler_sites(lines, log.count("\n", 0, m.start()))
         out.append(
-            BuildError("compiler", m["msg"], m["file"], int(m["line"]), img["image"] if img else "")
+            BuildError(
+                "compiler", m["msg"], m["file"], int(m["line"]), img["image"] if img else "", sites
+            )
         )
     failed = [m for m in _FAILED.finditer(log)]
     for m in _LINKER.finditer(log):
@@ -159,6 +165,19 @@ class BuildlogAnalyzer:
                 where = f"{e.image} image: " if e.image else ""
                 if own := project_path(e.file, proj):
                     ev.append(file_line(own, e.line, e.message))
+                elif site := next(
+                    (
+                        (rel, ln)
+                        for f, ln in e.sites
+                        if ln and (rel := project_path(f, proj)) is not None
+                    ),
+                    None,
+                ):
+                    # Raised inside a Zephyr header: show the project line that led there
+                    # (regression: A1-native's '__device_dts_ord_20' undeclared in
+                    # device.h:96, docs/DOGFOOD-3-baseline.md M9).
+                    raised = ctx.runner.redact(f"{e.file}:{e.line}")
+                    ev.append(file_line(site[0], site[1], f"{e.message} (raised in {raised})"))
                 else:
                     loc = f"{e.file}:{e.line}: " if e.file else ""
                     ev.append(
@@ -214,7 +233,18 @@ class BuildlogAnalyzer:
             if k not in old_keys:
                 fresh.setdefault(k, []).append(w)
         proj = project_roots(ctx.new, ctx.new_img.dir)
+        # Kconfig's "Deprecated symbol X is enabled." is the kconfig analyzer's
+        # symbol-deprecated finding, which has the assignment's file:line (regression:
+        # reported twice on A1-native, docs/DOGFOOD-3-baseline.md M10).
+        deprecated = {
+            f.subject.removeprefix("CONFIG_")
+            for f in ctx.prior
+            if f.category == Category.KCONFIG and f.kind == "symbol-deprecated"
+        }
         for (source, path, msg), ws in sorted(fresh.items()):
+            dep = re.match(r"Deprecated symbol (\w+) is enabled", msg)
+            if source == "kconfig" and dep and dep[1] in deprecated:
+                continue
             lines: dict[tuple[str, int], None] = {}  # project file:line sites, in order
             files: dict[str, None] = {}  # project files without a line (enclosing function)
             for w in ws:

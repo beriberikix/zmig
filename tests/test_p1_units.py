@@ -361,3 +361,15 @@ def test_verdict_with_unchecked_categories_is_a_lower_bound() -> None:
     u = upgrade_path(shared, [pin], _ok())
     assert u["verdict"] == "needs-changes" and u["unchecked"] == ["storage"]
     assert any("lower bound" in b for b in u["basis"])
+
+
+def test_verdict_confidence_low_when_the_target_did_not_build() -> None:
+    """bms-firmware native_sim/OLED were direct-ok (medium) with failed target builds
+    (docs/DOGFOOD-3-baseline.md M11)."""
+    from zmig.verdict import upgrade_path
+
+    ok = upgrade_path(_clean_shared(), [], _ok())
+    failed = upgrade_path(_clean_shared(), [], _ok(), target_status="build-failed")
+    assert ok["confidence"] != "low"
+    assert failed["verdict"] == "direct-ok" and failed["confidence"] == "low"
+    assert any(b.startswith("the target build failed") for b in failed["basis"])

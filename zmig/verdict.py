@@ -82,7 +82,10 @@ def _ran(statuses: list[AnalyzerStatus], analyzer: str) -> str | None:
 
 
 def upgrade_path(
-    shared: dict[str, Any], findings: list[Finding], statuses: list[AnalyzerStatus]
+    shared: dict[str, Any],
+    findings: list[Finding],
+    statuses: list[AnalyzerStatus],
+    target_status: str = "ok",
 ) -> JSON:
     recorded: dict[str, Any] = dict(shared.get("categories", {}))
     cats: dict[str, dict[str, Any]] = {}
@@ -172,6 +175,11 @@ def upgrade_path(
     confidence = min(judged, key=RANK.__getitem__, default="low")
     if capped:
         confidence = "low"
+    if target_status != "ok":
+        # Categories then rest on configure-time data and whatever the failed build left;
+        # "direct-ok" must not read as established (regression: bms-firmware's native_sim
+        # and OLED targets failed to build, docs/DOGFOOD-3-baseline.md M11).
+        confidence = "low"
 
     basis: list[str] = []
     for name, c in cats.items():
@@ -186,6 +194,11 @@ def upgrade_path(
         if name == "wire":
             basis.append("wire: clean means only that no allowlisted item changed")
     basis += resolved
+    if target_status != "ok":
+        basis.append(
+            f"the target {target_status.replace('-', ' ')}: the categories come from "
+            "its configuration and whatever the failed build produced; confidence capped at low"
+        )
     if verdict == "unknown":
         basis.append(
             "unknown: "

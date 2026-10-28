@@ -218,9 +218,13 @@ def outside_build(findings: list[Finding], base: ScanContext) -> list[Finding]:
     out = []
     for f in findings:
         files = {str(e["path"]) for e in f.evidence if e.get("type") == "file_line"}
+        # "<v4.1.0 hello>/zephyr/zephyr.dts" is a build artifact, not a project input file
+        # (regression: B-rak's partition findings were downgraded while the layout category
+        # stayed a hazard, docs/DOGFOOD-3-baseline.md M8).
         if (
             f.severity is not Severity.INFO
             and files
+            and not any(p.startswith("<") for p in files)
             and all(p.endswith(BUILD_INPUT_SUFFIXES) and p not in inputs for p in files)
         ):
             f = replace(

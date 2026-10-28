@@ -285,7 +285,7 @@ class BuildWarning:
         return (self.source, norm(self.file), norm(self.message))
 
 
-def _compiler_sites(lines: list[str], i: int) -> tuple[tuple[str, int], ...]:
+def compiler_sites(lines: list[str], i: int) -> tuple[tuple[str, int], ...]:
     """The code locations GCC prints around the diagnostic on lines[i] (see BuildWarning)."""
     notes: list[tuple[str, int]] = []
     for ln in lines[i + 1 :]:
@@ -319,7 +319,7 @@ def parse_warnings(text: str) -> list[BuildWarning]:
                     int(m["line"]),
                     m["msg"].strip(),
                     m["flag"] or "",
-                    _compiler_sites(lines, i),
+                    compiler_sites(lines, i),
                 )
             )
     out += [

@@ -68,14 +68,20 @@ class Entry:
     renames: list[Rename] = field(default_factory=list)
 
     @property
-    def lead(self) -> str:
-        """First sentence, without RST list markers or directives."""
+    def full(self) -> str:
+        """The whole entry as plain text, without RST list markers or directives."""
         clean = " ".join(
             _LIST_MARKER.sub("", t).strip()
             for t in self.text.splitlines()
             if not _DIRECTIVE.match(t)
         )
-        return _sentences(_plain(clean))[0] if clean.strip() else ""
+        return _plain(clean)
+
+    @property
+    def lead(self) -> str:
+        """First sentence, without RST list markers or directives."""
+        full = self.full
+        return _sentences(full)[0] if full.strip() else ""
 
 
 # Directive lines (".. list-table::") and their options (":header-rows: 1").

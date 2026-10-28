@@ -381,9 +381,54 @@ def test_findings_only_in_unused_input_files_become_info(tmp_path: Path) -> None
         finding("app.overlay"),
         finding("src/main.c", Severity.RISKY),
     )
-    out = outside_build([rak, used, src], base)  # type: ignore[arg-type]
+    artifact = finding("<v4.1.0 hello>/zephyr/zephyr.dts", Severity.RISKY)
+    out = outside_build([rak, used, src, artifact], base)  # type: ignore[arg-type]
+    assert out[3].severity is Severity.RISKY  # a generated file, never "outside the build"
     assert out[0].severity is Severity.INFO
     assert "only in files this build doesn't use: boards/rak5010_nrf52840.conf" in out[0].title
     assert "outside-build" in out[0].heuristics
     assert out[1].severity is Severity.BREAKING  # applied overlay
     assert out[2].severity is Severity.RISKY  # sources aren't judged by this rule
+
+
+DEVICE_ERROR_LOG = """\
+[40/281] Building C object modules/thingset-zephyr-sdk/CMakeFiles/thingset.dir/src/serial.c.obj
+In file included from /ws/zephyr/include/zephyr/device.h:12,
+                 from /mod/thingset-zephyr-sdk/src/serial.c:7:
+/ws/zephyr/include/zephyr/device.h:96:41: error: '__device_dts_ord_20' undeclared here (not in a function); did you mean '__device_dts_ord_21'?
+   96 | #define DEVICE_NAME_GET(dev_id) _CONCAT(__device_, dev_id)
+      |                                         ^~~~~~~~~
+/ws/zephyr/include/zephyr/toolchain/common.h:168:26: note: in definition of macro '_DO_CONCAT'
+  168 | #define _DO_CONCAT(x, y) x ## y
+      |                          ^
+/ws/zephyr/include/zephyr/device.h:96:33: note: in expansion of macro '_CONCAT'
+   96 | #define DEVICE_NAME_GET(dev_id) _CONCAT(__device_, dev_id)
+      |                                 ^~~~~~~
+/mod/thingset-zephyr-sdk/src/serial.c:28:46: note: in expansion of macro 'DEVICE_DT_GET'
+   28 | static const struct device *uart_dev = DEVICE_DT_GET(DT_CHOSEN(thingset_serial));
+      |                                              ^~~~~~~~~~~~~
+FAILED: modules/thingset-zephyr-sdk/CMakeFiles/thingset.dir/src/serial.c.obj
+"""
+
+
+def test_build_error_in_a_header_keeps_the_project_call_site() -> None:
+    """bms-firmware native_sim at v4.2 (docs/DOGFOOD-3-baseline.md M9)."""
+    (e,) = build_errors(DEVICE_ERROR_LOG)
+    assert (e.file, e.line) == ("/ws/zephyr/include/zephyr/device.h", 96)
+    project = [s for s in e.sites if s[0].startswith("/mod/")]
+    assert project[0] == ("/mod/thingset-zephyr-sdk/src/serial.c", 28)
+
+
+def test_guide_entry_full_text_keeps_the_remedy() -> None:
+    """The second sentence held the remedy (docs/DOGFOOD-3-baseline.md M12)."""
+    from zmig.guides import parse
+
+    text = (
+        "Migration guide\n###############\n\nSerial\n======\n\n"
+        "* :kconfig:option:`CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE` has been deprecated. This option does\n"
+        "  nothing now. Instead users should instantiate as many :dtcompatible:`zephyr,native-pty-uart` nodes\n"
+        "  as native PTY UART instances they want. (:github:`86739`)\n"
+    )
+    (entry,) = parse(text, "doc/releases/migration-guide-4.2.rst", "4.2", "MG-4.2")
+    assert entry.lead == "CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE has been deprecated."
+    assert "instantiate as many zephyr,native-pty-uart nodes" in entry.full
