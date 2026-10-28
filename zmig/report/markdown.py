@@ -64,6 +64,7 @@ SECTION_TITLES = {
     "images": "Images",
     "crossimage": "Consistency between images",
     "init": "Init order",
+    "api": "Zephyr API used by your code",
     "sysbuild": "Sysbuild configuration",
     "layout": "Flash layout",
     "mcuboot": "MCUboot and image format",

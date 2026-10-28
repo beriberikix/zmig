@@ -66,6 +66,7 @@ def _builtin(kind: str) -> list[type[Any]]:
         from zmig.analyzers.manifest import ManifestAnalyzer
 
         return [ManifestAnalyzer, ForksAnalyzer, HopsAnalyzer]
+    from zmig.analyzers.api import ApiAnalyzer
     from zmig.analyzers.ble import BleAnalyzer
     from zmig.analyzers.board import BoardAnalyzer
     from zmig.analyzers.buildlog import BuildlogAnalyzer
@@ -91,6 +92,7 @@ def _builtin(kind: str) -> list[type[Any]]:
         DevicetreeAnalyzer,
         BuildlogAnalyzer,
         InitOrderAnalyzer,
+        ApiAnalyzer,
         SbomAnalyzer,
         ImagesAnalyzer,
         CrossImageAnalyzer,

@@ -41,6 +41,7 @@ class Category(StrEnum):
     IMAGES = "images"
     CROSSIMAGE = "crossimage"
     INIT = "init"
+    API = "api"
     # Field-upgrade hazard categories (P1).
     SYSBUILD = "sysbuild"
     LAYOUT = "layout"

@@ -311,6 +311,7 @@
             "images",
             "crossimage",
             "init",
+            "api",
             "sysbuild",
             "layout",
             "mcuboot",

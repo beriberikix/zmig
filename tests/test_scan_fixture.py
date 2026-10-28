@@ -215,6 +215,7 @@ def test_large_gap_v442(tmp_path: Path) -> None:
         "buildlog": "ok",
         "initorder": "ok",
         "modules": "ok",
+        "api": "ok",
         "devicetree": "ok",
         "crossimage": "ok",
         "guide": "ok",
