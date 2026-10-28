@@ -49,7 +49,7 @@ from zmig.findings import (
     tool_output,
 )
 from zmig.scan import ScanContext
-from zmig.snapshots import _cached, build_dependencies
+from zmig.snapshots import build_dependencies
 
 _EXPECTED = re.compile(r"(?:assigning to|initializing|passing|returning) '([^']+)'")
 SYSCALLS_JSON = "zephyr/misc/generated/syscalls.json"
@@ -148,13 +148,15 @@ class ApiAnalyzer:
         src, tgt, gaps = self._parse_both(ctx, version)
         not_checked += gaps
         errs = [sum(1 for t in tus if t["errors"]) for tus in (src, tgt)]
+        stats = ctx.shared.get("api_parse_stats", {})
         checked.append(
             Checked(
                 "libclang parse coverage",
                 "partial" if gaps else "clean",
-                f"{version}: {len(src)} project TU(s) parsed with the source flags "
-                f"({errs[0]} with errors), {len(tgt)} with the target flags ({errs[1]} with "
-                f"errors, {len(src) - len(tgt)} without a target compile command)",
+                f"{version}: {len(src)} project TU(s) with the source flags ({errs[0]} with "
+                f"errors), {len(tgt)} with the target flags ({errs[1]} with errors); "
+                f"{stats.get('parsed', 0)} parsed, {stats.get('cached', 0)} from the parse "
+                f"cache, {stats.get('unchanged', 0)} TU(s) skipped (no included file changed)",
                 self.name,
             )
         )
@@ -205,38 +207,66 @@ class ApiAnalyzer:
         src_entries = entries(ctx.old_img, old_roots)
         tgt_entries = entries(ctx.new_img, new_roots)
 
-        def run(img: ImageContext, b: Any, roots: dict[str, str], todo: dict[str, Any]) -> Any:
-            def produce(out: Path) -> None:
-                results = []
-                values: dict[str, Any] = {}
-                for rel, e in sorted(todo.items()):
-                    r: TuResult = parse_tu(
-                        e["file"],
-                        e["command"],
-                        roots,
-                        lambda f: project_path(f, roots),
-                        str(b.workspace.root),
-                        str(b.dir),
-                        values,
-                    )
-                    results.append(
-                        {
-                            "file": rel,
-                            "decls": r.decls,
-                            "refs": r.refs,
-                            "diags": r.diags,
-                            "errors": r.errors,
-                            "dropped": r.dropped,
-                        }
-                    )
-                out.write_text(json.dumps({"tus": results}))
+        src_deps = _keyed_deps(ctx.old_img, ctx.old, old_roots, src_entries, ctx.runner)
+        tgt_deps = _keyed_deps(ctx.new_img, ctx.new, new_roots, tgt_entries, ctx.runner)
+        cache_dir = ctx.old.dir.parent.parent / "api"
+        stats = {"parsed": 0, "cached": 0, "unchanged": 0}
 
-            return _cached(img, f"api{API_VERSION}-{version.split()[-1]}", produce)["tus"]
+        def run(b: Any, roots: dict[str, str], todo: dict[str, Any], deps: Any) -> list[Any]:
+            """Parse each TU, or reuse a parse whose inputs (the TU, its normalized flags,
+            the content of every file it included) are identical: keyed by content, not by
+            build directory, so a fresh build of the same tree reuses it."""
+            results = []
+            values: dict[str, Any] = {}
+            for rel, e in sorted(todo.items()):
+                key = _parse_key(version, e, b, deps.get(rel))
+                cached = cache_dir / f"{key}.json" if key else None
+                if cached is not None and cached.is_file():
+                    results.append(json.loads(cached.read_text()))
+                    stats["cached"] += 1
+                    continue
+                r: TuResult = parse_tu(
+                    e["file"],
+                    e["command"],
+                    roots,
+                    lambda f: project_path(f, roots),
+                    str(b.workspace.root),
+                    str(b.dir),
+                    values,
+                )
+                stats["parsed"] += 1
+                one = {
+                    "file": rel,
+                    "decls": r.decls,
+                    "refs": r.refs,
+                    "diags": r.diags,
+                    "errors": r.errors,
+                    "dropped": r.dropped,
+                }
+                if cached is not None:
+                    cached.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = cached.with_suffix(".tmp")
+                    tmp.write_text(json.dumps(one))
+                    tmp.replace(cached)
+                results.append(one)
+            return results
 
-        src = run(ctx.old_img, ctx.old, old_roots, src_entries)
+        # A TU whose every included file is identical at both refs can't use a changed
+        # declaration: parse neither side.
         todo = {rel: tgt_entries[rel] for rel in src_entries if rel in tgt_entries}
-        tgt = run(ctx.new_img, ctx.new, new_roots, todo) if todo else []
-        for rel in sorted(set(src_entries) - set(todo)):
+        same = {
+            rel
+            for rel in todo
+            if src_deps.get(rel) is not None and src_deps.get(rel) == tgt_deps.get(rel)
+        }
+        stats["unchanged"] = len(same)
+        src = run(ctx.old, old_roots, {r: e for r, e in src_entries.items() if r not in same},
+                  src_deps)  # fmt: skip
+        todo = {r: e for r, e in todo.items() if r not in same}
+        tgt = run(ctx.new, new_roots, todo, tgt_deps) if todo else []
+        ctx.shared.setdefault("api_parse_stats", stats)
+        todo_all = {rel: tgt_entries[rel] for rel in src_entries if rel in tgt_entries}
+        for rel in sorted(set(src_entries) - set(todo_all)):
             gaps.append(
                 NotChecked(
                     f"API use in {rel} at {ctx.new_spec}",
@@ -371,6 +401,23 @@ class ApiAnalyzer:
                     f"{ctx.new_spec}", Severity.BREAKING,
                     "Find its replacement in the migration guides.", sites, shown(o), None,
                     [decl_old])  # fmt: skip
+                continue
+            if n["kind"] != what:
+                # The same name is now another kind of declaration (only referenced ones are
+                # recorded, so a function the project calls may be a macro at the target).
+                if what == "function" and n["kind"] == "macro" and n.get("function_like"):
+                    add(f"{what}-became-macro", name,
+                        f"{what_l} {name}, which your code uses, is a macro in {ctx.new_spec}",
+                        Severity.INFO,
+                        "Calls keep working; code that takes its address or #undefs it "
+                        "doesn't.", sites, o.get("type"), n["where"],
+                        [decl_old, tool_output("macro at the target", n["where"])])  # fmt: skip
+                else:
+                    add(f"{what}-kind-changed", name,
+                        f"{what_l} {name}, which your code uses, is now a {n['kind']} in "
+                        f"{ctx.new_spec}", Severity.RISKY,
+                        "Check every use: a different kind of declaration behaves differently.",
+                        sites, what, n["kind"], [decl_old])  # fmt: skip
                 continue
             decl_new = tool_output("declaration at the target", f"{n['where']}: {shown(n)}")
             if what == "field" and (o.get("type"), n.get("type")) in typedef_changes:
@@ -806,3 +853,85 @@ def _macro_at(ws: Any, where: str, name: str) -> dict[str, Any] | None:
                 "deprecated": False,
             }
     return None
+
+
+def _keyed_deps(
+    img: ImageContext, b: Any, roots: dict[str, str], entries: dict[str, Any], runner: Any
+) -> dict[str, dict[str, str]]:
+    """{project TU: {file key: content hash}} for every file the TU included, from ninja's
+    dependency records. Keys don't depend on the build directory or workspace location
+    (workspace-relative, build-relative, or the project path), so two builds of the same
+    content compare equal."""
+    import hashlib
+
+    deps = build_dependencies(img, runner)
+    if deps is None:
+        return {}
+    ws, bdir = str(b.workspace.root), str(img.dir)
+    hashes: dict[str, str] = {}
+
+    def digest(f: str) -> str:
+        if f not in hashes:
+            try:
+                hashes[f] = hashlib.sha256(Path(f).read_bytes()).hexdigest()
+            except OSError:
+                hashes[f] = "missing"
+        return hashes[f]
+
+    out: dict[str, dict[str, str]] = {}
+    for rel, e in entries.items():
+        obj = _object_of(e)
+        # compile_commands' "output" is absolute; ninja keys objects relative to the build.
+        if obj and obj.startswith(bdir + "/"):
+            obj = obj[len(bdir) + 1 :]
+        files = deps.get(obj) if obj else None
+        if files is None:
+            continue
+        keyed = {}
+        for f in files:
+            if f == e["file"]:
+                continue
+            own = project_path(f, roots)
+            if own is not None:
+                k = f"project:{own}"
+            elif f.startswith(bdir + "/"):
+                k = f"build:{f[len(bdir) + 1 :]}"
+            elif f.startswith(ws + "/"):
+                k = f"ws:{f[len(ws) + 1 :]}"
+            else:
+                k = f"abs:{f}"
+            keyed[k] = digest(f)
+        out[rel] = keyed
+    return out
+
+
+def _object_of(e: dict[str, Any]) -> str | None:
+    """The object file a compile_commands entry produces (its "output", or -o)."""
+    if e.get("output"):
+        return str(e["output"])
+    import shlex
+
+    args = shlex.split(e["command"])
+    return args[args.index("-o") + 1] if "-o" in args else None
+
+
+def _parse_key(version: str, e: dict[str, Any], b: Any, deps: dict[str, str] | None) -> str | None:
+    """Content key of one TU parse: the parser, the TU's text, its flags with build- and
+    workspace-specific paths replaced, and the content of every file it included. None
+    (don't cache) when the included files aren't known."""
+    import hashlib
+
+    if deps is None:
+        return None
+    try:
+        text = Path(e["file"]).read_bytes()
+    except OSError:
+        return None
+    cmd = e["command"].replace(str(b.dir), "<build>").replace(str(b.workspace.root), "<ws>")
+    cmd = cmd.replace(str(b.src), "<app>")
+    h = hashlib.sha256()
+    for part in (str(API_VERSION), version, cmd, json.dumps(sorted(deps.items()))):
+        h.update(part.encode())
+        h.update(b"\0")
+    h.update(text)
+    return h.hexdigest()

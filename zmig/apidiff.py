@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 # Bump when what a parse records changes (invalidates the per-build snapshots).
-API_VERSION = 11
+API_VERSION = 12
 
 # GCC options clang rejects or that don't matter for parsing (prefix match).
 GCC_ONLY = (
@@ -224,132 +224,157 @@ def parse(
 
     K = ci.CursorKind
     sources: dict[str, list[str]] = {}
-    uses = value_uses(tu, show)
+    shown: dict[str, str | None] = {}
 
-    def use_of(ext: Any, outermost: bool) -> str:
-        """How the expression a reference forms (the name itself, or for a macro the
-        outermost expression its expansion produces) uses the value."""
-        s, e = ext.start, ext.end
-        own = show(os.path.normpath(s.file.name)) if s.file else None
-        if own is None:
-            return "unknown"
-        if not outermost:
-            return uses.get((own, s.line, s.column, e.line, e.column), "unknown")
-        best: tuple[tuple[int, int], str] | None = None
-        for (f, sl, sc, el, ec), u in uses.items():
-            inside = f == own and (sl, sc) == (s.line, s.column) and (el, ec) <= (e.line, e.column)
-            if inside and (best is None or (el, ec) > best[0]):
-                best = ((el, ec), u)
-        return best[1] if best else "unknown"
+    def own_file(f: Any) -> str | None:
+        """`show` for a clang File, cached by name (looked up once per file, not per node)."""
+        if f is None:
+            return None
+        name = f.name
+        if name not in shown:
+            shown[name] = show(os.path.normpath(name))
+        return shown[name]
 
-    for c in tu.cursor.walk_preorder():
-        loc = c.location
-        if loc.file is None:
+    def outside(cur: Any) -> bool:
+        """A declaration outside project code: Zephyr's or a module's, not one the build
+        generated (regression: ZMK's own __syscall wrappers in the build directory's
+        syscalls/behavior.h were reported as removed Zephyr functions)."""
+        f = cur.location.file
+        if f is None or own_file(f) is not None:
+            return False
+        return not (build_dir and os.path.normpath(f.name).startswith(build_dir + os.sep))
+
+    def record(cur: Any) -> None:
+        """The declaration table entry for a referenced Zephyr/module declaration."""
+        if cur.spelling in res.decls:
+            return
+        where_ = f"{decl_path(cur.location)}:{cur.location.line}"
+        dep = cur.availability == ci.AvailabilityKind.DEPRECATED
+        if cur.kind == K.FUNCTION_DECL:
+            t = norm_type(cur.type.get_canonical().spelling)
+            res.decls[cur.spelling] = {"kind": "function", "type": t, "where": where_,
+                                       "deprecated": dep}  # fmt: skip
+        elif cur.kind == K.ENUM_CONSTANT_DECL:
+            t = norm_type(cur.type.get_canonical().spelling)
+            res.decls[cur.spelling] = {"kind": "enum", "value": cur.enum_value, "type": t,
+                                       "where": where_, "deprecated": dep}  # fmt: skip
+        elif cur.kind == K.TYPEDEF_DECL:
+            t = norm_type(cur.underlying_typedef_type.get_canonical().spelling)
+            res.decls[cur.spelling] = {"kind": "typedef", "type": t, "where": where_,
+                                       "deprecated": dep}  # fmt: skip
+
+    # Macro instantiations are top-level cursors of the detailed processing record; the
+    # expressions their expansions produce start at the instantiation's location.
+    tops = list(tu.cursor.get_children())
+    macro_at: dict[tuple[int, int], list[tuple[Any, str]]] = {}
+    for c in tops:
+        if c.kind != K.MACRO_INSTANTIATION:
             continue
-        own, line = where(loc)
+        own = own_file(c.location.file)
         if own is None:
-            # A declaration outside project code: Zephyr's or a module's, not one the build
-            # generated (regression: ZMK's own __syscall wrappers in the build directory's
-            # syscalls/behavior.h were reported as removed Zephyr functions).
-            if build_dir and os.path.normpath(loc.file.name).startswith(build_dir + os.sep):
-                continue
-            if c.kind == K.FUNCTION_DECL and c.spelling not in res.decls:
-                res.decls[c.spelling] = {
-                    "kind": "function",
-                    "type": norm_type(c.type.get_canonical().spelling),
-                    "where": f"{decl_path(loc)}:{line}",
-                    "deprecated": c.availability == ci.AvailabilityKind.DEPRECATED,
-                }
-            elif c.kind == K.ENUM_CONSTANT_DECL and c.spelling not in res.decls:
-                res.decls[c.spelling] = {
-                    "kind": "enum",
-                    "value": c.enum_value,
-                    "type": norm_type(c.type.get_canonical().spelling),
-                    "where": f"{decl_path(loc)}:{line}",
-                    "deprecated": c.availability == ci.AvailabilityKind.DEPRECATED,
-                }
-            elif c.kind == K.TYPEDEF_DECL and c.spelling not in res.decls:
-                res.decls[c.spelling] = {
-                    "kind": "typedef",
-                    "type": norm_type(c.underlying_typedef_type.get_canonical().spelling),
-                    "where": f"{decl_path(loc)}:{line}",
-                    "deprecated": c.availability == ci.AvailabilityKind.DEPRECATED,
-                }
             continue
-        if c.kind == K.MACRO_INSTANTIATION:
-            # Matched at the preprocessor's instantiation site, never by text.
-            d = c.referenced
-            if d is None or d.location.file is None or where(d.location)[0] is not None:
-                continue
-            dfile = os.path.normpath(d.location.file.name)
-            if build_dir and dfile.startswith(build_dir + os.sep):
-                continue
-            if d.spelling not in res.decls:
-                toks = [t.spelling for t in d.get_tokens()]
-                fn_like = _function_like(d)
-                res.decls[d.spelling] = {
-                    "kind": "macro",
-                    "function_like": fn_like,
-                    "arity": _arity(toks) if fn_like else None,
-                    "tokens": " ".join(toks[1:])[:400],
-                    "where": f"{decl_path(d.location)}:{d.location.line}",
-                    "deprecated": False,
+        d = c.referenced
+        if d is None or not outside(d):
+            continue
+        if d.spelling not in res.decls:
+            toks = [t.spelling for t in d.get_tokens()]
+            fn_like = _function_like(d)
+            res.decls[d.spelling] = {
+                "kind": "macro",
+                "function_like": fn_like,
+                "arity": _arity(toks) if fn_like else None,
+                "tokens": " ".join(toks[1:])[:400],
+                "where": f"{decl_path(d.location)}:{d.location.line}",
+                "deprecated": False,
+            }
+        e = c.extent.end
+        macro_at.setdefault((c.location.line, c.location.column), []).append(
+            (d, f"{own}:{c.location.line}|{e.line}:{e.column}")
+        )
+    # (start line, col) -> [((end line, col), use)] of expressions starting where a macro
+    # was instantiated: the outermost one inside the macro's extent is its expansion.
+    expr_uses: dict[tuple[int, int], list[tuple[tuple[int, int], str]]] = {}
+
+    def visit(c: Any, stack: list[Any]) -> None:
+        stack.append(c)
+        k = c.kind
+        if k.is_expression():
+            st = c.extent.start
+            if (st.line, st.column) in macro_at:
+                en = c.extent.end
+                expr_uses.setdefault((st.line, st.column), []).append(
+                    ((en.line, en.column), value_use(stack))
+                )
+        if k in (K.CALL_EXPR, K.DECL_REF_EXPR, K.TYPE_REF, K.MEMBER_REF_EXPR):
+            reference(c, stack)
+        for ch in c.get_children():
+            visit(ch, stack)
+        stack.pop()
+
+    def reference(c: Any, stack: list[Any]) -> None:
+        ref = c.referenced
+        if ref is None or not outside(ref):
+            return
+        # Written by the project, not by a Zephyr macro body expanded in its code
+        # (regression: LOG_DBG in ZMK's kscan_gpio_matrix.c "used" the logging internals
+        # Z_LOG_MSG2_MODE_*). Macro arguments are spelled in the project.
+        line = _written_at(c.location, ref.spelling, sources)
+        own = own_file(c.location.file)
+        if line is None or own is None:
+            return
+        if ref.kind == K.FIELD_DECL:
+            owner = _record_name(ref.semantic_parent)
+            if not owner:
+                return
+            key = norm_type(f"{owner}.{ref.spelling}")
+            if key not in res.decls:
+                res.decls[key] = {
+                    "kind": "field",
+                    "type": norm_type(ref.type.get_canonical().spelling),
+                    "offset": ref.get_field_offsetof(),
+                    "where": f"{decl_path(ref.location)}:{ref.location.line}",
+                    "deprecated": ref.availability == ci.AvailabilityKind.DEPRECATED,
                 }
+            res.refs.append({"name": key, "kind": "field", "at": f"{own}:{line}"})
+            # A field whose type is a typedef: the project uses that typedef.
+            decl = ref.type.get_declaration()
+            if decl.kind == K.TYPEDEF_DECL and outside(decl):
+                record(decl)
+                res.refs.append({"name": decl.spelling, "kind": "typedef", "at": f"{own}:{line}"})
+            return
+        kind = {
+            K.FUNCTION_DECL: "function",
+            K.TYPEDEF_DECL: "typedef",
+            K.ENUM_CONSTANT_DECL: "enum",
+        }.get(ref.kind)
+        if kind is None:
+            return
+        record(ref)
+        r = {"name": ref.spelling, "kind": kind, "at": f"{own}:{line}"}
+        if kind == "enum":
+            r["use"] = value_use(stack)
+        res.refs.append(r)
+
+    for c in tops:
+        if c.kind in (K.MACRO_INSTANTIATION, K.MACRO_DEFINITION, K.INCLUSION_DIRECTIVE):
+            continue
+        if own_file(c.location.file) is not None:
+            visit(c, [tu.cursor])
+
+    for (line, col), insts in macro_at.items():
+        for d, tag in insts:
+            at, _, end = tag.partition("|")
+            el, ec = (int(x) for x in end.split(":"))
+            inside = [u for (e, u) in expr_uses.get((line, col), []) if e <= (el, ec)]
+            # visit() appends outer expressions first (pre-order), so inside[0] is outermost.
             res.refs.append(
                 {
                     "name": d.spelling,
                     "kind": "macro",
-                    "at": f"{own}:{line}",
-                    "use": use_of(c.extent, True),
+                    "at": at,
+                    "use": inside[0] if inside else "unknown",
                 }
             )
-            continue
-        if c.kind in (K.CALL_EXPR, K.DECL_REF_EXPR, K.TYPE_REF, K.MEMBER_REF_EXPR):
-            ref = c.referenced
-            if ref is None or ref.location.file is None:
-                continue
-            if where(ref.location)[0] is not None:
-                continue  # the project's own declaration
-            # Written by the project, not by a Zephyr macro body expanded in its code
-            # (regression: LOG_DBG in ZMK's kscan_gpio_matrix.c "used" the logging
-            # internals Z_LOG_MSG2_MODE_*). Macro arguments are spelled in the project.
-            written = _written_at(c.location, ref.spelling, sources)
-            if written is None:
-                continue
-            line = written
-            kind = None
-            if ref.kind == K.FUNCTION_DECL:
-                kind = "function"
-            elif ref.kind == K.TYPEDEF_DECL:
-                kind = "typedef"
-            elif ref.kind == K.ENUM_CONSTANT_DECL:
-                kind = "enum"
-            elif ref.kind == K.FIELD_DECL:
-                owner = _record_name(ref.semantic_parent)
-                if not owner:
-                    continue
-                key = norm_type(f"{owner}.{ref.spelling}")
-                if key not in res.decls:
-                    res.decls[key] = {
-                        "kind": "field",
-                        "type": norm_type(ref.type.get_canonical().spelling),
-                        "offset": ref.get_field_offsetof(),
-                        "where": f"{decl_path(ref.location)}:{ref.location.line}",
-                        "deprecated": ref.availability == ci.AvailabilityKind.DEPRECATED,
-                    }
-                res.refs.append({"name": key, "kind": "field", "at": f"{own}:{line}"})
-                # A field whose type is a typedef: the project uses that typedef.
-                decl = ref.type.get_declaration()
-                if decl.kind == K.TYPEDEF_DECL:
-                    res.refs.append(
-                        {"name": decl.spelling, "kind": "typedef", "at": f"{own}:{line}"}
-                    )
-                continue
-            if kind:
-                r = {"name": ref.spelling, "kind": kind, "at": f"{own}:{line}"}
-                if kind == "enum":
-                    r["use"] = use_of(c.extent, False)
-                res.refs.append(r)
     object_like = sorted(
         n for n, d in res.decls.items() if d["kind"] == "macro" and not d["function_like"]
     )
@@ -614,33 +639,3 @@ def value_use(stack: list[Any]) -> str:
             return "other"
         return "unknown"
     return "unknown"
-
-
-def value_uses(tu: Any, show: Any) -> dict[tuple[str, int, int, int, int], str]:
-    """{(file, start line, start col, end line, end col): use} for every expression in
-    project code, from its ancestors."""
-    import clang.cindex as ci
-
-    out: dict[tuple[str, int, int, int, int], str] = {}
-
-    def visit(c: Any, stack: list[Any]) -> None:
-        stack.append(c)
-        s, e = c.extent.start, c.extent.end
-        if c.kind.is_expression() and s.file is not None:
-            own = show(os.path.normpath(s.file.name))
-            if own is not None:
-                key = (own, s.line, s.column, e.line, e.column)
-                out.setdefault(key, value_use(stack))
-        for k in c.get_children():
-            if (
-                k.kind == ci.CursorKind.MACRO_INSTANTIATION
-                or k.kind == ci.CursorKind.MACRO_DEFINITION
-            ):
-                continue
-            visit(k, stack)
-        stack.pop()
-
-    for top in tu.cursor.get_children():
-        if top.location.file is not None and show(os.path.normpath(top.location.file.name)):
-            visit(top, [tu.cursor])
-    return out

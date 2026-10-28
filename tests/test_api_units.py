@@ -257,3 +257,53 @@ def test_value_changes_demoted_only_when_provably_unused_as_a_value(tmp_path: Pa
         "E_SIZE": Severity.INFO,
         "M_SIZE": Severity.INFO,
     }
+
+
+def test_function_that_became_a_macro_at_the_target(tmp_path: Path) -> None:
+    """ZMK calls k_ms_to_ticks_ceil64(), a macro at v3.5: crashed the diff once declaration
+    tables held only referenced declarations (KeyError: 'type')."""
+    from zmig.analyzers.api import ApiAnalyzer
+    from zmig.findings import Severity
+
+    src = [{"file": "a.c", "errors": [], "diags": [],
+            "decls": {"k_ms": {"kind": "function", "type": "int (int)", "where": "t.h:3"}},
+            "refs": [{"name": "k_ms", "kind": "function", "at": "a.c:4"}]}]  # fmt: skip
+    tgt = [{"file": "a.c", "errors": [], "diags": [],
+            "decls": {"k_ms": {"kind": "macro", "function_like": True, "arity": 1,
+                               "where": "zephyr/include/t.h:9"}},
+            "refs": [{"name": "k_ms", "kind": "macro", "at": "a.c:4"}]}]  # fmt: skip
+    ws = SimpleNamespace(zephyr=tmp_path, root=tmp_path)
+    ctx = SimpleNamespace(new=SimpleNamespace(workspace=ws), new_spec="new", scope=("s",))
+    (f,) = ApiAnalyzer()._declaration_changes(ctx, src, tgt)  # type: ignore[arg-type]
+    assert (f.kind, f.severity) == ("function-became-macro", Severity.INFO)
+
+
+def test_parse_cache_key_ignores_build_and_workspace_location(tmp_path: Path) -> None:
+    from zmig.analyzers.api import _object_of, _parse_key
+
+    src = tmp_path / "main.c"
+    src.write_text("int x;\n")
+    deps = {
+        "ws:zephyr/include/zephyr/kernel.h": "aa",
+        "build:zephyr/include/generated/zephyr/autoconf.h": "bb",
+    }
+
+    def key(build: str, ws: str) -> str | None:
+        b = SimpleNamespace(dir=Path(build), workspace=SimpleNamespace(root=Path(ws)), src=tmp_path)
+        e = {
+            "file": str(src),
+            "command": f"cc -I{ws}/zephyr/include -I{build}/zephyr/include -c {src}",
+        }
+        return _parse_key("clang 18", e, b, deps)
+
+    assert key("/c/builds/1", "/c/ws/a") == key("/c/builds/2", "/c/ws/b")
+    assert key("/c/builds/1", "/c/ws/a") != _parse_key(
+        "clang 18", {"file": str(src), "command": "cc -c x"},
+        SimpleNamespace(dir=Path("/b"), workspace=SimpleNamespace(root=Path("/w")), src=tmp_path),
+        {**deps, "ws:zephyr/include/zephyr/kernel.h": "changed"},
+    )  # fmt: skip
+    assert _parse_key("clang 18", {"file": str(src), "command": "cc"}, None, None) is None
+    assert (
+        _object_of({"file": "a.c", "command": "cc -o CMakeFiles/a.c.obj -c a.c"})
+        == "CMakeFiles/a.c.obj"
+    )
