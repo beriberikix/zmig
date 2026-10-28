@@ -40,6 +40,7 @@ class Category(StrEnum):
     SBOM = "sbom"
     IMAGES = "images"
     CROSSIMAGE = "crossimage"
+    INIT = "init"
     # Field-upgrade hazard categories (P1).
     SYSBUILD = "sysbuild"
     LAYOUT = "layout"

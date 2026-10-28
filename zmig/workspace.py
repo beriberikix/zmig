@@ -138,5 +138,6 @@ def materialize(
             [*west_argv(), "update", "--narrow", *sorted(modules)],
             cwd=root,
             unset_env=["ZEPHYR_BASE"],
+            progress=f"updating modules {', '.join(sorted(modules))} for {resolved.ref.label}",
         )
     return ws

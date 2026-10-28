@@ -89,6 +89,13 @@ _ROLE = re.compile(
 _LITERAL = re.compile(r"``(?P<body>[^`]+)``")
 _BARE_CONFIG = re.compile(r"(?<![`\w])CONFIG_[A-Z0-9_]+\b")
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# Standard C type names say nothing about which API an entry is about: "the event type
+# changed from uint32_t to uint64_t" would otherwise match every uint32_t in the app
+# (regression: bms-firmware, docs/DOGFOOD-2-baseline.md M4).
+_C_STD_TYPE = re.compile(
+    r"u?int(?:8|16|32|64|ptr|max)_t|u?int_(?:least|fast)(?:8|16|32|64)_t|s?size_t|"
+    r"ptrdiff_t|off_t|time_t|wchar_t|bool|float|double|char|void"
+)
 _C_KEYWORDS = {
     "auto",
     "bool",
@@ -191,7 +198,12 @@ def _item(role: str | None, body: str) -> tuple[ItemKind, str] | None:
         return "header", m[1].removeprefix("include/")
     if re.fullmatch(r"[a-z0-9-]+,[a-z0-9.,+-]+", body):
         return "compat", body
-    if re.fullmatch(r"[A-Za-z_][\w-]*", body) and body not in _C_KEYWORDS and len(body) >= 3:
+    if (
+        re.fullmatch(r"[A-Za-z_][\w-]*", body)
+        and body not in _C_KEYWORDS
+        and not _C_STD_TYPE.fullmatch(body)
+        and len(body) >= 3
+    ):
         return "literal", body
     return None
 

@@ -5,11 +5,20 @@ excerpts are copied from the real target configure/build output (paths shortened
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
+import pytest
+
+from zmig import tools
+from zmig.analyzers import initorder
 from zmig.analyzers.buildlog import build_errors
-from zmig.buildctx import kconfig_block, locate_salvage_edits
-from zmig.diagnostics import parse_log
+from zmig.analyzers.kconfig import dependency_chains
+from zmig.buildctx import kconfig_block, locate_salvage_edits, project_path, project_roots
+from zmig.diagnostics import parse_log, parse_warnings
+from zmig.tools import Runner
 
 APP = "/ws/apps/x/app"
 
@@ -166,3 +175,215 @@ def test_app_binding_paths_compare_without_the_copy_dir() -> None:
     assert _binding("zephyr/dts/bindings/i2c/nordic,nrf-twim.yaml") == (
         "zephyr/dts/bindings/i2c/nordic,nrf-twim.yaml"
     )
+
+
+# --- Round 2: warnings raised in Zephyr headers, attributed to the project's call site ---
+
+SYS_INIT_LOG = """\
+[17/314] Building C object CMakeFiles/app.dir/src/activity.c.obj
+In file included from /ws/zephyr/include/zephyr/device.h:13,
+                 from /ws/apps/x/app/src/activity.c:7:
+/ws/zephyr/include/zephyr/init.h:193:44: warning: initialization of 'int (*)(void)' from incompatible pointer type 'int (*)(const struct device *)' [-Wincompatible-pointer-types]
+  193 |                         .init_fn = {.sys = (init_fn_)},                        \\
+      |                                            ^
+/ws/zephyr/include/zephyr/init.h:174:9: note: in expansion of macro 'SYS_INIT_NAMED'
+  174 |         SYS_INIT_NAMED(init_fn, init_fn, level, prio)
+      |         ^~~~~~~~~~~~~~
+/ws/apps/x/app/src/activity.c:98:1: note: in expansion of macro 'SYS_INIT'
+   98 | SYS_INIT(activity_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+      | ^~~~~~~~
+[18/314] Building C object CMakeFiles/app.dir/src/kscan.c.obj
+"""
+
+# Golioth hello at v4.2.0: the shared example code is in the project's own module, outside
+# the app directory.
+NET_MGMT_LOG = """\
+[172/432] Building C object zephyr/CMakeFiles/zephyr.dir/mod/golioth-firmware-sdk/examples/zephyr/common/net_connect.c.obj
+/mod/golioth-firmware-sdk/examples/zephyr/common/net_connect.c: In function 'wait_for_net_event':
+/mod/golioth-firmware-sdk/examples/zephyr/common/net_connect.c:36:21: warning: assignment to 'net_mgmt_event_handler_t' {aka 'void (*)(struct net_mgmt_event_callback *, long long unsigned int,  struct net_if *)'} from incompatible pointer type 'void (*)(struct net_mgmt_event_callback *, uint32_t,  struct net_if *)' {aka 'void (*)(struct net_mgmt_event_callback *, unsigned int,  struct net_if *)'} [-Wincompatible-pointer-types]
+   36 |     wait.cb.handler = event_cb_handler;
+      |                     ^
+In file included from /ws/zephyr/include/zephyr/net/net_mgmt.h:96,
+                 from /ws/zephyr/include/zephyr/net/net_stats.h:19,
+                 from /ws/zephyr/include/zephyr/net/net_if.h:32,
+                 from /mod/golioth-firmware-sdk/examples/zephyr/common/net_connect.c:11:
+/mod/golioth-firmware-sdk/examples/zephyr/common/net_connect.c: In function 'net_connect':
+/ws/zephyr/include/zephyr/net/net_event.h:344:9: warning: conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1' [-Woverflow]
+  344 |         (NET_EVENT_IPV4_BASE | NET_EVENT_IPV4_CMD_ADDR_ADD)
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/mod/golioth-firmware-sdk/examples/zephyr/common/net_connect.c:69:31: note: in expansion of macro 'NET_EVENT_IPV4_ADDR_ADD'
+   69 |     wait_for_net_event(iface, NET_EVENT_IPV4_ADDR_ADD);
+      |                               ^~~~~~~~~~~~~~~~~~~~~~~
+[173/432] Building C object zephyr/CMakeFiles/zephyr.dir/drivers/flash/flash_util.c.obj
+"""
+
+
+def test_header_warning_keeps_the_macro_call_site() -> None:
+    (w,) = parse_warnings(SYS_INIT_LOG)
+    assert (w.file, w.line) == ("/ws/zephyr/include/zephyr/init.h", 193)
+    # Innermost expansion first; the include chain's compiled file last.
+    assert w.sites == (
+        ("/ws/zephyr/include/zephyr/init.h", 174),
+        ("/ws/apps/x/app/src/activity.c", 98),
+        ("/ws/apps/x/app/src/activity.c", 7),
+    )
+
+
+def test_net_mgmt_warnings_point_at_the_module_call_site(tmp_path: Path) -> None:
+    handler, overflow = parse_warnings(NET_MGMT_LOG)
+    common = "/mod/golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
+    assert (handler.file, handler.line) == (common, 36)
+    assert handler.sites == ((common, 0),)
+    assert overflow.file.endswith("net_event.h")
+    assert overflow.sites[0] == (common, 69)
+
+    # The project's own modules (outside zmig's workspace) count as project code.
+    img = tmp_path / "build"
+    img.mkdir()
+    (img / "zephyr_modules.txt").write_text(
+        '"golioth-firmware-sdk":"/mod/golioth-firmware-sdk":"/mod/golioth-firmware-sdk/port/zephyr"\n'
+        '"hal_stm32":"/ws/modules/hal/stm32":"/ws/zephyr/modules/hal_stm32"\n'
+    )
+    b = SimpleNamespace(src=Path("/ws/apps/x/hello"), workspace=SimpleNamespace(root=Path("/ws")))
+    roots = project_roots(b, img)  # type: ignore[arg-type]
+    assert roots == {"/ws/apps/x/hello": "", "/mod/golioth-firmware-sdk": "golioth-firmware-sdk/"}
+    assert (
+        project_path(common, roots) == "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
+    )
+    assert project_path("/ws/apps/x/hello/src/main.c", roots) == "src/main.c"
+    assert project_path("/ws/zephyr/include/zephyr/net/net_event.h", roots) is None
+
+
+def test_long_steps_report_progress(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(tools, "HEARTBEAT_S", 0.2)
+    with caplog.at_level(logging.WARNING, logger="zmig"):
+        Runner().run(["sleep", "0.7"], progress="compiling app at v4.2.0")
+    msgs = [r.getMessage() for r in caplog.records]
+    assert msgs[0] == "  compiling app at v4.2.0..."
+    assert any(m.startswith("  ... still compiling app at v4.2.0 (") for m in msgs[1:-1])
+    assert msgs[-1].startswith("  compiling app at v4.2.0: done in ")
+    # Steps without a label stay quiet.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="zmig"):
+        Runner().run(["true"])
+    assert caplog.records == []
+
+
+def test_dependency_chains_one_hop_or_through_a_changed_symbol() -> None:
+    old = {
+        "APP_FEATURE": {"depends": "BT && !FOO", "selects": ["PM"], "defaults": ["y if BAR"]},
+        "BT": {"depends": "HAS_BT", "selects": [], "defaults": []},
+        "PM": {"depends": "HAS_PM", "selects": [], "defaults": []},
+        "HAS_PM": {},
+        "HAS_BT": {},
+        "BAR": {},
+        "FOO": {},
+    }
+    # PM: one hop (selected). HAS_PM: only through PM, which changed too. HAS_BT: BT didn't
+    # change, so the chain stops (SoC capability churn every config depends on).
+    chains = dependency_chains({"APP_FEATURE": ()}, {"PM", "HAS_PM", "HAS_BT", "BAR"}, old)
+    assert chains == {
+        "BAR": [("APP_FEATURE", "takes its default from", "BAR")],
+        "PM": [("APP_FEATURE", "selects", "PM")],
+        "HAS_PM": [("APP_FEATURE", "selects", "PM"), ("PM", "depends on", "HAS_PM")],
+    }
+    assert dependency_chains({"NOT_DEFINED": ()}, {"PM"}, old) == {}
+
+
+def test_init_order_swaps_and_device_identity() -> None:
+    def dump(entries: list[tuple[str, str, str, str | None]]) -> dict[str, Any]:
+        levels = ["PRE_KERNEL_1", "POST_KERNEL", "APPLICATION"]
+        idx: dict[str, int] = {}
+        out = []
+        for level, fn, arg, node in entries:
+            out.append(
+                {
+                    "level": level,
+                    "index": idx.setdefault(level, 0),
+                    "fn": fn,
+                    "arg": arg,
+                    "node": node,
+                }
+            )
+            idx[level] += 1
+        return {"levels": levels, "entries": out, "sites": {}}
+
+    old = dump(
+        [
+            ("PRE_KERNEL_1", "clock_init", "__device_dts_ord_3", "/soc/rcc"),
+            ("POST_KERNEL", "settings_init", "NULL", None),
+            ("POST_KERNEL", "app_ext_power_init", "__device_dts_ord_9", "/ext_power"),
+            ("POST_KERNEL", "regulator_init", "__device_dts_ord_7", "/regulator"),
+        ]
+    )
+    # v4.2: device init functions are listed as NULL and ordinals renumber.
+    new = dump(
+        [
+            ("PRE_KERNEL_1", "NULL", "__device_dts_ord_2", "/soc/rcc"),
+            ("POST_KERNEL", "NULL", "__device_dts_ord_11", "/regulator"),
+            ("POST_KERNEL", "NULL", "__device_dts_ord_8", "/ext_power"),
+            ("APPLICATION", "settings_init", "NULL", None),
+        ]
+    )
+    o = [initorder._key(e) for e in initorder.run_order(old)]
+    n = [initorder._key(e) for e in initorder.run_order(new)]
+    assert ("device", "/ext_power") in n
+    later, earlier = initorder.swaps(o, n, ("device", "/ext_power"))
+    assert later == [("settings_init", "NULL")]
+    assert earlier == [("device", "/regulator")]
+    assert initorder._label(new["entries"][2]) == "device /ext_power"
+
+
+def test_c_standard_type_names_are_not_guide_literals() -> None:
+    from zmig.guides import _item
+
+    assert _item(None, "uint32_t") is None
+    assert _item(None, "size_t") is None
+    assert _item(None, "net_mgmt_event_handler_t") == ("literal", "net_mgmt_event_handler_t")
+
+
+def test_elf_named_after_kernel_bin_name(tmp_path: Path) -> None:
+    from zmig.buildctx import Artifact, ImageContext
+
+    (tmp_path / "zephyr").mkdir()
+    (tmp_path / "zephyr" / ".config").write_text('CONFIG_KERNEL_BIN_NAME="zmk"\n')
+    (tmp_path / "zephyr" / "zmk.elf").write_bytes(b"\x7fELF")
+    img = ImageContext("app", "app", "", tmp_path, tmp_path / "log", "ok", "full", "b", "r")
+    assert img.has(Artifact.ELF)
+    assert img.artifact(Artifact.ELF) == tmp_path / "zephyr" / "zmk.elf"
+    assert img.missing_reason(Artifact.MAP) == "zephyr/zmk.map missing"
+
+
+def test_findings_only_in_unused_input_files_become_info(tmp_path: Path) -> None:
+    from zmig.analyzers import outside_build
+    from zmig.findings import Category, Confidence, Finding, Severity, file_line
+
+    app = tmp_path / "ws" / "apps" / "x" / "hello"
+    img_dir = tmp_path / "build"
+    (img_dir / "zephyr").mkdir(parents=True)
+    log = img_dir / "log"
+    log.write_text(f"Merged configuration '{app}/prj.conf'\n")
+    (img_dir / "zephyr" / "zephyr.dts.d").write_text(
+        f"empty_file.o: \\\n /ws/zephyr/boards/st/nucleo_h563zi/nucleo_h563zi.dts \\\n {app}/app.overlay\n"
+    )
+    img = SimpleNamespace(dir=img_dir, log=log)
+    b = SimpleNamespace(src=app, workspace=SimpleNamespace(root=tmp_path / "ws"), images=(img,))
+    base = SimpleNamespace(old=b, new=b, new_raw=b)
+
+    def finding(path: str, sev: Severity = Severity.BREAKING) -> Finding:
+        return Finding(Category.KCONFIG, "symbol-removed", path, "t", sev, Confidence.HIGH, "a",
+                       "kconfig", ("s",), evidence=(file_line(path, 27, "x"),))  # fmt: skip
+
+    rak, used, src = (
+        finding("boards/rak5010_nrf52840.conf"),
+        finding("app.overlay"),
+        finding("src/main.c", Severity.RISKY),
+    )
+    out = outside_build([rak, used, src], base)  # type: ignore[arg-type]
+    assert out[0].severity is Severity.INFO
+    assert "only in files this build doesn't use: boards/rak5010_nrf52840.conf" in out[0].title
+    assert "outside-build" in out[0].heuristics
+    assert out[1].severity is Severity.BREAKING  # applied overlay
+    assert out[2].severity is Severity.RISKY  # sources aren't judged by this rule

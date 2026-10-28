@@ -169,6 +169,41 @@ def edt(img: ImageContext, ws: RefWorkspace, runner: Runner) -> dict[str, Any]:
     return _cached(img, "edt", produce)
 
 
+def init_levels(img: ImageContext, ws: RefWorkspace, runner: Runner) -> dict[str, Any]:
+    """The init calls of an image in run order, read by this ref's own
+    check_init_priorities.py (extract/init_dump.py). Raises ArtifactMissing when the ref
+    has no such reader (before v3.5) or the image has no ELF."""
+    elf = img.artifact(Artifact.ELF)
+    # What Zephyr's own check reads: the native runner executable when there is one
+    # (native_sim's zephyr.elf is an intermediate library), else the ELF (CMakeLists.txt,
+    # check_init_priorities_input).
+    exe = elf.with_suffix(".exe")
+    if exe.is_file():
+        elf = exe
+    pickle_path = img.artifact(Artifact.EDT)
+    script = ws.zephyr / "scripts" / "build" / "check_init_priorities.py"
+    if not script.is_file() or "class ZephyrInitLevels" not in script.read_text():
+        raise ArtifactMissing(
+            f"{ws.resolved.ref.label} has no scripts/build/check_init_priorities.py that can "
+            "list init levels (ZephyrInitLevels, added in Zephyr v3.5)"
+        )
+
+    def produce(out: Path) -> None:
+        proc = runner.run(
+            [sys.executable, EXTRACT / "init_dump.py", script.parent, elf, pickle_path, out],
+            unset_env=["PYTHONPATH"],
+            check=False,
+        )
+        if proc.returncode != 0:
+            last = (proc.stderr.strip().splitlines() or ["no output"])[-1]
+            raise ArtifactMissing(
+                f"{ws.resolved.ref.label}'s check_init_priorities.py can't read the init "
+                f"levels of image {img.name}: {last}"
+            )
+
+    return _cached(img, "initlevels", produce)
+
+
 def app_undefined_symbols(img: ImageContext, app: Path, runner: Runner) -> set[str] | None:
     """Symbols the app's own object files reference but don't define (`nm -u`): the
     Zephyr APIs it actually calls. None when there are no objects (a --fast build)."""

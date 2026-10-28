@@ -98,8 +98,19 @@ class ImageContext:
     board: str
     ref: str  # spec of the ref it was built from, for messages
 
+    def path(self, a: Artifact) -> Path:
+        """Where the artifact is. The ELF and map are named after CONFIG_KERNEL_BIN_NAME
+        (regression: ZMK sets it to "zmk", so its ELF is zephyr/zmk.elf)."""
+        if a in (Artifact.ELF, Artifact.MAP):
+            config = self.dir / Artifact.CONFIG.value
+            if config.is_file():
+                m = re.search(r'^CONFIG_KERNEL_BIN_NAME="([^"]+)"$', config.read_text(), re.M)
+                if m and m[1] != "zephyr":
+                    return self.dir / "zephyr" / f"{m[1]}{Path(a.value).suffix}"
+        return self.dir / a.value
+
     def has(self, a: Artifact) -> bool:
-        return (self.dir / a.value).is_file()
+        return self.path(a).is_file()
 
     def missing_reason(self, a: Artifact) -> str:
         """Why an artifact is missing, quoting the producing tool when it said."""
@@ -110,13 +121,16 @@ class ImageContext:
             if errors:
                 return f"west spdx: {errors[0].removeprefix('ERROR:').strip()}"
             if self.status != "ok":
-                return f"the build {self.status.replace('-', ' ')}; west spdx needs a full build"
+                return f"the {self.status.replace('-', ' ')}; west spdx needs a full build"
+        name = self.path(a).relative_to(self.dir).as_posix()
         if a in BUILD_ONLY and self.mode == "fast":
-            return f"{a.value} needs a full build (rerun without --fast)"
-        return f"{a.value} missing"
+            return f"{name} needs a full build (rerun without --fast)"
+        if a in BUILD_ONLY and self.status != "ok":
+            return f"{name} missing: the {self.status.replace('-', ' ')}"
+        return f"{name} missing"
 
     def artifact(self, a: Artifact) -> Path:
-        p = self.dir / a.value
+        p = self.path(a)
         if p.is_file():
             return p
         raise ArtifactMissing(
@@ -234,6 +248,31 @@ SYSBUILD_SEGMENT = "sysbuild"
 
 
 _FOUND_TOOLCHAIN = re.compile(r"^-- Found toolchain: zephyr (?P<ver>\S+) \((?P<path>[^)]+)\)", re.M)
+
+
+def project_roots(b: BuildContext, img_dir: Path) -> dict[str, str]:
+    """Directories holding the project's own code, mapped to how paths under them are shown:
+    the app ("") and every module outside zmig's workspace, i.e. the project's own modules
+    passed with ZEPHYR_EXTRA_MODULES ("<module name>/")."""
+    roots = {str(b.src): ""}
+    modules = img_dir / Artifact.MODULES.value
+    if modules.is_file():
+        for ln in modules.read_text().splitlines():
+            parts = [p.strip('"') for p in ln.split('":"')]
+            if len(parts) < 2:
+                continue
+            path = Path(parts[1])
+            if not path.is_relative_to(b.workspace.root):
+                roots[str(path)] = f"{parts[0]}/"
+    return roots
+
+
+def project_path(path: str, roots: dict[str, str]) -> str | None:
+    """`path` as shown to the user if it's the project's own code, else None."""
+    for root, prefix in sorted(roots.items(), key=lambda kv: -len(kv[0])):
+        if path.startswith(root + "/"):
+            return prefix + path[len(root) + 1 :]
+    return None
 
 
 def sdk_identity(sdk: Path | None) -> dict[str, str] | None:
@@ -410,7 +449,8 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
     # PYTHONPATH from the user's shell (e.g. ROS) can shadow the packages Zephyr's
     # scripts import; the build must see only zmig's interpreter environment.
     run_env = {"env": env, "unset_env": unset, "check": False, "merge_output": True}
-    conf = runner.run(argv, cwd=ws.root, **run_env)  # type: ignore[arg-type]
+    at = ws.resolved.ref.label
+    conf = runner.run(argv, cwd=ws.root, progress=f"configuring at {at}", **run_env)  # type: ignore[arg-type]
     configure_text = f"$ {' '.join(argv)}\n{conf.stdout}"
     if spec.sdk is not None and conf.returncode == 0:
         # Keep the evidence even when the check fails. A failed configure is reported as
@@ -449,7 +489,11 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
             # Keep going past failed steps (ninja -k 0), so one missing header doesn't hide
             # every other compile error (regression: ZMK's v3.5 build stopped at the
             # syscall headers).
-            proc = runner.run([cmake, "--build", str(d), "--", "-k", "0"], **run_env)  # type: ignore[arg-type]
+            proc = runner.run(
+                [cmake, "--build", str(d), "--", "-k", "0"],
+                progress=f"compiling {name} at {at}",
+                **run_env,  # type: ignore[arg-type]
+            )
             build_text[name] = (
                 build_text.get(name, "") + f"$ cmake --build {d} -- -k 0\n{proc.stdout}"
             )
@@ -462,7 +506,11 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
     elif any(s == "build-failed" for s in statuses.values()):
         overall = "build-failed"
     if spec.sysbuild and spec.mode == "full" and overall == "ok":
-        proc = runner.run([cmake, "--build", str(bdir)], **run_env)  # type: ignore[arg-type]
+        proc = runner.run(
+            [cmake, "--build", str(bdir)],
+            progress=f"signing and merging sysbuild images at {at}",
+            **run_env,  # type: ignore[arg-type]
+        )
         top = f"$ cmake --build {bdir}\n{proc.stdout}"
         parts.append(top)
         segments[SYSBUILD_SEGMENT] = segments.get(SYSBUILD_SEGMENT, "") + top

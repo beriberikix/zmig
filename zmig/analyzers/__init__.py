@@ -8,6 +8,7 @@ entry-point group and declare `kind = "build"` or `kind = "workspace"`.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from importlib.metadata import entry_points
@@ -72,6 +73,7 @@ def _builtin(kind: str) -> list[type[Any]]:
     from zmig.analyzers.devicetree import DevicetreeAnalyzer
     from zmig.analyzers.guide import GuideAnalyzer
     from zmig.analyzers.images import ImagesAnalyzer
+    from zmig.analyzers.initorder import InitOrderAnalyzer
     from zmig.analyzers.kconfig import KconfigAnalyzer
     from zmig.analyzers.layout import LayoutAnalyzer
     from zmig.analyzers.mcuboot import McubootAnalyzer
@@ -86,6 +88,7 @@ def _builtin(kind: str) -> list[type[Any]]:
         KconfigAnalyzer,
         DevicetreeAnalyzer,
         BuildlogAnalyzer,
+        InitOrderAnalyzer,
         SbomAnalyzer,
         ImagesAnalyzer,
         CrossImageAnalyzer,
@@ -166,7 +169,67 @@ def run_build_analyzers(
             not_checked += res.not_checked
             statuses.append(AnalyzerStatus(label, res.status, res.reason))
             ctx.shared.setdefault("findings", []).extend(res.findings)
-    return link_related(findings), statuses, not_checked
+    return link_related(outside_build(findings, base)), statuses, not_checked
+
+
+# App input files that a build may or may not use, depending on board, shield and SoC.
+BUILD_INPUT_SUFFIXES = (".conf", ".overlay", ".dts", ".dtsi", ".keymap")
+
+
+def build_inputs(base: ScanContext) -> set[str] | None:
+    """The project's configuration and devicetree input files that any image of either
+    build used (merged .conf fragments, and every file in zephyr.dts.d), as shown in
+    evidence (app-relative, or "<module>/..."). None if no image recorded them."""
+    from zmig.buildctx import project_path, project_roots
+    from zmig.diagnostics import parse_log
+
+    out: set[str] = set()
+    found = False
+    for b in (base.old, base.new, base.new_raw):
+        for img in b.images:
+            roots = project_roots(b, img.dir)
+            paths: list[str] = []
+            if img.log.is_file():
+                facts = parse_log(img.log.read_text())
+                paths += [*facts.configs, *facts.overlays]
+            deps = img.dir / "zephyr" / "zephyr.dts.d"
+            if deps.is_file():
+                found = True
+                paths += [t.rstrip(":") for t in deps.read_text().split() if t != "\\"]
+            for p in paths:
+                if rel := project_path(os.path.normpath(p), roots):
+                    out.add(rel)
+    return out if found else None
+
+
+def outside_build(findings: list[Finding], base: ScanContext) -> list[Finding]:
+    """Breaking/risky findings whose only evidence is in configuration or devicetree files
+    no build used (another board's .conf, a shield's overlay) become info, saying so. They
+    stay in the report as hints for those configurations (regression: Golioth's
+    rak5010_nrf52840.conf and an STM32H5 USB node blamed on rak5010's overlay,
+    docs/DOGFOOD-2-baseline.md M2/M3)."""
+    from zmig.findings import Severity
+
+    inputs = build_inputs(base)
+    if inputs is None:
+        return findings
+    out = []
+    for f in findings:
+        files = {str(e["path"]) for e in f.evidence if e.get("type") == "file_line"}
+        if (
+            f.severity is not Severity.INFO
+            and files
+            and all(p.endswith(BUILD_INPUT_SUFFIXES) and p not in inputs for p in files)
+        ):
+            f = replace(
+                f,
+                severity=Severity.INFO,
+                title=f"{f.title} (only in files this build doesn't use: "
+                f"{', '.join(sorted(files)[:3])}{', ...' if len(files) > 3 else ''})",
+                heuristics=(*f.heuristics, "outside-build"),
+            )
+        out.append(f)
+    return out
 
 
 def link_related(findings: list[Finding]) -> list[Finding]:

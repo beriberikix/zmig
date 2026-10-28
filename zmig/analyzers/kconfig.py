@@ -7,12 +7,13 @@ target configure rejected the app's assignments.
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
-from zmig.buildctx import Artifact
-from zmig.diagnostics import Diagnostic
+from zmig.buildctx import Artifact, project_path, project_roots
+from zmig.diagnostics import Diagnostic, app_relative
 from zmig.findings import (
     JSON,
     Category,
@@ -83,6 +84,49 @@ def guide_renames(ctx: ScanContext, sym: str, new: Symbols) -> list[tuple[str, s
 
 def _locs(locs: list[Loc]) -> tuple[JSON, ...]:
     return tuple(file_line(loc.path, loc.line, loc.text) for loc in locs)
+
+
+_SYMBOL = re.compile(r"\b[A-Z_][A-Z0-9_]*\b")
+
+
+def references(info: dict[str, Any], known: Symbols) -> dict[str, str]:
+    """Symbols one symbol's definition leans on, with how: what it depends on, selects or
+    implies, and what its defaults name (values and conditions)."""
+    out: dict[str, str] = {}
+    for s in _SYMBOL.findall(info.get("depends") or ""):
+        out.setdefault(s, "depends on")
+    for s in info.get("selects", []):
+        out.setdefault(s, "selects")
+    for s in info.get("implies", []):
+        out.setdefault(s, "implies")
+    for d in info.get("defaults", []):
+        for s in _SYMBOL.findall(d):
+            out.setdefault(s, "takes its default from")
+    return {s: how for s, how in out.items() if s in known}
+
+
+def dependency_chains(
+    roots: dict[str, Any], changed: set[str], old: Symbols
+) -> dict[str, list[tuple[str, str, str]]]:
+    """For each symbol in `changed` that an app root leans on, the shortest chain of
+    (symbol, how, next symbol) links from a root to it. One hop, or two when the
+    intermediate symbol changed too (so the change visibly propagates through it); deeper
+    chains reach the SoC and arch symbols every config depends on."""
+    out: dict[str, list[tuple[str, str, str]]] = {}
+    for root in sorted(roots):
+        if root not in old:
+            continue
+        first = references(old[root], old)
+        for mid, how in sorted(first.items()):
+            if mid in changed and mid != root:
+                out.setdefault(mid, [(root, how, mid)])
+        for mid, how in sorted(first.items()):
+            if mid not in changed or mid == root:
+                continue
+            for x, how2 in sorted(references(old[mid], old).items()):
+                if x in changed and x not in (root, mid) and x not in out:
+                    out[x] = [(root, how, mid), (mid, how2, x)]
+    return out
 
 
 class KconfigAnalyzer:
@@ -283,6 +327,7 @@ class KconfigAnalyzer:
                 s: ov[s] for s in sorted(ov.keys() - nv.keys()) if ov[s] != "n" and s not in handled
             },
         }
+        self._promote_dependencies(ctx, others, add, diff_ev)
         titles = {
             "default-changed": "other symbols resolve to a different value",
             "newly-set": "symbols are newly enabled or set",
@@ -323,3 +368,57 @@ class KconfigAnalyzer:
                 )
             )
         return AnalyzerResult(findings)
+
+    @staticmethod
+    def _promote_dependencies(
+        ctx: ScanContext, others: dict[str, dict[str, Any]], add: Any, diff_ev: Any
+    ) -> None:
+        """Take the symbols the app's own configuration leans on out of the bulk lists and
+        report each as risky, with the chain from the app's line to the changed symbol.
+
+        Roots: the symbols set in a configuration fragment this build applied, and the
+        symbols the project's own Kconfig files define or override (the app and the
+        project's modules outside zmig's workspace)."""
+        ok = ctx.old_kconfig
+        applied = set(app_relative(ctx.old_facts.configs, ctx.old.src))
+        roots: dict[str, tuple[JSON, ...]] = {}
+        for sym, assigns in ctx.usage.kconfig_set.items():
+            locs = [loc for loc, _ in assigns if loc.path in applied]
+            if locs:
+                roots[sym] = _locs(locs)
+        proj = project_roots(ctx.old, ctx.old_img.dir)
+        ov, nv = ctx.old_config, ctx.new_config
+        for sym, info in ok.items():
+            # Only definitions that take effect in this build: a shield's Kconfig is parsed
+            # by every build of the app, but its symbols stay off without the shield.
+            if ov.get(sym, "n") in ("n", ""):
+                continue
+            ev: list[JSON] = []
+            for loc in info.get("locations", []):
+                path, _, line = loc.rpartition(":")
+                full = os.path.normpath(os.path.join(ctx.old.workspace.zephyr, path))
+                if (own := project_path(full, proj)) and line.isdigit():
+                    fl = file_line(own, int(line), f"config {sym}")
+                    if fl not in ev:  # a Kconfig file sourced twice lists its node twice
+                        ev.append(fl)
+            if ev:
+                roots.setdefault(sym, tuple(ev))
+        changed = {s for items in others.values() for s in items}
+        for x, chain in sorted(dependency_chains(roots, changed, ok).items()):
+            root = chain[0][0]
+            text = "; ".join(f"CONFIG_{a} {how} CONFIG_{b}" for a, how, b in chain)
+            for items in others.values():
+                items.pop(x, None)
+            add(
+                "dependency-changed",
+                x,
+                f"CONFIG_{x}, which your configuration of CONFIG_{root} relies on, changed "
+                f"from {ov.get(x, 'unset')} to {nv.get(x, 'unset')} in {ctx.new_spec}",
+                Severity.RISKY,
+                Confidence.MEDIUM,
+                f"{text}. Check that CONFIG_{root} still does what your app expects.",
+                (*roots[root], tool_output("Kconfig at the source", text), diff_ev(x)),
+                old=ov.get(x),
+                new={"value": nv.get(x), "chain": [list(link) for link in chain]},
+                heuristics=("kconfig.dependency-chain",),
+            )

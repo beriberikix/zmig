@@ -63,6 +63,7 @@ SECTION_TITLES = {
     "sbom": "SBOM",
     "images": "Images",
     "crossimage": "Consistency between images",
+    "init": "Init order",
     "sysbuild": "Sysbuild configuration",
     "layout": "Flash layout",
     "mcuboot": "MCUboot and image format",

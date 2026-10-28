@@ -91,7 +91,10 @@ class Mirror:
         if tmp.exists():
             shutil.rmtree(tmp)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.runner.run([self.git, "clone", "--bare", self.url, tmp])
+        self.runner.run(
+            [self.git, "clone", "--bare", self.url, tmp],
+            progress=f"cloning {self.url} into zmig's cache (once; can take several minutes)",
+        )
         tmp.rename(self.path)
         # A plain --bare clone sets no fetch refspec; track branches and tags.
         self._git("config", "remote.origin.fetch", "+refs/heads/*:refs/heads/*")
@@ -100,7 +103,10 @@ class Mirror:
     def fetch(self) -> None:
         if self._fetched:
             return
-        self._git("fetch", "--prune", "--tags", "origin")
+        self.runner.run(
+            [self.git, "--git-dir", self.path, "fetch", "--prune", "--tags", "origin"],
+            progress=f"fetching {self.url}",
+        )
         self._fetched = True
 
     def _lookup(self, spec: str) -> tuple[str, RefKind] | None:

@@ -13,6 +13,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -114,6 +115,19 @@ class Invocation:
         }
 
 
+HEARTBEAT_S = 60.0
+
+
+def _elapsed(seconds: float) -> str:
+    m, s = divmod(int(seconds), 60)
+    return f"{m}m{s:02d}s" if m else f"{s}s"
+
+
+def _heartbeat(label: str, start: float, done: threading.Event) -> None:
+    while not done.wait(HEARTBEAT_S):
+        log.warning("  ... still %s (%s)", label, _elapsed(time.monotonic() - start))
+
+
 @dataclass
 class Runner:
     """Runs external commands, logging each one."""
@@ -138,9 +152,13 @@ class Runner:
         check: bool = True,
         input: str | None = None,
         merge_output: bool = False,
+        progress: str = "",
     ) -> subprocess.CompletedProcess[str]:
         """Run a command. With merge_output, stderr is interleaved into stdout in the
-        order the tool wrote them (needed to attribute warnings), and stderr is empty."""
+        order the tool wrote them (needed to attribute warnings), and stderr is empty.
+        A `progress` label marks a step that can take minutes (clones, builds): it is
+        printed when the step starts, every HEARTBEAT_S while it runs, and with its
+        duration when it ends."""
         args = [str(a) for a in argv]
         inv_id = f"cmd-{len(self.invocations) + 1:03d}"
         full_env = dict(os.environ)
@@ -149,19 +167,29 @@ class Runner:
         full_env.update(env or {})
         log.info("$ %s%s", " ".join(args), f"  (in {cwd})" if cwd else "")
         start = time.monotonic()
-        proc = subprocess.run(
-            args,
-            cwd=cwd,
-            env=full_env,
-            input=input,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT if merge_output else subprocess.PIPE,
-            text=True,
-            errors="replace",
-        )
+        done = threading.Event()
+        if progress:
+            log.warning("  %s...", progress)
+            threading.Thread(target=_heartbeat, args=(progress, start, done), daemon=True).start()
+        try:
+            proc = subprocess.run(
+                args,
+                cwd=cwd,
+                env=full_env,
+                input=input,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT if merge_output else subprocess.PIPE,
+                text=True,
+                errors="replace",
+            )
+        finally:
+            done.set()
         if proc.stderr is None:
             proc.stderr = ""
         duration = time.monotonic() - start
+        if progress:
+            outcome = "done" if proc.returncode == 0 else f"failed (exit {proc.returncode})"
+            log.warning("  %s: %s in %s", progress, outcome, _elapsed(duration))
 
         log_rel = ""
         if self.log_dir is not None:

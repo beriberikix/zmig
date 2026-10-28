@@ -310,6 +310,7 @@
             "sbom",
             "images",
             "crossimage",
+            "init",
             "sysbuild",
             "layout",
             "mcuboot",

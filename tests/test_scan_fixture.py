@@ -213,6 +213,7 @@ def test_large_gap_v442(tmp_path: Path) -> None:
     assert {a["name"]: a["status"] for a in r["analyzers"]} == {
         "board": "ok",
         "buildlog": "ok",
+        "initorder": "ok",
         "devicetree": "ok",
         "crossimage": "ok",
         "guide": "ok",

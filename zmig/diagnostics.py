@@ -251,6 +251,15 @@ _W_CMAKE = re.compile(
 )
 
 
+# The context GCC prints around a diagnostic: the include chain and the enclosing function
+# before it, the "in expansion of macro" notes after it (innermost first), and source
+# excerpts (" 36 | code", "    |  ^~~") in between.
+_W_INCLUDED = re.compile(r"^(?:In file included|\s+) from (?P<file>[^\s:]+):(?P<line>\d+)[:,]$")
+_W_FUNCTION = re.compile(r"^(?P<file>[^\s:]+): In (?:function|member function) '[^']*':$")
+_W_NOTE = re.compile(r"^(?P<file>[^\s:]+):(?P<line>\d+):(?:\d+:)? note: (?P<msg>.*)$")
+_W_EXCERPT = re.compile(r"^\s+\d*\s*\|")
+
+
 @dataclass(frozen=True)
 class BuildWarning:
     source: str  # "compiler" | "kconfig" | "cmake"
@@ -258,6 +267,10 @@ class BuildWarning:
     line: int
     message: str
     flag: str = ""
+    # Where the code that triggered it was written, when the warning itself is reported in
+    # another file (a Zephyr header): the "in expansion of macro" sites, innermost first,
+    # then the enclosing function's file (line 0), then the include chain's outermost file.
+    sites: tuple[tuple[str, int], ...] = ()
 
     def key(self, roots: dict[str, str]) -> tuple[str, str, str]:
         """Identity across builds: paths made relative to known roots (the zephyr tree,
@@ -272,11 +285,43 @@ class BuildWarning:
         return (self.source, norm(self.file), norm(self.message))
 
 
+def _compiler_sites(lines: list[str], i: int) -> tuple[tuple[str, int], ...]:
+    """The code locations GCC prints around the diagnostic on lines[i] (see BuildWarning)."""
+    notes: list[tuple[str, int]] = []
+    for ln in lines[i + 1 :]:
+        if m := _W_NOTE.match(ln):
+            if m["msg"].startswith("in expansion of macro"):
+                notes.append((m["file"], int(m["line"])))
+        elif not _W_EXCERPT.match(ln):
+            break
+    function: list[tuple[str, int]] = []
+    included: list[tuple[str, int]] = []
+    for ln in reversed(lines[max(0, i - 40) : i]):
+        if m := _W_FUNCTION.match(ln):
+            function = function or [(m["file"], 0)]
+        elif m := _W_INCLUDED.match(ln):
+            included.append((m["file"], int(m["line"])))
+        else:
+            break
+    # The include chain is printed innermost first; its last line is the compiled file.
+    return tuple(dict.fromkeys([*notes, *function, *included[:1]]))
+
+
 def parse_warnings(text: str) -> list[BuildWarning]:
-    out = [
-        BuildWarning("compiler", m["file"], int(m["line"]), m["msg"].strip(), m["flag"] or "")
-        for m in _W_COMPILER.finditer(text)
-    ]
+    lines = text.splitlines()
+    out = []
+    for i, ln in enumerate(lines):
+        if m := _W_COMPILER.match(ln):
+            out.append(
+                BuildWarning(
+                    "compiler",
+                    m["file"],
+                    int(m["line"]),
+                    m["msg"].strip(),
+                    m["flag"] or "",
+                    _compiler_sites(lines, i),
+                )
+            )
     out += [
         BuildWarning("kconfig", "", 0, " ".join(m["msg"].split())) for m in _W_PLAIN.finditer(text)
     ]

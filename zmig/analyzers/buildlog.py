@@ -10,10 +10,11 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
-from zmig.buildctx import Artifact, BuildContext, is_host_board
+from zmig.buildctx import Artifact, BuildContext, is_host_board, project_path, project_roots
 from zmig.diagnostics import BuildWarning, app_relative, parse_log, parse_warnings
 from zmig.errors import ArtifactMissing
 from zmig.findings import (
@@ -82,12 +83,13 @@ _COMPILER_ERROR = re.compile(
 )
 
 
-def _roots(b: BuildContext) -> dict[str, str]:
+def _roots(b: BuildContext, img_dir: Path) -> dict[str, str]:
     return {
         str(b.workspace.zephyr): "<zephyr>",
         str(b.src): "<app>",
         str(b.dir): "<build>",
         str(b.workspace.root): "<workspace>",
+        **{r: f"<module:{p}>" for r, p in project_roots(b, img_dir).items() if p},
     }
 
 
@@ -150,13 +152,13 @@ class BuildlogAnalyzer:
             return AnalyzerResult(findings)
 
         if ctx.new_img.status == "build-failed":
-            app = str(ctx.new.src)
+            proj = project_roots(ctx.new, ctx.new_img.dir)
             errors = build_errors(log)
             ev: list[JSON] = []
             for e in errors[:MAX_ERRORS]:
                 where = f"{e.image} image: " if e.image else ""
-                if e.file.startswith(app + "/"):
-                    ev.append(file_line(e.file[len(app) + 1 :], e.line, e.message))
+                if own := project_path(e.file, proj):
+                    ev.append(file_line(own, e.line, e.message))
                 else:
                     loc = f"{e.file}:{e.line}: " if e.file else ""
                     ev.append(
@@ -201,33 +203,60 @@ class BuildlogAnalyzer:
     def _warnings(ctx: ScanContext, add: Add) -> None:
         old_w = parse_warnings(ctx.old_img.log.read_text())
         new_w = parse_warnings(ctx.new_img.log.read_text())
-        old_keys = {w.key(_roots(ctx.old)) for w in old_w}
-        new_keys = {w.key(_roots(ctx.new)) for w in new_w}
-        fresh: dict[tuple[str, str, str], BuildWarning] = {}
+        old_roots, new_roots = _roots(ctx.old, ctx.old_img.dir), _roots(ctx.new, ctx.new_img.dir)
+        old_keys = {w.key(old_roots) for w in old_w}
+        new_keys = {w.key(new_roots) for w in new_w}
+        # One finding per new warning; a warning raised in a header once per call site
+        # (SYS_INIT in every file) keeps all of them.
+        fresh: dict[tuple[str, str, str], list[BuildWarning]] = {}
         for w in new_w:
-            k = w.key(_roots(ctx.new))
+            k = w.key(new_roots)
             if k not in old_keys:
-                fresh.setdefault(k, w)
-        app = str(ctx.new.src) + "/"
-        for (source, path, msg), w in sorted(fresh.items()):
-            in_app = w.file.startswith(app)
-            ev: tuple[JSON, ...] = (
-                (file_line(w.file[len(app) :], w.line, msg),)
-                if in_app
-                else (tool_output(f"target build ({source})", f"{path}: {msg}" if path else msg),)
+                fresh.setdefault(k, []).append(w)
+        proj = project_roots(ctx.new, ctx.new_img.dir)
+        for (source, path, msg), ws in sorted(fresh.items()):
+            lines: dict[tuple[str, int], None] = {}  # project file:line sites, in order
+            files: dict[str, None] = {}  # project files without a line (enclosing function)
+            for w in ws:
+                own = project_path(w.file, proj) if w.file else None
+                if own:
+                    lines[(own, w.line)] = None
+                    continue
+                for f, ln in w.sites:
+                    rel = project_path(f, proj)
+                    if rel and ln:
+                        lines[(rel, ln)] = None
+                        break
+                    if rel and not ln:
+                        files[rel] = None
+                        break
+            raised = ctx.runner.redact(f"{path}: {msg}" if path else msg)
+            ev: tuple[JSON, ...] = tuple(file_line(f, ln, msg) for f, ln in lines) + tuple(
+                tool_output(f"target build ({source})", f"in {f}: {raised}") for f in files
             )
+            attributed = bool(lines or files)
+            if not ev:
+                ev = (tool_output(f"target build ({source})", raised),)
+            elif not any(project_path(w.file, proj) for w in ws if w.file):
+                # Reported inside a Zephyr or module header: say where it was raised.
+                ev += (tool_output(f"target build ({source}), raised at", raised),)
             deprecation = "deprecat" in msg.lower()
+            new: dict[str, object] = {"file": path}
+            if ws[0].flag:
+                new["flag"] = ws[0].flag
+            if attributed:
+                new["sites"] = [f"{f}:{ln}" for f, ln in lines] + list(files)
             add(
                 "new-warning",
                 f"{source}:{path}:{msg}"[:200],
                 f"New {source} warning at {ctx.new_spec}: {msg[:140]}",
-                Severity.RISKY if in_app or deprecation else Severity.INFO,
+                Severity.RISKY if attributed or deprecation else Severity.INFO,
                 "Look at it before it becomes an error in a later release."
                 if deprecation
                 else "Check whether it points at a real problem.",
                 ev,
                 None,
-                {"file": path, "flag": w.flag} if w.flag else {"file": path},
+                new,
             )
         gone = old_keys - new_keys
         if gone:

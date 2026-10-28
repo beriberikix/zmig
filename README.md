@@ -72,11 +72,17 @@ zmig scan --app tests/fixtures/app --board native_sim_64 --module zcbor \
 | Analyzer | Compares | Examples |
 |---|---|---|
 | board | `boards/deprecated.cmake` (incl. aliases dropped in later releases), app files each build applied | `native_sim_64` → `native_sim/native/64` |
-| kconfig | final `.config` and each tree's Kconfig metadata (via its own kconfiglib) | symbol you set was removed (with likely replacement), value no longer takes effect, deprecated, value your code reads changed |
+| kconfig | final `.config` and each tree's Kconfig metadata (via its own kconfiglib) | symbol you set was removed (with likely replacement), value no longer takes effect, deprecated, value your code reads changed, a symbol your settings depend on/select changed (with the chain) |
 | devicetree | final devicetree (via each tree's edtlib) against your overlays and `DT_*` macros | node your code references is gone, property you read has no value, property you set is deprecated |
-| buildlog | the target build | configure/compile failures with the real errors, new warnings, ROM/RAM delta with top symbols |
+| buildlog | the target build | configure/compile failures with the real errors, new warnings (a warning raised in a Zephyr header is reported at your call site), ROM/RAM delta with top symbols |
+| initorder | the init calls in both ELFs, read by each version's own `check_init_priorities.py` (v3.5+) | your `SYS_INIT`/device init now runs at another level, or Zephyr inits it relied on now run after it |
 | sbom | `west spdx` at both versions | modules added/dropped/re-pinned, compiled files added/removed/changed, upstream commits touching them, headers you include that changed |
 | guide | migration guides and release notes for every release crossed | entries mentioning symbols, compatibles, headers or APIs you use, with guide line and your line |
+
+Your own modules (passed with `--cmake-arg=-DZEPHYR_EXTRA_MODULES=...`) count as your code:
+findings in them are shown as `<module>/<path>:<line>`. Findings whose only evidence is in
+`.conf`/overlay/devicetree files this build doesn't use (another board's `.conf`, say) are
+kept as info and say so. Long steps (clones, builds) print progress every minute.
 
 When the target configure fails (Zephyr turns Kconfig and devicetree warnings into
 errors, so it usually does), zmig reports Zephyr's errors as findings, then disables
