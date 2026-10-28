@@ -1,6 +1,8 @@
 # DESIGN-P2: public API/ABI diff, intersected with the project's call sites
 
-Status: **draft for review**. Nothing here is implemented yet.
+Status: **reviewed 2026-10-28** (decisions in §10, which take precedence over earlier sections
+where they differ). Not implemented yet. Module-set detection and the new held-out
+configurations come first (DOGFOOD-3).
 
 P2 answers one question: *which Zephyr declarations that this project's compiled code uses
 changed between the two refs, and where does the project use them?* Every finding names a
@@ -207,22 +209,93 @@ makes pure layout changes info.
 
 ---
 
-## 9. Questions for review
+## 9. Questions for review (answered; see §10)
 
-1. **Dependency:** is the `libclang` PyPI wheel acceptable as an optional extra, or do you
-   want system libclang through the `clang` bindings?
-2. **Scope of headers:** `include/zephyr/**` only, or also the public headers of modules
-   the build uses (`modules/hal/*`, mbedtls, …)? The brief says `include/zephyr/**`, and
-   the design keeps to that.
-3. **Severity of value changes** (§4) for enum constants and object-like macros the project
-   uses: risky as proposed, or info unless narrowing?
-4. **Installing `abigail-tools` and `dwarves`** to test §6: OK to install with apt?
-5. **Order of implementation**, as proposed:
-   1. flags and the parse snapshot;
-   2. functions, typedefs and the function-pointer flow (G1, ZMK #2);
-   3. syscalls (ZMK #5);
-   4. macros, enums and structs;
-   5. DT macros;
-   6. the optional tools.
+1. libclang: PyPI wheel or system libclang?
+2. Header scope: `include/zephyr/**` only, or module headers too?
+3. Severity of value changes.
+4. Install `abigail-tools` and `dwarves`?
+5. Order of implementation.
 
-   Each step is measured on all three projects before the next.
+## 10. Review decisions (2026-10-28)
+
+### 10.1 libclang
+
+- **Default:** the PyPI `libclang` wheel, as the optional extra `zmig[api]`.
+- **Override:** `ZMIG_LIBCLANG=/path/to/libclang.so` uses a system libclang instead, through
+  `clang.cindex.Config.set_library_file`.
+- **Version:** the libclang version actually loaded (`clang_getClangVersion`) is recorded in
+  the report's `environment`.
+- **Flags:** compile flags clang doesn't accept are stripped or translated (§3.1).
+  - The list is data, with a test per supported SDK (0.16.x, 0.17.x, 1.0.x).
+  - An unknown flag that makes a parse fail is reported (see §10.4), not silently dropped.
+
+### 10.2 Scope: by usage, from the SOURCE build
+
+The headers analyzed are those **included by the project's own translation units** in the
+**source** build: `compile_commands.json` plus each object's dependency file (`ninja -t
+deps`). That includes module public headers (HALs, mbedtls, …) whenever a project TU
+includes them. Headers no project TU includes are never scanned.
+
+A header in that set that has no counterpart at the target is reported as **header
+removed**. Each header is resolved to its include root at the source and looked up under the
+same root at the target.
+
+### 10.3 Severity
+
+| Change | Severity |
+|---|---|
+| Removal (function, type, field, enum constant, macro, header); signature change; function-like macro arity change | **breaking** |
+| Changed value of an enum constant or object-like macro the project uses | **risky** |
+| Type-width change (e.g. `uint32_t` → `uint64_t`) where the project stores, passes or compares the value at a narrower type (truncation), or implements a callback with the old width | **breaking** |
+| Type-width change otherwise | **risky** |
+| Newly deprecated, used | **risky** |
+| Added symbol | **info** |
+| Any change to a symbol | **info only when it is provably unused** in the compiled project TUs, i.e. no reference in any TU that parsed. If any project TU failed to parse, "unused" can't be proven, and the change is reported as not interpreted for those TUs instead (§10.4) |
+
+### 10.4 Requirements confirmed
+
+1. **Call sites come from the source build's TUs** (flags, sources, dependency files). P2
+   therefore still finds call sites when the target build fails.
+   - Target declarations come from parsing the same source TUs with the target's flags and
+     include paths. That needs the target to be configured (its `autoconf.h` and
+     `devicetree_generated.h`).
+   - If the raw target configure fails, the salvaged target configure is used and the
+     report says so.
+   - If no target configuration exists at all, the target side is **not interpreted**, and
+     no change is claimed.
+2. **Macro use is matched at preprocessor instantiation sites.** These are libclang's
+   `MACRO_INSTANTIATION` cursors in a detailed-processing-record parse, resolved to the
+   macro definition they expand, including nested expansions inside project macros.
+   - It is never a text match. A token that happens to equal a macro name in a comment,
+     string or `#ifdef`-ed-out block doesn't count.
+3. **Zero findings for symbols the project doesn't use** is an explicit test. A fixture
+   changes a function, a struct, an enum and a macro the project doesn't reference, plus
+   one it does, and only the used one may be reported.
+4. **Every parse gap is reported as "not interpreted"**, never as clean:
+   - a TU that fails to parse;
+   - a TU parsed with errors (the errors listed);
+   - a stripped flag that changed preprocessing (e.g. a `-D` lost);
+   - an unsupported target such as Xtensa (no layout);
+   - a header outside the scanned set.
+
+   These are `not_checked` entries with the TU or header and the first error. The `api`
+   status is `partial` whenever any exist.
+
+### 10.5 Optional tools
+
+`abigail-tools` and `dwarves` are approved for installation, and tests cover both paths:
+
+- **Tools present:** `pahole` cross-check and `abidiff` on a binary boundary.
+- **Tools absent:** simulated by an empty `PATH` override. The result must be a `not_checked`
+  entry, with no finding and no error.
+
+### 10.6 Order of work
+
+1. Module-set change detection.
+2. Bigger held-out denominators (new configurations, oracles first).
+3. DOGFOOD-3 baseline.
+4. P2, in the §9.5 order: syscall-header check, then functions / typedefs / function-pointer
+   flow, then macros / enums / structs, then DT macros, then the optional tools.
+
+Per-side SDK support stays queued after P2.
