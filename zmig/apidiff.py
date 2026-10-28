@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 # Bump when what a parse records changes (invalidates the per-build snapshots).
-API_VERSION = 7
+API_VERSION = 9
 
 # GCC options clang rejects or that don't matter for parsing (prefix match).
 GCC_ONLY = (
@@ -223,6 +223,7 @@ def parse(
         return os.path.relpath(f, zephyr_root) if f.startswith(zephyr_root) else f
 
     K = ci.CursorKind
+    sources: dict[str, list[str]] = {}
     for c in tu.cursor.walk_preorder():
         loc = c.location
         if loc.file is None:
@@ -284,6 +285,13 @@ def parse(
                 continue
             if where(ref.location)[0] is not None:
                 continue  # the project's own declaration
+            # Written by the project, not by a Zephyr macro body expanded in its code
+            # (regression: LOG_DBG in ZMK's kscan_gpio_matrix.c "used" the logging
+            # internals Z_LOG_MSG2_MODE_*). Macro arguments are spelled in the project.
+            written = _written_at(c.location, ref.spelling, sources)
+            if written is None:
+                continue
+            line = written
             kind = None
             if ref.kind == K.FUNCTION_DECL:
                 kind = "function"
@@ -390,6 +398,35 @@ def _record_name(parent: Any) -> str:
     if parent is None or parent.kind not in records:
         return ""
     return ".".join([parent.spelling, *reversed(parts)])
+
+
+def _written_at(loc: Any, name: str, sources: dict[str, list[str]]) -> int | None:
+    """The line where `name` is written in the project source, or None when the reference
+    comes from a macro body. libclang places a token from a macro body at the macro's name,
+    and a token from a macro argument (clang_getFileLocation) where the argument is
+    written, so the name is at that position only in the second case."""
+    import ctypes
+
+    import clang.cindex as ci
+
+    f = ci.c_object_p()
+    line, col, off = ctypes.c_uint(), ctypes.c_uint(), ctypes.c_uint()
+    ci.conf.lib.clang_getFileLocation(
+        loc, ctypes.byref(f), ctypes.byref(line), ctypes.byref(col), ctypes.byref(off)
+    )
+    if not f:
+        return None
+    path = str(ci.File(f).name)
+    if path not in sources:
+        try:
+            sources[path] = Path(path).read_text(errors="replace").splitlines()
+        except OSError:
+            sources[path] = []
+    lines = sources[path]
+    if not 0 < line.value <= len(lines):
+        return None
+    text = lines[line.value - 1]
+    return line.value if text[col.value - 1 :].startswith(name) else None
 
 
 def _unnamed(spelling: str) -> bool:

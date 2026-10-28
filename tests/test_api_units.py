@@ -173,3 +173,24 @@ def test_missing_header_is_a_parse_gap_not_clean(tmp_path: Path) -> None:
     (app / "main.c").write_text("#include <syscalls/gone.h>\nstatic int f(void) { return 0; }\n")
     r = parse(str(app / "main.c"), f"cc -c {app / 'main.c'}", {}, lambda f: None, str(tmp_path))
     assert r.errors == ["syscalls/gone.h: file not found (parsed with an empty stand-in)"]
+
+
+def test_uses_inside_zephyr_macro_bodies_are_not_project_uses(tmp_path: Path) -> None:
+    """LOG_DBG in ZMK's kscan_gpio_matrix.c 'used' the logging internals
+    Z_LOG_MSG2_MODE_*; macro arguments are the project's own (CFB_DISPLAY_HEIGH)."""
+    from zmig.apidiff import parse
+
+    inc, app = tmp_path / "inc", tmp_path / "app"
+    inc.mkdir()
+    app.mkdir()
+    (inc / "z.h").write_text(
+        "enum { Z_INTERNAL = 1, Z_ARG = 2 };\nint z_fn(int);\n"
+        "#define Z_LOG(x) z_fn(Z_INTERNAL + (x))\n"
+    )
+    (app / "m.c").write_text(
+        "#include <z.h>\nint f(void) {\n    return Z_LOG(\n        Z_ARG);\n}\n"
+    )
+    r = parse(str(app / "m.c"), f"cc -I{inc} -c {app / 'm.c'}", {},
+              lambda f: "m.c" if f.endswith("/m.c") else None, str(tmp_path))  # fmt: skip
+    refs = sorted((x["name"], x["at"]) for x in r.refs)
+    assert refs == [("Z_ARG", "m.c:4"), ("Z_LOG", "m.c:3")]
