@@ -35,6 +35,18 @@ _SHA40 = re.compile(r"\b[0-9a-f]{40}\b")
 _HASH_DIR = re.compile(r"(?<=/)[0-9a-f]{16}(?=/)")
 
 
+def zmig_build() -> str:
+    """Content hash of the installed zmig package (code and data). The version string
+    doesn't change between commits; this does, so a baseline can tell which zmig made
+    it (version skew, §3.7)."""
+    root = Path(__file__).resolve().parent
+    h = hashlib.sha256()
+    for f in sorted(root.rglob("*")):
+        if f.is_file() and f.suffix in (".py", ".json", ".yaml", ".yml"):
+            h.update(f.relative_to(root).as_posix().encode() + b"\0" + f.read_bytes())
+    return h.hexdigest()[:16]
+
+
 # --- Fingerprints (§2) -------------------------------------------------------------------
 
 
@@ -210,6 +222,7 @@ def make_baseline(
     acc: Acceptance,
     zmig_version: str,
     previous: Baseline | None = None,
+    build: str | None = None,
 ) -> JSON:
     """A baseline accepting the report's breaking and risky findings. Entries that were
     already accepted keep their reason, author, date and expiry; only findings not in
@@ -231,17 +244,105 @@ def make_baseline(
                     e.pop(k, None)
         accepted.append(e)
     path = report.get("upgrade_path") or {}
+    prior_gaps: dict[str, JSON] = {
+        e["id"]: e for e in (previous.data.get("accepted_gaps", []) if previous else [])
+    }
+    accepted_gaps: list[JSON] = []
+    for g in gaps(report, previous.data if previous else None):
+        was = prior_gaps.get(g.id)
+        if was is not None and g.rank <= int(was.get("rank", 0)):
+            # Still within what was accepted: keep who/when/why (and the accepted level).
+            accepted_gaps.append(was)
+        else:
+            accepted_gaps.append(_gap_entry(g, acc))
     return {
         "schema": BASELINE_SCHEMA,
         "zmig_version": zmig_version,
+        "zmig_build": build or zmig_build(),
         "fingerprint_version": FINGERPRINT_VERSION,
         "config": config,
         "from": {"spec": report["inputs"]["from"]["spec"], "sha": report["inputs"]["from"]["sha"]},
         "to": to,
         "verdict": {"verdict": path.get("verdict"), "confidence": path.get("confidence")},
-        "inconclusive": inconclusive_reasons(report),
+        "accepted_gaps": sorted(accepted_gaps, key=lambda e: e["id"]),
         "accepted": sorted(accepted, key=lambda e: (_SEV_RANK[e["severity"]], e["fingerprint"])),
+        "rebases": previous.data.get("rebases", []) if previous else [],
     }
+
+
+@dataclass
+class Rebase:
+    data: JSON
+    remapped: list[tuple[JSON, JSON]]  # (old entry, new entry)
+    unmapped: list[tuple[JSON, str]]  # (old entry, why)
+    not_accepted: list[JSON]  # current findings with no old entry: not accepted by a rebase
+
+
+def rebase_baseline(
+    previous: Baseline, report: JSON, acc: Acceptance, zmig_version: str, build: str
+) -> Rebase:
+    """Re-key a baseline made by another zmig build onto this build's findings.
+
+    Old entries map to this run's breaking/risky findings by (category, kind, normalized
+    subject), as multisets; fingerprints, paths and titles come from this build, while
+    who/when/why/until are kept. An entry whose finding is gone, or whose severity rose,
+    is not carried over. Findings with no old entry stay unaccepted: a rebase never
+    accepts anything new.
+    """
+    ctx = FingerprintContext.of(report)
+    pool: dict[tuple[str, str, str], list[JSON]] = defaultdict(list)
+    for f in sorted(_gated(report), key=lambda f: _SEV_RANK[f["severity"]]):
+        pool[(f["category"], f["kind"], ctx.normalize(f["subject"]))].append(f)
+    remapped, unmapped, accepted = [], [], []
+    keep = ("reason", "accepted_by", "accepted_at", "accepted_commit", "until")
+    for e in previous.accepted:
+        cands = pool[(e["category"], e["kind"], e["subject"])]
+        ok = [f for f in cands if _SEV_RANK[f["severity"]] >= _SEV_RANK[e["severity"]]]
+        if not ok:
+            why = (
+                f"severity rose ({e['severity']} -> {cands[0]['severity']})"
+                if cands
+                else "no finding with this category/kind/subject in this build"
+            )
+            unmapped.append((e, why))
+            continue
+        f = ok[0]
+        cands.remove(f)
+        new = _entry(f, ctx, Acceptance("", "", "", None))
+        for k in keep:
+            new.pop(k, None)
+            if k in e:
+                new[k] = e[k]
+        new["rebased_from"] = e["fingerprint"]
+        remapped.append((e, new))
+        accepted.append(new)
+    not_accepted = [f for fs in pool.values() for f in fs]
+    data = dict(previous.data)
+    data.update(
+        {
+            "zmig_version": zmig_version,
+            "zmig_build": build,
+            "accepted": sorted(
+                accepted, key=lambda e: (_SEV_RANK[e["severity"]], e["fingerprint"])
+            ),
+            "rebases": [
+                *previous.data.get("rebases", []),
+                {
+                    "from_version": previous.data.get("zmig_version"),
+                    "from_build": previous.data.get("zmig_build"),
+                    "to_version": zmig_version,
+                    "to_build": build,
+                    "remapped": len(remapped),
+                    "dropped": len(unmapped),
+                    "reason": acc.reason,
+                    "by": acc.by,
+                    "at": acc.at,
+                    "commit": acc.commit,
+                },
+            ],
+        }
+    )
+    return Rebase(data, remapped, unmapped, not_accepted)
 
 
 # --- Comparison (§2, §4) -----------------------------------------------------------------
@@ -365,28 +466,110 @@ def _item(
 # --- Exit policy (§4) --------------------------------------------------------------------
 
 
-def inconclusive_reasons(report: JSON, baseline: JSON | None = None) -> list[str]:
+@dataclass(frozen=True)
+class Gap:
+    """Something the run couldn't analyze. `id` is stable across runs; `rank` orders the
+    levels of one id, so a gap can get worse (e.g. analyzer partial -> skipped)."""
+
+    id: str
+    level: str
+    rank: int
+    detail: str
+
+
+_BUILD_RANK = {"build-failed": 1, "configure-failed": 2}
+_ANALYZER_RANK = {"partial": 1, "skipped": 2, "error": 3}
+
+
+def gaps(report: JSON, baseline: JSON | None = None) -> list[Gap]:
     """Why this run can't establish that there's no new breaking finding."""
+    ctx = FingerprintContext.of(report)
     out = []
     ctxs = report.get("contexts") or []
     if len(ctxs) >= 2 and ctxs[-1].get("status") != "ok":
+        st = str(ctxs[-1].get("status"))
         out.append(
-            f"the target build is {ctxs[-1].get('status')}: later build stages and "
-            "the analyzers that need them saw nothing"
+            Gap(
+                "target-build",
+                st,
+                _BUILD_RANK.get(st, 3),
+                f"the target build is {st}: later build stages and the analyzers that need "
+                "them saw nothing",
+            )
         )
     for a in report.get("analyzers", []):
         if a["status"] != "ok":
             out.append(
-                f"analyzer {a['name']} {a['status']}"
-                + (f": {a['reason']}" if a.get("reason") else "")
+                Gap(
+                    f"analyzer:{a['name']}",
+                    a["status"],
+                    _ANALYZER_RANK.get(a["status"], 3),
+                    ctx.normalize(
+                        f"analyzer {a['name']} {a['status']}"
+                        + (f": {a['reason']}" if a.get("reason") else "")
+                    ),
+                )
             )
-    out = [FingerprintContext.of(report).normalize(r) for r in out]
     path = report.get("upgrade_path") or {}
     was = ((baseline or {}).get("verdict") or {}).get("confidence")
     now = path.get("confidence")
     if was in _CONF_RANK and now in _CONF_RANK and _CONF_RANK[now] > _CONF_RANK[was]:
-        out.append(f"the verdict's confidence dropped from {was} to {now}")
+        out.append(
+            Gap(
+                "verdict-confidence",
+                str(now),
+                _CONF_RANK[now],
+                f"the verdict's confidence dropped from {was} to {now}",
+            )
+        )
     return out
+
+
+def inconclusive_reasons(report: JSON, baseline: JSON | None = None) -> list[str]:
+    return [g.detail for g in gaps(report, baseline)]
+
+
+@dataclass
+class GapState:
+    gap: Gap
+    state: str  # accepted | unaccepted | worse | expired
+    entry: JSON | None = None
+
+    @property
+    def blocking(self) -> bool:
+        return self.state != "accepted"
+
+
+def classify_gaps(found: list[Gap], baseline: Baseline, today: dt.date) -> list[GapState]:
+    """Same policy as accepted findings: an accepted gap passes until its `until`; a gap
+    not accepted, or worse than the level accepted, doesn't."""
+    accepted = {e["id"]: e for e in baseline.data.get("accepted_gaps", [])}
+    out = []
+    for g in found:
+        e = accepted.get(g.id)
+        if e is None:
+            out.append(GapState(g, "unaccepted"))
+        elif g.rank > int(e.get("rank", 0)):
+            out.append(GapState(g, "worse", e))
+        elif e.get("until") and dt.date.fromisoformat(e["until"]) < today:
+            out.append(GapState(g, "expired", e))
+        else:
+            out.append(GapState(g, "accepted", e))
+    return out
+
+
+def _gap_entry(g: Gap, acc: Acceptance) -> JSON:
+    return {
+        "id": g.id,
+        "level": g.level,
+        "rank": g.rank,
+        "detail": g.detail,
+        "reason": acc.reason,
+        "accepted_by": acc.by,
+        "accepted_at": acc.at,
+        "accepted_commit": acc.commit,
+        **({"until": acc.until} if acc.until else {}),
+    }
 
 
 @dataclass(frozen=True)
@@ -401,11 +584,20 @@ class Outcome:
     code: int
     failing: list[Item]
     warned: list[Item]
-    inconclusive: list[str]
+    gaps: list[GapState]
     summary: str
 
+    @property
+    def blocking_gaps(self) -> list[GapState]:
+        return [g for g in self.gaps if g.blocking]
 
-def decide(cmp: Comparison, inconclusive: list[str], policy: Policy) -> Outcome:
+    @property
+    def inconclusive(self) -> list[str]:
+        """The blocking gaps' details (what makes the run inconclusive)."""
+        return [g.gap.detail for g in self.blocking_gaps]
+
+
+def decide(cmp: Comparison, gap_states: list[GapState], policy: Policy) -> Outcome:
     gating = [i for i in cmp.items if i.gating and i.severity in policy.fail_on]
     failing = [
         i
@@ -413,6 +605,7 @@ def decide(cmp: Comparison, inconclusive: list[str], policy: Policy) -> Outcome:
         if not (i.cause == "target-movement" and policy.on_target_movement == "warn")
     ]
     warned = [i for i in gating if i not in failing]
+    blocking = [g for g in gap_states if g.blocking]
     if failing:
         n = Counter(i.severity for i in failing)
         what = ", ".join(f"{v} {k}" for k, v in sorted(n.items(), key=lambda kv: _SEV_RANK[kv[0]]))
@@ -420,26 +613,36 @@ def decide(cmp: Comparison, inconclusive: list[str], policy: Policy) -> Outcome:
             EXIT_NEW_FINDING,
             failing,
             warned,
-            inconclusive,
+            gap_states,
             f"new finding(s) outside the baseline: {what}",
         )
-    if inconclusive and not policy.allow_inconclusive:
+    if blocking and not policy.allow_inconclusive:
+        states = Counter(g.state for g in blocking)
+        what = ", ".join(f"{v} {k}" for k, v in sorted(states.items()))
         return Outcome(
             EXIT_INCONCLUSIVE,
             [],
             warned,
-            inconclusive,
-            "inconclusive: no new finding, but the run couldn't check everything",
+            gap_states,
+            f"inconclusive: no new finding, but the run couldn't check everything ({what} gap(s))",
         )
-    if inconclusive:
+    if blocking:
         return Outcome(
             EXIT_OK,
             [],
             warned,
-            inconclusive,
+            gap_states,
             "no new finding; WARNING: inconclusive (allowed by --allow-inconclusive)",
         )
-    return Outcome(EXIT_OK, [], warned, inconclusive, "no new finding outside the baseline")
+    if gap_states:
+        return Outcome(
+            EXIT_OK,
+            [],
+            warned,
+            gap_states,
+            "no new finding outside the baseline; analysis incomplete (accepted gaps)",
+        )
+    return Outcome(EXIT_OK, [], warned, gap_states, "no new finding outside the baseline")
 
 
 # --- Outputs (§5) ------------------------------------------------------------------------
@@ -456,8 +659,21 @@ def _short(spec: str) -> str:
     return spec[:12] if _SHA40.fullmatch(spec) else spec
 
 
+def _age_days(stamp: str | None, today: dt.date) -> str:
+    if not stamp:
+        return "unknown"
+    days = (today - dt.date.fromisoformat(stamp[:10])).days
+    return f"{days} day" + ("" if days == 1 else "s")
+
+
 def render_comment(
-    report: JSON, baseline: Baseline, cmp: Comparison, out: Outcome, board: str
+    report: JSON,
+    baseline: Baseline,
+    cmp: Comparison,
+    out: Outcome,
+    board: str,
+    today: dt.date,
+    warnings: tuple[str, ...] = (),
 ) -> str:
     ctx = FingerprintContext.of(report)
     inputs = report["inputs"]
@@ -486,6 +702,8 @@ def render_comment(
         )
     else:
         lines.append(f"Target pinned to the baseline's `{to_sha[:12]}`.")
+    for w in warnings:
+        lines.append(f"\n> **Warning:** {w}")
 
     def section(title: str, items: list[Item], show_cause: bool) -> None:
         if not items:
@@ -527,11 +745,28 @@ def render_comment(
             f"{unchanged['risky']} risky.",
         ]
     )
-    if out.inconclusive:
-        lines.extend(["", "#### Not fully checked"])
-        known = set(baseline.data.get("inconclusive", []))
-        for r in out.inconclusive:
-            lines.append(f"- {r}" + (" (also in the baseline)" if r in known else ""))
+    if out.gaps:
+        lines.extend(["", "#### Analysis incomplete"])
+        for g in out.gaps:
+            e = g.entry or {}
+            if g.state == "accepted":
+                age = _age_days(e.get("accepted_at"), today)
+                lines.append(
+                    "- analysis incomplete: new breaking findings cannot be seen while this gap "
+                    f"exists: {g.gap.detail} (accepted gap, age {age}; by "
+                    f"{e.get('accepted_by')}: {e.get('reason')}"
+                    + (f"; until {e['until']}" if e.get("until") else "")
+                    + ")"
+                )
+            elif g.state == "worse":
+                lines.append(
+                    f"- **worse than accepted** ({e.get('level')} accepted, now "
+                    f"{g.gap.level}): {g.gap.detail}"
+                )
+            elif g.state == "expired":
+                lines.append(f"- **acceptance expired {e.get('until')}**: {g.gap.detail}")
+            else:
+                lines.append(f"- **not accepted**: {g.gap.detail}")
     return "\n".join(lines) + "\n"
 
 
@@ -607,6 +842,10 @@ def watch_json(report: JSON, baseline: Baseline, cmp: Comparison, out: Outcome) 
         "target_moved": cmp.moved,
         "attributed": cmp.attributed,
         "inconclusive": out.inconclusive,
+        "gaps": [
+            {"id": g.gap.id, "level": g.gap.level, "state": g.state, "detail": g.gap.detail}
+            for g in out.gaps
+        ],
         "items": [
             {
                 "state": i.state,

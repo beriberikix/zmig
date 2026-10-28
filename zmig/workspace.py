@@ -108,11 +108,32 @@ class RefWorkspace:
             found.append(Module(name, Path(path), sha))
         return sorted(found, key=lambda m: m.name)
 
+    def shallow_modules(self, runner: Runner) -> list[str]:
+        """Active modules cloned without history (`--shallow`, or an earlier shallow run)."""
+        out = []
+        for m in self.modules(runner):
+            proc = runner.run(
+                [find_tool("git"), "-C", m.path, "rev-parse", "--is-shallow-repository"],
+                check=False,
+            )
+            if proc.stdout.strip() == "true":
+                out.append(m.name)
+        return out
+
 
 def materialize(
-    resolved: ResolvedRef, cache: Cache, runner: Runner, modules: Sequence[str] = ()
+    resolved: ResolvedRef,
+    cache: Cache,
+    runner: Runner,
+    modules: Sequence[str] = (),
+    shallow: bool = False,
 ) -> RefWorkspace:
-    """Create or reuse the workspace for a ref, cloning `modules` (west project names)."""
+    """Create or reuse the workspace for a ref, cloning `modules` (west project names).
+
+    shallow: fetch only each module's pinned commit (`git fetch --depth=1`), about 5x
+    less to download than its history (docs/DESIGN-WATCH.md §7). Nothing in `scan`
+    reads module history; fork triage would (see shallow_modules()).
+    """
     root = cache.workspaces / resolved.ref.key
     lock_workspace(root.with_name(root.name + ".lock"))
     resolved.mirror.checkout(resolved.ref, root / "zephyr", resolved.dirty)
@@ -135,7 +156,13 @@ def materialize(
     ws.activate(modules, runner)
     if modules:
         runner.run(
-            [*west_argv(), "update", "--narrow", *sorted(modules)],
+            [
+                *west_argv(),
+                "update",
+                "--narrow",
+                *(["-o=--depth=1"] if shallow else []),
+                *sorted(modules),
+            ],
             cwd=root,
             unset_env=["ZEPHYR_BASE"],
             progress=f"updating modules {', '.join(sorted(modules))} for {resolved.ref.label}",

@@ -17,18 +17,23 @@ from zmig.watch import (
     EXIT_INCONCLUSIVE,
     EXIT_NEW_FINDING,
     EXIT_OK,
+    EXIT_USAGE,
     SARIF_FINGERPRINT_KEY,
     Acceptance,
     Baseline,
     FingerprintContext,
     Policy,
+    classify_gaps,
     compare,
     decide,
     fingerprint,
+    gaps,
     inconclusive_reasons,
     make_baseline,
+    rebase_baseline,
     render_comment,
     render_watch_sarif,
+    zmig_build,
 )
 
 FIX = Path(__file__).parent / "fixtures" / "watch"
@@ -42,10 +47,17 @@ def load(name: str) -> JSON:
     return data
 
 
-def baseline_of(report: JSON, until: str | None = None) -> Baseline:
+def baseline_of(report: JSON, until: str | None = None, accept_gaps: bool = True) -> Baseline:
     acc = Acceptance(ACC.reason, ACC.by, ACC.at, ACC.commit, until)
     to = {"spec": "x", "resolved": "x", "sha": report["inputs"]["to"]["sha"]}
-    return Baseline(Path("b.json"), make_baseline(report, {}, to, acc, "test"))
+    data = make_baseline(report, {}, to, acc, "test")
+    if not accept_gaps:
+        data["accepted_gaps"] = []
+    return Baseline(Path("b.json"), data)
+
+
+def gap_states(report: JSON, b: Baseline, today: dt.date = TODAY) -> list[Any]:
+    return classify_gaps(gaps(report, b.data), b, today)
 
 
 def fps(report: JSON) -> list[str]:
@@ -129,19 +141,104 @@ def test_renamed_file_is_new_and_fixed_not_matched() -> None:
 
 def test_same_report_is_unchanged_and_conclusiveness_decides_the_exit() -> None:
     r = load("cannectivity-c1")
-    b = baseline_of(r)
+    b = baseline_of(r, accept_gaps=False)
     cmp = compare(r, b, TODAY)
     assert {i.state for i in cmp.items} == {"unchanged"}
     reasons = inconclusive_reasons(r, b.data)
     assert any("target build is build-failed" in x for x in reasons)
     assert all(r["inputs"]["to"]["sha"] not in x for x in reasons)
-    assert decide(cmp, reasons, Policy()).code == EXIT_INCONCLUSIVE
-    assert decide(cmp, reasons, Policy(allow_inconclusive=True)).code == EXIT_OK
+    assert {g.id for g in gaps(r)} == {"target-build", "analyzer:initorder", "analyzer:sbom"}
+    states = gap_states(r, b)
+    assert {g.state for g in states} == {"unaccepted"}
+    assert decide(cmp, states, Policy()).code == EXIT_INCONCLUSIVE
+    assert decide(cmp, states, Policy(allow_inconclusive=True)).code == EXIT_OK
 
     g = load("golioth-b")
     gb = baseline_of(g)
-    out = decide(compare(g, gb, TODAY), inconclusive_reasons(g, gb.data), Policy())
-    assert (out.code, out.inconclusive) == (EXIT_OK, [])
+    out = decide(compare(g, gb, TODAY), gap_states(g, gb), Policy())
+    assert (out.code, out.gaps) == (EXIT_OK, [])
+
+
+def test_accepted_gaps_pass_with_a_warning_and_expire() -> None:
+    r = load("cannectivity-c1")
+    b = baseline_of(r)
+    for e in b.data["accepted_gaps"]:
+        e["until"] = "2026-11-30"
+    assert [e["id"] for e in b.data["accepted_gaps"]] == [
+        "analyzer:initorder",
+        "analyzer:sbom",
+        "target-build",
+    ]
+    assert all(
+        e["accepted_by"] and e["accepted_at"] and e["reason"] for e in b.data["accepted_gaps"]
+    )
+    cmp = compare(r, b, TODAY)
+    states = gap_states(r, b)
+    out = decide(cmp, states, Policy())
+    assert out.code == EXIT_OK and not out.blocking_gaps and len(out.gaps) == 3
+    text = render_comment(r, b, cmp, out, "usb2canfdv1", dt.date(2026, 11, 7))
+    assert (
+        text.count(
+            "analysis incomplete: new breaking findings cannot be seen while this gap exists"
+        )
+        == 3
+    )
+    assert "age 10 days" in text
+    # Past `until`: back to exit 4.
+    late = dt.date(2026, 12, 1)
+    states = gap_states(r, b, late)
+    assert {g.state for g in states} == {"expired"}
+    assert decide(compare(r, b, late), states, Policy()).code == EXIT_INCONCLUSIVE
+
+
+def test_new_or_worse_gaps_are_not_covered_by_an_acceptance() -> None:
+    g = load("golioth-b")
+    b = baseline_of(g)
+    worse = copy.deepcopy(g)
+    worse["analyzers"] = [
+        {**a, "status": "skipped", "reason": "no ELF"} if a["name"] == "api" else a
+        for a in worse["analyzers"]
+    ]
+    states = gap_states(worse, b)
+    assert [(s.gap.id, s.state) for s in states] == [("analyzer:api", "unaccepted")]
+    # Accept api *partial*; skipped is worse than that.
+    partial = copy.deepcopy(g)
+    partial["analyzers"] = [
+        {**a, "status": "partial", "reason": "1 TU"} if a["name"] == "api" else a
+        for a in partial["analyzers"]
+    ]
+    bp = baseline_of(partial)
+    assert [(s.gap.id, s.state) for s in gap_states(partial, bp)] == [("analyzer:api", "accepted")]
+    states = gap_states(worse, bp)
+    assert [(s.gap.id, s.state) for s in states] == [("analyzer:api", "worse")]
+    out = decide(compare(worse, bp, TODAY), states, Policy())
+    assert out.code == EXIT_INCONCLUSIVE
+    text = render_comment(worse, bp, compare(worse, bp, TODAY), out, "b", TODAY)
+    assert "**worse than accepted** (partial accepted, now skipped)" in text
+    # A gap that improves stays accepted (partial accepted at skipped's level is fine).
+    assert [s.state for s in gap_states(partial, baseline_of(worse))] == ["accepted"]
+
+
+def test_rebase_maps_by_category_kind_subject() -> None:
+    """The two CANnectivity reports are real output of two zmig builds (before and after
+    the M13-M15 fixes): a baseline from the older build, rebased onto the newer one."""
+    old = baseline_of(load("cannectivity-c1-prefix"))
+    new = load("cannectivity-c1")
+    rb = rebase_baseline(old, new, ACC, "0.1.0", "newbuild")
+    assert len(rb.remapped) == 8
+    assert sorted(e["subject"] for e, _ in rb.unmapped) == [
+        "&timers2/counter2:/soc/timers@40000000/counter2",
+        "alias led0:/leds/led_ready",
+        "alias mcuboot_led0:/leds/led_ready",
+    ]
+    assert all("no finding" in why for _, why in rb.unmapped)
+    assert rb.not_accepted == []
+    moved = [(o, n) for o, n in rb.remapped if o["fingerprint"] != n["fingerprint"]]
+    assert [n["kind"] for _, n in moved] == ["target-build-failed"]  # gained a file (M14)
+    assert all(n["reason"] == "test" and n["rebased_from"] for _, n in rb.remapped)
+    assert rb.data["zmig_build"] == "newbuild" and rb.data["rebases"][-1]["dropped"] == 3
+    after = Baseline(Path("b.json"), rb.data)
+    assert {i.state for i in compare(new, after, TODAY).items} == {"unchanged"}
 
 
 def test_new_findings_fail_by_severity_policy() -> None:
@@ -172,7 +269,7 @@ def test_multiset_counts_one_extra_copy_as_new() -> None:
     if path:
         fp = cmp.of("new")[0].fingerprint
         assert cmp.file_counts[path][fp] >= 2
-        assert "in this file" in render_comment(dup, b, cmp, decide(cmp, [], Policy()), "b")
+        assert "in this file" in render_comment(dup, b, cmp, decide(cmp, [], Policy()), "b", TODAY)
 
 
 def test_expired_acceptance_makes_the_finding_new_again() -> None:
@@ -232,7 +329,7 @@ def test_sarif_and_comment() -> None:
     b = baseline_of(load("cannectivity-c1"))
     pre = load("cannectivity-c1-prefix")
     cmp = compare(pre, b, TODAY)
-    out = decide(cmp, inconclusive_reasons(pre, b.data), Policy())
+    out = decide(cmp, gap_states(pre, b), Policy())
     sarif = json.loads(render_watch_sarif(pre, cmp, "0", "app"))
     results = sarif["runs"][0]["results"]
     assert {r["baselineState"] for r in results} == {"new", "unchanged", "absent"}
@@ -240,9 +337,10 @@ def test_sarif_and_comment() -> None:
     absent = [r for r in results if r["baselineState"] == "absent"]
     assert absent[0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] == "src/led.c"
     assert "region" not in absent[0]["locations"][0]["physicalLocation"]
-    text = render_comment(pre, b, cmp, out, "usb2canfdv1")
+    text = render_comment(pre, b, cmp, out, "usb2canfdv1", TODAY, ("pins a branch",))
     assert text.startswith(COMMENT_MARKER)
-    assert "breaking/risky in this file" in text and "(also in the baseline)" in text
+    assert "breaking/risky in this file" in text and "analysis incomplete" in text
+    assert "> **Warning:** pins a branch" in text
 
 
 def _cli(tmp: Path, report: str, *extra: str) -> int:
@@ -272,22 +370,27 @@ def test_cli_baseline_lifecycle(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert _cli(tmp_path, "cannectivity-c1", "--init") == 2
     assert "need --reason" in capsys.readouterr().err
     assert _cli(tmp_path, "cannectivity-c1", "--init", "--reason", "v4.2 port pending") == 0
-    data = json.loads((tmp_path / ".zmig" / "baseline.json").read_text())
+    bfile = tmp_path / ".zmig" / "baseline.json"
+    data = json.loads(bfile.read_text())
     assert {e["reason"] for e in data["accepted"]} == {"v4.2 port pending"}
     assert all(e["accepted_by"] and e["accepted_at"] for e in data["accepted"])
+    assert len(data["accepted_gaps"]) == 3 and data["zmig_build"] == zmig_build()
     assert data["config"]["app"] == "."
     capsys.readouterr()
     assert _cli(tmp_path, "cannectivity-c1", "--init", "--reason", "again") == 2
-    assert _cli(tmp_path, "cannectivity-c1") == EXIT_INCONCLUSIVE
-    assert _cli(tmp_path, "cannectivity-c1", "--allow-inconclusive") == EXIT_OK
-    assert _cli(tmp_path, "cannectivity-c1-prefix", "--allow-inconclusive") == EXIT_NEW_FINDING
+    # Gaps accepted at --init: exit 0, with the "analysis incomplete" lines.
+    assert _cli(tmp_path, "cannectivity-c1") == EXIT_OK
+    assert "analysis incomplete" in capsys.readouterr().out
+    assert _cli(tmp_path, "cannectivity-c1", "--today", "2026-10-29") == EXIT_OK
+    assert _cli(tmp_path, "cannectivity-c1-prefix") == EXIT_NEW_FINDING
     # Updating keeps who/why of entries that remain; new ones get the new reason.
     assert (
         _cli(tmp_path, "cannectivity-c1-prefix", "--update-baseline", "--reason", "phandles") == 0
     )
-    data = json.loads((tmp_path / ".zmig" / "baseline.json").read_text())
+    data = json.loads(bfile.read_text())
     reasons = sorted(e["reason"] for e in data["accepted"])
     assert reasons.count("phandles") == 4 and reasons.count("v4.2 port pending") == 7
+    assert {e["reason"] for e in data["accepted_gaps"]} == {"v4.2 port pending"}
     capsys.readouterr()
     # A different board is a config mismatch: exit 2, not a comparison.
     rc = main(
@@ -300,9 +403,65 @@ def test_cli_baseline_lifecycle(tmp_path: Path, capsys: pytest.CaptureFixture[st
             "--board",
             "candlelight",
             "--baseline",
-            str(tmp_path / ".zmig" / "baseline.json"),
+            str(bfile),
             "--report",
             str(FIX / "cannectivity-c1.json"),
         ]
     )
     assert rc == 2 and "board: baseline 'usb2canfdv1'" in capsys.readouterr().err
+
+
+def test_cli_version_skew_and_rebase(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A baseline from another zmig build: exit 2, not a flood of new findings; then
+    --rebase-baseline re-keys it (needs --reason) and the comparison is clean."""
+    assert _cli(tmp_path, "cannectivity-c1-prefix", "--init", "--reason", "old zmig") == 0
+    bfile = tmp_path / ".zmig" / "baseline.json"
+    data = json.loads(bfile.read_text())
+    data["zmig_build"] = "0123456789abcdef"  # made by another build
+    bfile.write_text(json.dumps(data))
+    capsys.readouterr()
+    assert _cli(tmp_path, "cannectivity-c1") == EXIT_USAGE
+    err = capsys.readouterr().err
+    assert "build 0123456789abcdef" in err and "--rebase-baseline" in err
+    assert _cli(tmp_path, "cannectivity-c1", "--update-baseline", "--reason", "x") == EXIT_USAGE
+    assert _cli(tmp_path, "cannectivity-c1", "--rebase-baseline") == EXIT_USAGE
+    capsys.readouterr()
+    assert _cli(tmp_path, "cannectivity-c1", "--rebase-baseline", "--reason", "zmig 2aca9a9") == 0
+    out = capsys.readouterr().out
+    assert "Re-mapped (8):" in out and "Could not re-map, dropped from the baseline (3):" in out
+    assert "(fingerprint changed)" in out
+    data = json.loads(bfile.read_text())
+    assert data["zmig_build"] == zmig_build() and data["rebases"][-1]["reason"] == "zmig 2aca9a9"
+    assert _cli(tmp_path, "cannectivity-c1") == EXIT_OK
+    # Nothing to rebase once it matches.
+    assert _cli(tmp_path, "cannectivity-c1", "--rebase-baseline", "--reason", "y") == EXIT_USAGE
+
+
+def test_from_manifest_branch_is_warned(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CANnectivity v1.1.0's west.yml pins `v4.1-branch`: resolving it gives today's tip,
+    which may not be what the project was tested with."""
+    import argparse
+
+    from zmig import watchcmd
+    from zmig.refs import Ref
+
+    (tmp_path / "app").mkdir()
+    (tmp_path / "west.yml").write_text(
+        "manifest:\n  projects:\n    - name: zephyr\n"
+        "      url: https://github.com/zephyrproject-rtos/zephyr\n"
+        "      revision: v4.1-branch\n      import: true\n"
+    )
+
+    class Resolved:
+        def __init__(self, spec: str, kind: str) -> None:
+            self.ref = Ref(spec=spec, sha="a" * 40, kind=kind, url="u")  # type: ignore[arg-type]
+
+    kind = "branch"
+    monkeypatch.setattr(watchcmd, "resolve_ref", lambda spec, *a, **k: Resolved(spec, kind))
+    args = argparse.Namespace(from_ref="manifest", manifest=None, app=tmp_path / "app")
+    rev, _, sha, rec = watchcmd._resolve_from(args, None, None)  # type: ignore[arg-type]
+    assert (rev, sha, rec and rec["kind"]) == ("v4.1-branch", "a" * 40, "branch")
+    assert rec and "may differ from the Zephyr commit" in rec["warning"]
+    kind = "tag"
+    _, _, _, rec = watchcmd._resolve_from(args, None, None)  # type: ignore[arg-type]
+    assert rec and "warning" not in rec

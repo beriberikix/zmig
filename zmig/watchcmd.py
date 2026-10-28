@@ -22,6 +22,7 @@ import yaml
 from zmig import __version__
 from zmig.cache import Cache
 from zmig.errors import UsageError
+from zmig.findings import NotChecked
 from zmig.refs import UPSTREAM_ZEPHYR, resolve_ref
 from zmig.tools import Runner
 from zmig.verdict import invariant_violations
@@ -32,15 +33,18 @@ from zmig.watch import (
     Baseline,
     Policy,
     baseline_root,
+    classify_gaps,
     compare,
     config_mismatch,
     decide,
-    inconclusive_reasons,
+    gaps,
     make_baseline,
     portable,
+    rebase_baseline,
     render_comment,
     render_watch_sarif,
     watch_json,
+    zmig_build,
 )
 
 log = logging.getLogger("zmig")
@@ -153,6 +157,7 @@ def _scan(
     from_ref: str,
     to_ref: str,
     md: str = "MIGRATION.md",
+    from_manifest: JSON | None = None,
 ) -> JSON:
     from zmig.cli import scan_report
     from zmig.report import render
@@ -160,6 +165,12 @@ def _scan(
     a = copy.copy(args)
     a.from_ref, a.to_ref = from_ref, to_ref
     report = scan_report(a, cache, runner)
+    if from_manifest:
+        report.inputs["from_manifest"] = from_manifest
+        if from_manifest.get("warning"):
+            report.not_checked.append(
+                NotChecked("the Zephyr commit under test", from_manifest["warning"], "watch")
+            )
     if args.out:
         _write(args.out / md, render(report, "markdown"))
     return report.to_json()
@@ -171,15 +182,54 @@ def _write(path: Path | None, text: str) -> None:
         path.write_text(text)
 
 
-def _command_line(args: argparse.Namespace) -> str:
+def _command_line() -> str:
     """The current command line without baseline-update options, for instructions."""
-    skip = {"--init", "--update-baseline"}
+    skip = {"--init", "--update-baseline", "--rebase-baseline"}
     return shlex.join(["zmig", *[a for a in sys.argv[1:] if a not in skip]])
 
 
+def _skew(baseline: Baseline) -> str | None:
+    build = zmig_build()
+    if baseline.data.get("zmig_build") == build:
+        return None
+    return (
+        f"{baseline.path} was made by zmig {baseline.data.get('zmig_version')} (build "
+        f"{baseline.data.get('zmig_build') or 'unrecorded'}); this is zmig {__version__} "
+        f"(build {build}). Findings and their fingerprints can change between zmig builds, "
+        "so comparing would report findings as new that aren't. Either run the zmig the "
+        "baseline was made with (pin it by commit), or upgrade zmig in a pull request that "
+        f'also re-keys the baseline:\n  {_command_line()} --rebase-baseline --reason "..."'
+    )
+
+
+def _resolve_from(
+    args: argparse.Namespace, cache: Cache, runner: Runner
+) -> tuple[str, str, str, JSON | None]:
+    """(from ref, url, sha, from_manifest record) for --from."""
+    if args.from_ref != "manifest":
+        ref = resolve_ref(args.from_ref, cache, runner).ref
+        return args.from_ref, UPSTREAM_ZEPHYR, ref.sha, None
+    manifest = args.manifest or find_manifest(args.app)
+    rev, url = manifest_zephyr(manifest)
+    ref = resolve_ref(rev, cache, runner, url).ref
+    record: JSON = {"manifest": str(manifest), "revision": rev, "kind": ref.kind, "sha": ref.sha}
+    if ref.kind == "branch":
+        record["warning"] = (
+            f"--from manifest: {manifest.name} pins zephyr at branch {rev!r}, resolved to "
+            f"its tip today ({ref.sha[:12]}). That may differ from the Zephyr commit the "
+            "project was built and tested with; pin a tag or SHA in the manifest, or pass "
+            "--from <sha>."
+        )
+        log.warning("%s", record["warning"])
+    else:
+        log.warning("--from manifest: %s pins zephyr at %s (%s)", manifest, rev, url)
+    return rev, url, ref.sha, record
+
+
 def cmd_watch(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
-    if (args.init or args.update_baseline) and not args.reason:
-        raise UsageError('--init and --update-baseline need --reason "why these are accepted"')
+    updating = args.init or args.update_baseline or args.rebase_baseline
+    if updating and not args.reason:
+        raise UsageError('--init, --update-baseline and --rebase-baseline need --reason "why"')
     if args.pinned_report and not args.report:
         raise UsageError("--pinned-report only applies with --report")
     root = baseline_root(args.baseline)
@@ -196,14 +246,22 @@ def cmd_watch(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
                 + "\n  ".join(diff)
                 + "\nRun with the options the baseline was made with, or re-create it."
             )
+        if not args.rebase_baseline and (skew := _skew(baseline)):
+            raise UsageError(skew)
+        if args.rebase_baseline and not _skew(baseline):
+            raise UsageError(
+                f"{args.baseline} was made by this zmig build; there is nothing to rebase"
+            )
     elif not args.init:
         raise UsageError(
             f"no baseline at {args.baseline}. Create one from a run you have reviewed, and "
-            f'commit it:\n  {_command_line(args)} --to <target> --init --reason "..."\n'
+            f'commit it:\n  {_command_line()} --to <target> --init --reason "..."\n'
             "(--to v4.4.0 or --to track:next-release; PR runs then pin to its target SHA)"
         )
     if args.init and not args.to_ref and not args.report:
         raise UsageError("--init needs --to (the upgrade target to record)")
+    if args.rebase_baseline and args.to_ref:
+        raise UsageError("--rebase-baseline runs against the baseline's own target; omit --to")
 
     # The run's refs.
     if args.report:
@@ -211,19 +269,13 @@ def cmd_watch(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         to_spec = args.to_ref or report["inputs"]["to"]["spec"]
         resolved = report["inputs"]["to"]["spec"]
     else:
-        if args.from_ref == "manifest":
-            manifest = args.manifest or find_manifest(args.app)
-            rev, url = manifest_zephyr(manifest)
-            log.warning("--from manifest: %s pins zephyr at %s (%s)", manifest, rev, url)
-            from_ref = rev
-        else:
-            from_ref, url = args.from_ref, UPSTREAM_ZEPHYR
-        from_sha = resolve_ref(from_ref, cache, runner, url).ref.sha
+        from_ref, url, from_sha, from_manifest = _resolve_from(args, cache, runner)
         to_spec = args.to_ref or (baseline.to_sha if baseline else "")
         resolved = resolve_target(to_spec, from_sha, url, cache, runner, args.include_rc)
         if resolved != to_spec:
             log.warning("--to %s resolved to %s", to_spec, resolved)
-        report = _scan(args, cache, runner, from_ref, resolved)
+        report = _scan(args, cache, runner, from_ref, resolved, from_manifest=from_manifest)
+    warnings = tuple(w for w in [(report["inputs"].get("from_manifest") or {}).get("warning")] if w)
 
     to = {"spec": to_spec, "resolved": resolved, "sha": report["inputs"]["to"]["sha"]}
     if args.out:
@@ -236,13 +288,42 @@ def cmd_watch(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
             print(f"  {v}", file=sys.stderr)
         return EXIT_ERROR
 
+    if args.rebase_baseline:
+        assert baseline is not None
+        if report["inputs"]["to"]["sha"] != baseline.to_sha:
+            raise UsageError("--rebase-baseline needs a run against the baseline's target")
+        rb = rebase_baseline(baseline, report, _acceptance(args, root), __version__, zmig_build())
+        _write(args.baseline, json.dumps(rb.data, indent=2) + "\n")
+        print(
+            f"zmig watch: rebased {args.baseline} from build "
+            f"{baseline.data.get('zmig_build') or 'unrecorded'} to {zmig_build()}"
+        )
+        print(f"Re-mapped ({len(rb.remapped)}):")
+        for old, new in rb.remapped:
+            moved = "" if old["fingerprint"] == new["fingerprint"] else " (fingerprint changed)"
+            print(
+                f"  {old['fingerprint']} -> {new['fingerprint']}{moved}  {new['severity']} "
+                f"{new['category']}/{new['kind']} {new['subject'][:60]}"
+            )
+        print(f"Could not re-map, dropped from the baseline ({len(rb.unmapped)}):")
+        for old, why in rb.unmapped:
+            print(
+                f"  {old['fingerprint']}  {old['severity']} {old['category']}/{old['kind']} "
+                f"{old['subject'][:60]}: {why}"
+            )
+        print(f"Found by this build, not accepted (will be new) ({len(rb.not_accepted)}):")
+        for f in rb.not_accepted:
+            print(f"  {f['severity']} {f['category']}/{f['kind']}: {f['title'][:90]}")
+        print("Review the diff and commit it with the zmig upgrade.")
+        return EXIT_OK
+
     if args.init or args.update_baseline:
         data = make_baseline(report, config, to, _acceptance(args, root), __version__, baseline)
         _write(args.baseline, json.dumps(data, indent=2) + "\n")
-        n = len(data["accepted"])
         print(
-            f"zmig watch: wrote {args.baseline}: {n} accepted finding(s), target "
-            f"{resolved} ({to['sha'][:12]}). Review and commit it."
+            f"zmig watch: wrote {args.baseline}: {len(data['accepted'])} accepted finding(s), "
+            f"{len(data['accepted_gaps'])} accepted gap(s), target {resolved} "
+            f"({to['sha'][:12]}). Review and commit it."
         )
         return EXIT_OK
     assert baseline is not None
@@ -275,13 +356,16 @@ def cmd_watch(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         allow_inconclusive=args.allow_inconclusive,
         on_target_movement=args.on_target_movement,
     )
-    outcome = decide(cmp, inconclusive_reasons(report, baseline.data), policy)
-    comment = render_comment(report, baseline, cmp, outcome, args.board)
+    gap_states = classify_gaps(gaps(report, baseline.data), baseline, today)
+    outcome = decide(cmp, gap_states, policy)
+    comment = render_comment(report, baseline, cmp, outcome, args.board, today, warnings)
     base = str(config["app"])
     sarif = render_watch_sarif(report, cmp, __version__, base)
-    result = json.dumps(watch_json(report, baseline, cmp, outcome), indent=2) + "\n"
+    result = watch_json(report, baseline, cmp, outcome)
+    result["warnings"] = list(warnings)
+    result_text = json.dumps(result, indent=2) + "\n"
     if args.out:
-        _write(args.out / "watch.json", result)
+        _write(args.out / "watch.json", result_text)
         _write(args.out / "watch-comment.md", comment)
         _write(args.out / "watch.sarif", sarif)
         if pinned is not None:
@@ -290,10 +374,10 @@ def cmd_watch(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     _write(args.pr_comment, comment)
     # Fork PRs get a read-only token and can't post comments; the job summary always works.
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
-        with open(summary, "a") as f:
-            f.write(comment)
+        with open(summary, "a") as fh:
+            fh.write(comment)
     if args.format == "json":
-        sys.stdout.write(result)
+        sys.stdout.write(result_text)
     else:
         sys.stdout.write(comment)
     return outcome.code

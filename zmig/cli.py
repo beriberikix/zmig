@@ -148,7 +148,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="rewrite the baseline's accepted set to this run's findings (needs --reason)",
     )
-    watch.add_argument("--reason", help="why findings are accepted (--init, --update-baseline)")
+    watch.add_argument(
+        "--rebase-baseline",
+        action="store_true",
+        help="re-key a baseline made by another zmig build onto this build's findings "
+        "(needs --reason)",
+    )
+    watch.add_argument("--reason", help="why (--init, --update-baseline, --rebase-baseline)")
     watch.add_argument(
         "--until", help="expiry date (YYYY-MM-DD) for entries this --init/--update-baseline adds"
     )
@@ -215,6 +221,11 @@ def _scan_args(scan: argparse.ArgumentParser) -> None:
     scan.add_argument("--board", required=True, help="board[@rev][/qualifiers] at --from")
     scan.add_argument("--to-board", help="board name at --to (default: mapped automatically)")
     scan.add_argument("--sysbuild", action="store_true")
+    scan.add_argument(
+        "--shallow",
+        action="store_true",
+        help="fetch modules at depth 1 (no history; much less to download)",
+    )
     scan.add_argument(
         "--fast",
         action="store_true",
@@ -332,8 +343,8 @@ def scan_report(args: argparse.Namespace, cache: Cache, runner: Runner) -> Repor
     mode: BuildMode = "fast" if args.fast else "full"
     old_r = resolve_ref(args.from_ref, cache, runner)
     new_r = resolve_ref(args.to_ref, cache, runner)
-    old_ws = materialize(old_r, cache, runner, args.modules)
-    new_ws = materialize(new_r, cache, runner, args.modules)
+    old_ws = materialize(old_r, cache, runner, args.modules, shallow=args.shallow)
+    new_ws = materialize(new_r, cache, runner, args.modules, shallow=args.shallow)
     table = new_ws.zephyr / "boards" / "deprecated.cmake"
     mapping = map_board(
         args.board,
@@ -379,7 +390,7 @@ def scan_report(args: argparse.Namespace, cache: Cache, runner: Runner) -> Repor
             ", ".join(added),
             "; ".join(n.why for n in needs),
         )
-        new_ws = materialize(new_r, cache, runner, [*args.modules, *added])
+        new_ws = materialize(new_r, cache, runner, [*args.modules, *added], shallow=args.shallow)
         first_contexts = [salvage.original.to_json()]
         salvage = build_with_salvage(new_ws, spec(to_board), cache, runner)
         log.warning("  %s with %s: %s", args.to_ref, ", ".join(added), salvage.effective.status)
@@ -444,6 +455,17 @@ def scan_report(args: argparse.Namespace, cache: Cache, runner: Runner) -> Repor
     # Tool versions analyzers recorded (the libclang the API diff used).
     report.environment.update(ctx.shared.get("environment", {}))
     report.checked = list(ctx.shared.get("checked", []))
+    shallow = sorted(set(old_ws.shallow_modules(runner)) | set(new_ws.shallow_modules(runner)))
+    if shallow:
+        report.not_checked.append(
+            NotChecked(
+                "fork triage of modules",
+                f"module history is unavailable (shallow clones: {', '.join(shallow)}), so "
+                "commits a project carries on top of upstream modules can't be classified; "
+                "run `zmig plan` on a full workspace for that",
+                "scan",
+            )
+        )
     report.not_checked.append(
         NotChecked(
             "salvage of files the app doesn't own",
