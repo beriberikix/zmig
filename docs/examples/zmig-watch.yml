@@ -22,10 +22,12 @@ on:
 
 env:
   ZMIG_VERSION: "0.1.0"
-  # The zmig package to install. zmig isn't on PyPI; point this at where you host it,
-  # pinned to a commit.
+  # The zmig package to install, pinned by commit. zmig isn't on PyPI. The baseline
+  # records the zmig build, so upgrade zmig in a PR that changes this pin and includes
+  # `zmig watch ... --rebase-baseline --reason ...` (DESIGN-WATCH.md §3.6).
   ZMIG_PIP: "zmig[zephyr,api] @ git+https://github.com/OWNER/zmig@COMMIT_SHA"
   ZMIG_ARGS: >-
+    --shallow
     --app app --board usb2canfdv1
     --module cmsis --module hal_stm32
     --cmake-arg=-DZEPHYR_EXTRA_MODULES=${{ github.workspace }}

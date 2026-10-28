@@ -735,6 +735,11 @@ def render_comment(
                 )
 
     section("New", cmp.of("new", "escalated"), True)
+    if out.warned:
+        lines.append(
+            f"\n{len(out.warned)} new finding(s) due to target movement don't fail this run "
+            "(--on-target-movement warn)."
+        )
     section("Fixed (accepted, no longer found)", cmp.of("fixed"), False)
     section("Accepted, value changed", cmp.of("updated"), False)
     unchanged = Counter(i.severity for i in cmp.of("unchanged", "updated"))

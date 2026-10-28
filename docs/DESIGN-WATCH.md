@@ -53,9 +53,16 @@ zmig watch --app app --board <board> [scan options...] \
 `west.yml` above `--app` (or `--manifest PATH`). The URL comes from the project's `url` or
 its remote, so a fork is mirrored from the fork.
 
-- **Caveat:** a manifest that pins a **branch** (CANnectivity v1.1.0 pins `v4.1-branch`)
-  resolves to that branch's tip today, not when the commit was made. Pass `--from <sha>`
-  when that matters.
+- **Branch warning.** A manifest that pins a **branch** (CANnectivity v1.1.0 pins
+  `v4.1-branch`) resolves to that branch's tip today, not when the commit was made. The
+  run then warns in three places:
+  - the report (`inputs.from_manifest.warning`, and a `not_checked` entry "the Zephyr
+    commit under test");
+  - the comment (a "**Warning:**" line);
+  - `watch.json` (`warnings`).
+
+  The warning says the commit may differ from the one the project was tested with. Pin a
+  tag or SHA in the manifest, or pass `--from <sha>`.
 
 **`--to`** takes one of three forms, depending on the kind of run:
 
@@ -82,6 +89,30 @@ scan. Every new finding then gets a cause:
 With `--no-attribute`, the second scan is skipped and new findings are **unattributed**.
 The policy for each cause is in §4. With warm workspaces, the second scan costs one more
 target build plus analysis.
+
+**Real run (2026-10-28).** Golioth B, with the baseline at `v4.2.0` and the run at
+`--to v4.3.0`, the next minor. The project copy also gained one line,
+`#include <zephyr/drivers/gpio.h>` in `hello/src/main.c`, so that both causes appear.
+Script: [examples/watch-movement.sh](examples/watch-movement.sh). Comment excerpt:
+
+```
+Target **moved**: baseline `413b789deb39`, this run `3568e1b6d5cd`. New findings are labelled by cause …
+#### New (3)
+- **`(no file)`**: 2 here; 0 breaking/risky in this file
+  - risky: New kconfig warning at <ref>: Deprecated symbol MBEDTLS_DTLS is enabled. (due to target movement)
+  - risky: ROM 251306 → 268208 bytes (+16902), RAM 92222 → 91636 bytes (-586) (due to target movement)
+- **`src/main.c`**: 1 here; 3 breaking/risky in this file
+  - risky line 14: <zephyr/drivers/gpio.h>, which your code includes, changed upstream (+45/-24 lines in 8 commits) (due to this change)
+```
+
+| Flags | Exit | Failing findings |
+|---|---|---|
+| (default: fail on breaking) | 0 | none: all 3 new findings are risky |
+| `--fail-on risky` | 3 | 3 |
+| `--fail-on risky --on-target-movement warn` | 3 | 1: the `gpio.h` finding, due to this change; the 2 due to target movement are only warnings |
+
+Without the `gpio.h` line, the same pair gives exactly the 2 "due to target movement"
+findings, exit 0.
 
 ## 2. Finding identity across runs
 
@@ -199,8 +230,8 @@ Golioth keeps it in `west-zephyr.yml`, not `west.yml`, so it needs `--manifest`.
 
 ## 3. The baseline file
 
-`.zmig/baseline.json`, committed. It's written only by `zmig watch --init` or
-`--update-baseline`; zmig never updates it on its own in CI.
+`.zmig/baseline.json`, committed. It's written only by `zmig watch --init`,
+`--update-baseline` or `--rebase-baseline`; zmig never updates it on its own in CI.
 
 ```json
 {
@@ -213,8 +244,16 @@ Golioth keeps it in `west-zephyr.yml`, not `west.yml`, so it needs `--manifest`.
              "analyzers": "all"},
   "from": {"spec": "…", "sha": "…"},
   "to": {"spec": "track:next-release", "resolved": "v4.2.0", "sha": "…"},
+  "zmig_build": "<content hash of the zmig package>",
   "verdict": {"verdict": "direct-ok", "confidence": "low"},
-  "inconclusive": ["the target build is build-failed: …"],
+  "accepted_gaps": [
+    {"id": "target-build", "level": "build-failed", "rank": 1,
+     "detail": "the target build is build-failed: …",
+     "reason": "v4.2 port in progress (#123)", "accepted_by": "jdoe",
+     "accepted_at": "2026-10-28T14:02:11Z", "accepted_commit": "<project HEAD>",
+     "until": "2026-12-31"}
+  ],
+  "rebases": [],
   "accepted": [
     {"fingerprint": "8ec5292b30029d23", "severity": "breaking", "category": "api",
      "kind": "function-removed", "subject": "smf_set_handled", "title": "…",
@@ -241,10 +280,10 @@ current options plus `--to <target> --init --reason "..."`.
 ### 3.2 Updating it
 
 `--update-baseline --reason "..."` rewrites `accepted` to this run's breaking and risky
-findings:
+findings, and `accepted_gaps` to this run's gaps (§4.2):
 
 - entries that are still found **keep** their original reason, author, date, commit and
-  `until`;
+  `until`. For a gap, that means one still at or below its accepted level;
 - only newly accepted entries get the new `--reason`;
 - `--until YYYY-MM-DD` sets an expiry on the entries this update adds.
 
@@ -270,7 +309,41 @@ Absolute paths under the repository (the parent of `.zmig/`) are written as `<re
 the same command line matches on a laptop and in CI. The app path is stored relative to
 the repository.
 
-### 3.6 Who may change it
+### 3.6 zmig version skew, and `--rebase-baseline`
+
+**What's recorded.** The baseline records `zmig_version`, and `zmig_build`: a content hash
+of the installed zmig package, its code and data. The version string alone doesn't change
+between commits.
+
+**A run by a different build exits 2** with a message saying which builds differ and how
+to fix it. It never reports findings, because a new zmig can legitimately produce
+different findings or fingerprints: M14, for instance, gave the target-build failure a
+file. `--update-baseline` is refused too, since it would silently drop who/why.
+
+**`--rebase-baseline --reason "..."`** runs the new zmig against the baseline's own target
+(`--to` isn't allowed). Old entries map to this build's findings by (category, kind,
+normalized subject), as multisets. It prints three lists:
+
+- **Re-mapped:** old → new fingerprint, marked "(fingerprint changed)" where it did.
+  Who/when/why/until are kept, plus `rebased_from`.
+- **Could not re-map, dropped:** no such finding in this build, or its severity rose.
+- **Found by this build, not accepted:** a rebase never accepts anything new; these are
+  "new" on the next run.
+
+Each rebase is appended to `rebases` (from/to build, counts, reason, who, when, commit).
+
+**Policy.** Pin zmig by commit in the workflow (§6). Upgrade zmig in a pull request that
+changes the pin and includes the rebase commit, so the baseline diff is reviewed under
+CODEOWNERS (§3.7).
+
+**Tested** (`tests/test_watch.py`) on the two CANnectivity reports, which are real output
+of two zmig builds, before and after the M13–M15 fixes:
+
+- 8 entries re-mapped, 1 with a changed fingerprint (the target-build failure);
+- 3 dropped (the phandle findings, which the newer build no longer reports);
+- afterwards, the comparison is all unchanged.
+
+### 3.7 Who may change it
 
 **Recommendation:** add a `CODEOWNERS` entry:
 
@@ -285,11 +358,11 @@ approval. The diff shows who accepted what, and why.
 
 | Code | When |
 |---|---|
-| 0 | no new gating finding, and the run is conclusive (or `--allow-inconclusive`, with a warning) |
+| 0 | no new gating finding, and every gap accepted (§4.2), or `--allow-inconclusive` (with a warning) |
 | 1 | internal error: crash, invariant violation, tool failure |
-| 2 | usage error, a missing baseline, `--init`/`--update-baseline` without `--reason`, or a config mismatch |
+| 2 | usage error, a missing baseline, `--init`/`--update-baseline`/`--rebase-baseline` without `--reason`, a config mismatch, or a baseline made by another zmig build (§3.6) |
 | 3 | at least one **new or escalated** finding at a gating severity |
-| 4 | **inconclusive** and no new gating finding (the default; `--allow-inconclusive` gives 0) |
+| 4 | a **new, worse or expired gap** and no new gating finding (`--allow-inconclusive` gives 0) |
 
 ### 4.1 Which findings fail the run
 
@@ -302,19 +375,37 @@ approval. The diff shows who accepted what, and why.
   this change.
 - **A new gating finding wins over inconclusive:** exit 3.
 
-### 4.2 Inconclusive
+### 4.2 Gaps: inconclusive runs, and accepted gaps
 
-A run is **inconclusive** when any of these hold:
+A **gap** is something the run couldn't analyze. Each has a stable id and a level:
 
-- the effective target build isn't `ok`;
-- any analyzer's status isn't `ok` (skipped, partial or error), with its reason;
-- the verdict's confidence dropped below the baseline's.
+| Gap id | When | Levels, best to worst |
+|---|---|---|
+| `target-build` | the effective target build isn't `ok` | build-failed < configure-failed < other |
+| `analyzer:<name>` | an analyzer's status isn't `ok` | partial < skipped < error |
+| `verdict-confidence` | the verdict's confidence dropped below the baseline's | medium < low |
 
-These reasons are normalized like subjects. The comment marks the ones also recorded in
-the baseline as "(also in the baseline)". Strict means they still exit 4.
+Details are normalized like subjects, so they don't change when the target moves.
 
-**Example.** CANnectivity at v4.2 fails its target build, so every run of it is
-inconclusive until the port lands. On PRs that's a warning (§6); nightly it fails.
+**`accepted_gaps`** in the baseline follow the same policy as accepted findings: id,
+level, reason, who/when/commit, optional `until`. `--init` and `--update-baseline` accept
+the run's gaps with `--reason`. Each gap in a run is one of four states:
+
+| State | When | Exit (no new finding) | Comment |
+|---|---|---|---|
+| accepted | same id, level not worse, not expired | **0** | "analysis incomplete: new breaking findings cannot be seen while this gap exists: … (accepted gap, age N days; by X: reason; until D)" |
+| unaccepted | id not in `accepted_gaps` | 4 | "**not accepted**: …" |
+| worse | same id, worse level (e.g. api partial accepted, now skipped) | 4 | "**worse than accepted** (partial accepted, now skipped): …" |
+| expired | past `until` | 4 | "**acceptance expired D**: …" |
+
+The age is days since `accepted_at`.
+
+- A new gating finding still wins: exit 3.
+- `--allow-inconclusive` turns 4 into 0 with a warning.
+
+**Example.** CANnectivity at v4.2 fails its target build: 3 gaps, the target build plus
+`initorder` and `sbom` skipped. Accepted at `--init`, they exit 0 with three "analysis
+incomplete" lines until the port lands or they expire.
 
 ### 4.3 Verdict regressions
 
