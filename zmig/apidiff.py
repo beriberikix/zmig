@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 # Bump when what a parse records changes (invalidates the per-build snapshots).
-API_VERSION = 12
+API_VERSION = 13
 
 # GCC options clang rejects or that don't matter for parsing (prefix match).
 GCC_ONLY = (
@@ -164,6 +164,9 @@ class TuResult:
     diags: list[dict[str, Any]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     dropped: list[str] = field(default_factory=list)
+    # Project functions used as values where the function-pointer type they convert to
+    # isn't their own type: {"at", "function", "defined_at", "expected"}.
+    fn_values: list[dict[str, Any]] = field(default_factory=list)
 
 
 def libclang_version() -> str | None:
@@ -307,9 +310,56 @@ def parse(
                 )
         if k in (K.CALL_EXPR, K.DECL_REF_EXPR, K.TYPE_REF, K.MEMBER_REF_EXPR):
             reference(c, stack)
+        if k == K.DECL_REF_EXPR:
+            function_value(c, stack)
         for ch in c.get_children():
             visit(ch, stack)
         stack.pop()
+
+    def function_value(c: Any, stack: list[Any]) -> None:
+        """A project function used as a value (a callback): where its definition is, and
+        whether the function-pointer type it's converted to (the implicit casts above it)
+        is still its own type. A mismatch is what a "callbacks no longer match" finding
+        is about, so the finding can cite the definition to change, not only the use."""
+        ref = c.referenced
+        if ref is None or ref.kind != K.FUNCTION_DECL or own_file(ref.location.file) is None:
+            return
+        i = len(stack) - 2
+        dest = None
+        # The outermost implicit conversion to a function-pointer type (an outer `void`
+        # node, e.g. inside SMF_CREATE_STATE, ends the chain).
+        while i >= 0 and stack[i].kind in (K.UNEXPOSED_EXPR, K.PAREN_EXPR, K.CSTYLE_CAST_EXPR):
+            t = stack[i].type.get_canonical()
+            if t.kind == ci.TypeKind.POINTER and t.get_pointee().kind in (
+                ci.TypeKind.FUNCTIONPROTO,
+                ci.TypeKind.FUNCTIONNOPROTO,
+            ):
+                dest = stack[i].type
+            elif dest is not None:
+                break
+            i -= 1
+        if i >= 0 and stack[i].kind == K.CALL_EXPR and dest is None:
+            return  # a call, not a value
+        if dest is None or dest.get_canonical().kind != ci.TypeKind.POINTER:
+            return
+        want = dest.get_canonical().get_pointee()
+        if want.kind not in (ci.TypeKind.FUNCTIONPROTO, ci.TypeKind.FUNCTIONNOPROTO):
+            return
+        if norm_type(want.spelling) == norm_type(ref.type.get_canonical().spelling):
+            return
+        line = _written_at(c.location, ref.spelling, sources)
+        own = own_file(c.location.file)
+        if line is None or own is None:
+            return
+        d = ref.get_definition() or ref
+        res.fn_values.append(
+            {
+                "at": f"{own}:{line}",
+                "function": ref.spelling,
+                "defined_at": f"{own_file(d.location.file)}:{d.location.line}",
+                "expected": norm_type(dest.spelling),
+            }
+        )
 
     def reference(c: Any, stack: list[Any]) -> None:
         ref = c.referenced
@@ -427,6 +477,7 @@ def parse(
         if site[0] is not None:
             res.diags.append({"at": f"{site[0]}:{site[1]}", "message": d.spelling, "kind": dkind})
     res.refs = [dict(t) for t in {tuple(sorted(r.items())) for r in res.refs}]
+    res.fn_values = [dict(t) for t in {tuple(sorted(r.items())) for r in res.fn_values}]
     return res
 
 

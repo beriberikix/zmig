@@ -240,6 +240,7 @@ class ApiAnalyzer:
                     "decls": r.decls,
                     "refs": r.refs,
                     "diags": r.diags,
+                    "fn_values": r.fn_values,
                     "errors": r.errors,
                     "dropped": r.dropped,
                 }
@@ -311,12 +312,36 @@ class ApiAnalyzer:
         ]
         callback_diags = [d for d in new_diags if d.get("kind", "callback") == "callback"]
         truncations = [d for d in new_diags if d.get("kind") == "truncation"]
+        # Project callbacks whose function-pointer type no longer matches at the target:
+        # their definitions are what has to change (N1a in docs/oracles/cannectivity.md).
+        old_mismatch = {(m["function"], m["at"]) for t in src for m in t.get("fn_values", [])}
+        new_mismatch = [
+            m
+            for t in tgt
+            for m in t.get("fn_values", [])
+            if (m["function"], m["at"]) not in old_mismatch
+        ]
+
+        def definitions(expected: str, sites: list[str]) -> list[tuple[str, int, str]]:
+            """Definition sites of the project callbacks that no longer match: passed at one
+            of `sites`, or converted to `expected` in one of their files."""
+            at = set(sites)
+            files = {x.rpartition(":")[0] for x in sites}
+            out = set()
+            for m in new_mismatch:
+                same_type = _bare(m["expected"]) == _bare(expected)
+                if m["at"] in at or (same_type and m["at"].rpartition(":")[0] in files):
+                    path, _, line = m["defined_at"].rpartition(":")
+                    out.add((path, int(line), f"{m['function']}: definition to change"))
+            return sorted(out)
 
         findings: list[Finding] = []
 
         def add(kind: str, name: str, title: str, sev: Severity, action: str,
-                sites: list[str], old: Any, new: Any, decl_ev: list[JSON]) -> None:  # fmt: skip
-            ev: list[JSON] = []
+                sites: list[str], old: Any, new: Any, decl_ev: list[JSON],
+                defs: list[tuple[str, int, str]] = []) -> None:  # noqa: B006  # fmt: skip
+            # Definition sites (what to change) first, then the use sites.
+            ev: list[JSON] = [file_line(p, ln, text) for p, ln, text in defs]
             for site in sorted(set(sites), key=_site_key):
                 path, _, line = site.rpartition(":")
                 ev.append(file_line(path, int(line), name))
@@ -431,7 +456,7 @@ class ApiAnalyzer:
                 add(f"{what}-changed", name,
                     f"{what_l} {name}, which your code uses, changed: {shown(o)} → {shown(n)}",
                     sev, why, sites + extra_sites, shown(o), shown(n),
-                    [decl_old, decl_new])  # fmt: skip
+                    [decl_old, decl_new], definitions(name, sites + extra_sites))  # fmt: skip
             elif n.get("deprecated") and not o.get("deprecated"):
                 add(f"{what}-deprecated", name,
                     f"{what_l} {name}, which your code uses, is deprecated in {ctx.new_spec}",
@@ -463,7 +488,7 @@ class ApiAnalyzer:
                     f"Callbacks your code provides no longer match the type Zephyr expects at "
                     f"{ctx.new_spec}: {key}", Severity.BREAKING,
                     f"Change their signatures to match ({msg[:200]}).", sites, None,
-                    {"expected": key, "message": msg}, [])  # fmt: skip
+                    {"expected": key, "message": msg}, [], definitions(key, sites))  # fmt: skip
             else:
                 add("value-truncated", key[:80],
                     f"A value your code stores no longer fits at {ctx.new_spec}: {key[:160]}",
@@ -800,6 +825,11 @@ class ApiAnalyzer:
                 "APPLICATION_DEFINED_SYSCALL": has_kconfig,
             },
         )
+
+
+def _bare(type_name: str) -> str:
+    """A type name without qualifiers: diagnostics say 'const state_execution'."""
+    return " ".join(w for w in type_name.split() if w not in ("const", "volatile"))
 
 
 def _site_key(s: str) -> tuple[str, int]:

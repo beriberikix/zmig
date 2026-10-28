@@ -123,6 +123,7 @@ def _tus(
                 "decls": r.decls,
                 "refs": r.refs,
                 "diags": r.diags,
+                "fn_values": r.fn_values,
                 "errors": r.errors,
                 "dropped": r.dropped,
             }
@@ -148,6 +149,10 @@ def test_declarations_the_project_uses_and_only_those(tmp_path: Path) -> None:
     # register_cb's parameter type (cb_t) widened: my_cb no longer matches it.
     assert found["register_cb"].severity is Severity.BREAKING
     assert any(e.get("line") == 7 for e in found["register_cb"].evidence)
+    # ... and cites my_cb's definition, the line to change.
+    assert ("main.c", 2, "my_cb: definition to change") in [
+        (e.get("path"), e.get("line"), e.get("text")) for e in found["register_cb"].evidence
+    ]
     assert found["s.used_field"].severity is Severity.RISKY  # type changed
     assert found["USED_C"].severity is Severity.RISKY  # value changed
     assert found["USED_FM"].severity is Severity.BREAKING  # arity changed
@@ -156,6 +161,93 @@ def test_declarations_the_project_uses_and_only_those(tmp_path: Path) -> None:
     assert any(e.get("line") == 5 for e in found["USED_M"].evidence)
     # Every finding points at a project line.
     assert all(any(e["type"] == "file_line" for e in f.evidence) for f in found.values())
+
+
+SMF_OLD_H = """\
+#pragma once
+typedef void (*state_method)(void *obj);
+typedef void (*state_execution)(void *obj);
+struct smf_state { const state_method entry; const state_execution run; };
+#define SMF_CREATE_STATE(_entry, _run) { .entry = _entry, .run = _run }
+"""
+SMF_NEW_H = """\
+#pragma once
+enum smf_state_result { SMF_EVENT_HANDLED, SMF_EVENT_PROPAGATE };
+typedef void (*state_method)(void *obj);
+typedef enum smf_state_result (*state_execution)(void *obj);
+struct smf_state { const state_method entry; const state_execution run; };
+#define SMF_CREATE_STATE(_entry, _run) { .entry = _entry, .run = _run }
+"""
+SMF_MAIN = """\
+#include <zephyr/smf.h>
+static void st_entry(void *o) { (void)o; }
+
+static void st_run(void *o)
+{
+    (void)o;
+}
+
+static const struct smf_state states[] = {
+    SMF_CREATE_STATE(st_entry, st_run),
+};
+const void *keep = states;
+"""
+
+
+def test_callback_findings_cite_definitions_and_uses(tmp_path: Path) -> None:
+    """CANnectivity N1a (docs/oracles/cannectivity.md): the run functions passed to
+    SMF_CREATE_STATE no longer match `state_execution`. The finding cited only the
+    SMF_CREATE_STATE line (the use); the maintainers changed the definitions."""
+    from zmig.analyzers.api import ApiAnalyzer
+    from zmig.apidiff import parse
+
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "main.c").write_text(SMF_MAIN)
+    out = []
+    for side, h in (("old", SMF_OLD_H), ("new", SMF_NEW_H)):
+        inc = tmp_path / side / "include" / "zephyr"
+        inc.mkdir(parents=True)
+        (inc / "smf.h").write_text(h)
+        cmd = f"cc -I{tmp_path / side / 'include'} -c {app / 'main.c'}"
+        r = parse(
+            str(app / "main.c"),
+            cmd,
+            {str(app): ""},
+            lambda f, a=str(app): f[len(a) + 1 :] if f.startswith(a + "/") else None,
+            str(tmp_path / side),
+        )
+        out.append(
+            {
+                "file": "main.c",
+                "decls": r.decls,
+                "refs": r.refs,
+                "diags": r.diags,
+                "fn_values": r.fn_values,
+                "errors": r.errors,
+                "dropped": r.dropped,
+            }
+        )
+    # Only the run function is a mismatch at the target; the entry function still fits.
+    assert out[0]["fn_values"] == []
+    assert [(m["function"], m["defined_at"]) for m in out[1]["fn_values"]] == [
+        ("st_run", "main.c:4")
+    ]
+    ctx = SimpleNamespace(
+        new=SimpleNamespace(
+            workspace=SimpleNamespace(zephyr=tmp_path / "new", root=tmp_path / "new")
+        ),
+        new_spec="new",
+        scope=("s",),
+    )
+    found = ApiAnalyzer()._declaration_changes(ctx, [out[0]], [out[1]])  # type: ignore[arg-type]
+    cb = [f for f in found if any("definition to change" in str(e.get("text")) for e in f.evidence)]
+    assert len(cb) == 1, [(f.kind, f.subject) for f in found]
+    lines = [
+        (e["path"], e["line"], e.get("text")) for e in cb[0].evidence if e["type"] == "file_line"
+    ]
+    assert lines[0] == ("main.c", 4, "st_run: definition to change")  # definition first
+    assert ("main.c", 10) in [(p, ln) for p, ln, _ in lines[1:]]  # then the use
 
 
 def test_zero_findings_for_symbols_the_project_does_not_use(tmp_path: Path) -> None:
