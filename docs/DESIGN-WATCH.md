@@ -590,7 +590,7 @@ Creating either archive took about 0.55 s, from a warm page cache.
   The shallow fetch of the same two took 60 s.
 - **A shallow fetch moves about 5× fewer bytes** than zmig's current fetch:
   `materialize` runs `west update --narrow` without `--depth`, which is full history.
-  `--shallow` (§7.4) now adds `-o=--depth=1`.
+  `--shallow` (§7.3) now adds `-o=--depth=1`.
 - **Excluded from the numbers above:**
   - GitHub Actions cache throughput: a restore there comes from remote storage, not local
     disk, so the 1–4 s above isn't a prediction for it;
@@ -598,7 +598,7 @@ Creating either archive took about 0.55 s, from a warm page cache.
   - hosted-runner network speed, which is likely far above 150 KB/s but is unmeasured.
   §8.3 lists what to measure on a real runner.
 
-### 7.4 Cold `zmig scan`, `--shallow` vs full
+### 7.3 Cold `zmig scan`, `--shallow` vs full
 
 Script: [examples/watch-cold.sh](examples/watch-cold.sh), 2026-10-28, on the same network.
 
@@ -617,7 +617,7 @@ Script: [examples/watch-cold.sh](examples/watch-cold.sh), 2026-10-28, on the sam
 - **The shallow run moved 4.4× fewer bytes in about half the time.** The fetches are
   partly latency-bound, so time doesn't scale with bytes.
 
-### 7.3 Against the budget
+### 7.4 Against the budget
 
 - **Analysis and builds** fit the PR budget when the workspaces are present:
   - two builds take ≤ 2 min for these projects;
