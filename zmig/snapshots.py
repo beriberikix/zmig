@@ -26,7 +26,7 @@ from zmig.tools import Runner, find_tool
 from zmig.workspace import RefWorkspace
 
 EXTRACT = Path(__file__).parent / "extract"
-SNAPSHOT_VERSION = 6
+SNAPSHOT_VERSION = 7
 
 ConfigValues = dict[str, str]
 

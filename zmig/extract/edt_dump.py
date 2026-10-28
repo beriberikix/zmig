@@ -74,6 +74,8 @@ def main():
             "compats": list(node.compats),
             "matching_compat": node.matching_compat,
             "status": node.status,
+            # Devicetree dependency ordinal: what DEVICE_DT_GET() names (__device_dts_ord_N).
+            "ord": node.dep_ordinal,
             "binding": rel(node.binding_path),
             "props": {k: norm(p.val) for k, p in node.props.items()},
             "raw_props": sorted(raw.props) if raw is not None else [],

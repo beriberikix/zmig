@@ -26,10 +26,17 @@ import re
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
+from zmig.abitools import (
+    abidiff_changes,
+    binary_boundaries,
+    pahole_layouts,
+    undefined_symbols,
+)
 from zmig.analyzers import AnalyzerResult
 from zmig.apidiff import API_VERSION, TuResult, libclang_version
 from zmig.apidiff import parse as parse_tu
 from zmig.buildctx import Artifact, ImageContext, project_path, project_roots
+from zmig.errors import ZmigError
 from zmig.findings import (
     JSON,
     Category,
@@ -123,6 +130,9 @@ class ApiAnalyzer:
         src, tgt, gaps = self._parse_both(ctx, version)
         not_checked += gaps
         findings += self._declaration_changes(ctx, src, tgt)
+        b_findings, b_gaps = self._binary_checks(ctx, src, tgt)
+        findings += b_findings
+        not_checked += b_gaps
         return AnalyzerResult(findings, status="partial" if gaps else "ok", not_checked=not_checked)
 
     def _parse_both(
@@ -336,12 +346,18 @@ class ApiAnalyzer:
         for d in new_diags:
             if d["at"] in explained:
                 continue
+            if d.get("kind") == "devicetree":
+                groups.setdefault(("devicetree", str(d.get("ord"))), []).append(d["at"])
+                continue
             if d.get("kind", "callback") == "callback":
                 m = _EXPECTED.search(d["message"])
                 groups.setdefault(("callback", m[1] if m else d["message"]), []).append(d["at"])
             else:
                 groups.setdefault(("truncation", d["message"]), []).append(d["at"])
         for (kind, key), sites in sorted(groups.items()):
+            if kind == "devicetree":
+                findings.append(self._missing_device(ctx, int(key), sites))
+                continue
             if kind == "callback":
                 msg = next(d["message"] for d in callback_diags if d["at"] == sites[0])
                 add("callback-type-changed", key,
@@ -356,6 +372,151 @@ class ApiAnalyzer:
                     "Widen the variable or parameter it's stored in.", sites, None,
                     {"message": key}, [])  # fmt: skip
         return findings
+
+    def _binary_checks(
+        self, ctx: ScanContext, src: list[dict[str, Any]], tgt: list[dict[str, Any]]
+    ) -> tuple[list[Finding], list[NotChecked]]:
+        """§6: pahole cross-checks clang's layout of the structs the project accesses
+        against the GCC-built ELFs; abidiff compares what a binary boundary (a prebuilt
+        static library the project links, LLEXT) sees. Missing tools are not-checked."""
+        findings: list[Finding] = []
+        gaps: list[NotChecked] = []
+        for side, img, tus in (("source", ctx.old_img, src), ("target", ctx.new_img, tgt)):
+            fields = {
+                k: v
+                for t in tus
+                for k, v in t["decls"].items()
+                if v["kind"] == "field" and k.count(".") == 1 and not k.startswith("<")
+            }
+            if not fields or not img.has(Artifact.ELF):
+                continue
+            layouts = pahole_layouts(img.artifact(Artifact.ELF), [k.split(".")[0] for k in fields])
+            if layouts is None:
+                gaps.append(
+                    NotChecked(
+                        "struct layouts against the toolchain's DWARF (pahole)",
+                        "pahole isn't installed: struct layouts come from clang's model only",
+                        self.name,
+                    )
+                )
+                break
+            differ = []
+            for k, v in sorted(fields.items()):
+                struct, member = k.split(".")
+                elf_bit = layouts.get(struct, {}).get(member)
+                if elf_bit is not None and v.get("offset", -1) >= 0 and elf_bit != v["offset"]:
+                    differ.append(f"{k} (clang bit {v['offset']}, ELF bit {elf_bit})")
+            if differ:
+                gaps.append(
+                    NotChecked(
+                        f"struct layouts at the {side} (clang vs. the GCC-built ELF)",
+                        "clang's layout model disagrees with pahole for "
+                        + ", ".join(differ[:5])
+                        + (", ..." if len(differ) > 5 else "")
+                        + "; offset findings for these fields aren't reliable",
+                        self.name,
+                    )
+                )
+        roots = project_roots(ctx.old, ctx.old_img.dir)
+        for b in binary_boundaries(ctx.old_img.dir, list(roots)):
+            if b == "llext":
+                gaps.append(
+                    NotChecked(
+                        "ABI seen by LLEXT extensions",
+                        "CONFIG_LLEXT is set, but the extensions aren't part of this build, so "
+                        "the symbols they import are unknown",
+                        self.name,
+                    )
+                )
+                continue
+            rel = project_path(b, roots) or b
+            if not (ctx.old_img.has(Artifact.ELF) and ctx.new_img.has(Artifact.ELF)):
+                gaps.append(NotChecked(f"ABI seen by {rel}", "needs both builds' ELFs", self.name))
+                continue
+            changes = abidiff_changes(
+                ctx.old_img.artifact(Artifact.ELF),
+                ctx.new_img.artifact(Artifact.ELF),
+                undefined_symbols(Path(b)),
+            )
+            if changes is None:
+                gaps.append(
+                    NotChecked(
+                        f"ABI seen by {rel}",
+                        "abidiff isn't installed (abigail-tools)",
+                        self.name,
+                    )
+                )
+            elif changes:
+                findings.append(
+                    Finding(
+                        category=Category.API,
+                        kind="abi-changed",
+                        subject=rel,
+                        title=f"{rel}, a prebuilt library your build links, uses Zephyr "
+                        f"symbols whose ABI changed in {ctx.new_spec}",
+                        severity=Severity.RISKY,
+                        confidence=Confidence.MEDIUM,
+                        action="Rebuild the library against the new version, or check that "
+                        "the changes listed don't affect it.",
+                        analyzer=self.name,
+                        scope=ctx.scope,
+                        evidence=(
+                            file_line(rel, 1, "prebuilt library linked into the image"),
+                            *(tool_output("abidiff", c) for c in changes[:10]),
+                        ),
+                        new=changes,
+                    )
+                )
+        return findings, gaps
+
+    def _missing_device(self, ctx: ScanContext, ord_: int, sites: list[str]) -> Finding:
+        """A devicetree device the project takes (DEVICE_DT_GET, DT_CHOSEN, ...) that the
+        target defines no device for: the node, its status at both refs, and the chosen
+        property naming it (regression: bms-firmware native_sim, ThingSet's serial.c on a
+        uart1 that v4.2 leaves disabled, docs/DOGFOOD-3-baseline.md B5)."""
+        try:
+            new_nodes = ctx.new_edt["nodes"]
+            old_nodes = ctx.old_edt["nodes"]
+            chosen = ctx.new_edt.get("chosen", {})
+        except ZmigError:  # no devicetree snapshot: report what clang said
+            new_nodes, old_nodes, chosen = {}, {}, {}
+        path = next((p for p, n in new_nodes.items() if n.get("ord") == ord_), None)
+        status_new = new_nodes.get(path, {}).get("status") if path else None
+        status_old = old_nodes.get(path, {}).get("status") if path else None
+        names = sorted(k for k, v in chosen.items() if v == path)
+        what = (
+            f"{path}" + (f" (chosen {', '.join(names)})" if names else "")
+            if path
+            else (f"devicetree ordinal {ord_}")
+        )
+        ev: list[JSON] = []
+        for site in sorted(set(sites), key=_site_key):
+            p, _, line = site.rpartition(":")
+            ev.append(file_line(p, int(line), f"__device_dts_ord_{ord_}"))
+        if path:
+            ev.append(
+                tool_output(
+                    "devicetree",
+                    f"{path}: status {status_old!r} at {ctx.old_spec}, {status_new!r} at "
+                    f"{ctx.new_spec}",
+                )
+            )
+        return Finding(
+            category=Category.API,
+            kind="device-missing",
+            subject=path or f"ord {ord_}",
+            title=f"Your code takes the device for {what}, which has no device at "
+            f"{ctx.new_spec}" + (f" (status {status_new!r}, was {status_old!r})" if path else ""),
+            severity=Severity.BREAKING,
+            confidence=Confidence.HIGH,
+            action='Enable the node in an overlay (status = "okay") or point the code (or '
+            "the chosen property) at the node that replaced it.",
+            analyzer=self.name,
+            scope=ctx.scope,
+            evidence=tuple(ev),
+            new={"node": path, "status": status_new, "chosen": names},
+            old={"status": status_old},
+        )
 
     @staticmethod
     def _change(

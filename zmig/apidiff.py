@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 # Bump when what a parse records changes (invalidates the per-build snapshots).
-API_VERSION = 5
+API_VERSION = 7
 
 # GCC options clang rejects or that don't matter for parsing (prefix match).
 GCC_ONLY = (
@@ -72,6 +72,7 @@ def norm_type(spelling: str) -> str:
     return _UNNAMED.sub("(anonymous)", spelling)
 
 
+_DTS_DEVICE = re.compile(r"'__device_dts_ord_(\d+)'")
 _NOT_FOUND = re.compile(r"'([^']+)' file not found")
 
 # Diagnostics that show a project callback no longer matches what Zephyr expects.
@@ -294,7 +295,7 @@ def parse(
                 owner = _record_name(ref.semantic_parent)
                 if not owner:
                     continue
-                key = f"{owner}.{ref.spelling}"
+                key = norm_type(f"{owner}.{ref.spelling}")
                 if key not in res.decls:
                     res.decls[key] = {
                         "kind": "field",
@@ -329,6 +330,24 @@ def parse(
         if d.severity >= ci.Diagnostic.Error:
             f = d.location.file.name if d.location.file else ""
             res.errors.append(f"{show(f) or decl_path(d.location)}:{d.location.line}: {d.spelling}")
+            dts = _DTS_DEVICE.search(d.spelling)
+            if not dts:
+                continue
+            # A devicetree device the project's code takes (DEVICE_DT_GET and friends) that
+            # the target doesn't define: the error is inside Zephyr's macros, the use is in
+            # an "expanded from macro" note.
+            use = next(
+                (s for n in [d, *d.children] if (s := where(n.location))[0] is not None), None
+            )
+            if use is not None:
+                res.diags.append(
+                    {
+                        "at": f"{use[0]}:{use[1]}",
+                        "message": d.spelling,
+                        "kind": "devicetree",
+                        "ord": int(dts[1]),
+                    }
+                )
             continue
         if CALLBACK_DIAG.search(d.spelling):
             dkind = "callback"
