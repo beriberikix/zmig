@@ -15,13 +15,15 @@ from pathlib import Path
 from typing import Any
 
 from zmig.boards import BoardMapping
-from zmig.buildctx import BuildContext, ImageContext, SalvageEdit
+from zmig.buildctx import BuildContext, ImageContext, SalvageEdit, project_path, project_roots
 from zmig.diagnostics import LogFacts, app_relative, parse_log
 from zmig.findings import Finding
 from zmig.guides import NOTES_SECTION, Document, Entry, load_documents, parse
+from zmig.modulecheck import ModuleNeed
 from zmig.snapshots import (
     ConfigValues,
     app_undefined_symbols,
+    build_dependencies,
     config_values,
     edt,
     kconfig_symbols,
@@ -52,6 +54,10 @@ class ScanContext:
     deployed_image: Path | None = None
     # User wire-format allowlist entries (--wire-allowlist), added to the shipped ones.
     wire_allowlist: Path | None = None
+    # Modules the target build turned out to need (zmig.modulecheck), and those of them
+    # zmig added to rebuild the target so the analysis could continue.
+    module_needs: tuple[ModuleNeed, ...] = ()
+    modules_added: tuple[str, ...] = ()
     # Caches shared by the contexts of all images of one scan.
     shared: dict[str, Any] = field(default_factory=dict)
 
@@ -104,6 +110,17 @@ class ScanContext:
             return usage_scan(app, include=keep)
         applied = set(app_relative(self.old_facts.overlays + self.old_facts.configs, self.old.src))
         return usage_scan(app, include=lambda rel: rel in applied)
+
+    @cached_property
+    def build_files(self) -> set[str] | None:
+        """The project's files the source build of this image used: compiled sources and
+        every header they included (ninja's dependency records), shown as in evidence
+        (app-relative, or "<module>/..."). None when the build has no records."""
+        deps = build_dependencies(self.old_img, self.runner)
+        if deps is None:
+            return None
+        roots = project_roots(self.old, self.old_img.dir)
+        return {rel for files in deps.values() for f in files if (rel := project_path(f, roots))}
 
     @property
     def app_usage(self) -> ProjectUsage:

@@ -84,6 +84,11 @@ findings in them are shown as `<module>/<path>:<line>`. Findings whose only evid
 `.conf`/overlay/devicetree files this build doesn't use (another board's `.conf`, say) are
 kept as info and say so. Long steps (clones, builds) print progress every minute.
 
+If the target build fails because it needs a Zephyr module the scan wasn't given (a header
+only that module's glue ships, a Kconfig dependency on `ZEPHYR_<X>_MODULE`, or a CMake error
+naming it), zmig reports the module, where it's required and where the target's `west.yml`
+declares it, then rebuilds the target with it so the rest of the analysis still runs.
+
 When the target configure fails (Zephyr turns Kconfig and devicetree warnings into
 errors, so it usually does), zmig reports Zephyr's errors as findings, then disables
 exactly those lines in a copy of your app and compares the rest. The report lists every

@@ -77,6 +77,7 @@ def _builtin(kind: str) -> list[type[Any]]:
     from zmig.analyzers.kconfig import KconfigAnalyzer
     from zmig.analyzers.layout import LayoutAnalyzer
     from zmig.analyzers.mcuboot import McubootAnalyzer
+    from zmig.analyzers.modules import ModulesAnalyzer
     from zmig.analyzers.sbom import SbomAnalyzer
     from zmig.analyzers.storage import StorageAnalyzer
     from zmig.analyzers.sysbuild import SysbuildAnalyzer
@@ -84,6 +85,7 @@ def _builtin(kind: str) -> list[type[Any]]:
 
     # The guide analyzer runs last: it links its findings to the ones before it.
     return [
+        ModulesAnalyzer,
         BoardAnalyzer,
         KconfigAnalyzer,
         DevicetreeAnalyzer,

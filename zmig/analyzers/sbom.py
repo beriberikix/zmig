@@ -167,13 +167,20 @@ class SbomAnalyzer:
             if status is None:
                 continue
             kind, detail = status
-            ev = tuple(file_line(loc.path, loc.line, loc.text) for loc in locs)
+            # Only the includes this build compiles: an include in a file that's built for
+            # another board or shield says nothing about this build (regression:
+            # bms-firmware's oled.c, docs/DOGFOOD-3-baseline.md).
+            built = ctx.build_files
+            used = [loc for loc in locs if built is None or loc.path in built]
+            outside = "" if used else " (only in files this build doesn't compile)"
+            ev = tuple(file_line(loc.path, loc.line, loc.text) for loc in (used or locs))
             if kind == "removed":
                 add(
                     "header-removed",
                     inc,
-                    f"<{inc}>, which your code includes, no longer exists in {ctx.new_spec}",
-                    Severity.BREAKING,
+                    f"<{inc}>, which your code includes, no longer exists in {ctx.new_spec}"
+                    + outside,
+                    Severity.BREAKING if used else Severity.INFO,
                     "Find where its declarations moved (see the migration guides).",
                     ev=ev,
                 )
@@ -181,8 +188,8 @@ class SbomAnalyzer:
                 add(
                     "header-changed",
                     inc,
-                    f"<{inc}>, which your code includes, changed upstream ({detail})",
-                    Severity.RISKY,
+                    f"<{inc}>, which your code includes, changed upstream ({detail})" + outside,
+                    Severity.RISKY if used else Severity.INFO,
                     "Review the API changes in that header against your calls.",
                     ev=ev,
                     new_v=detail,

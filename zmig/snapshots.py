@@ -22,7 +22,7 @@ from typing import Any
 
 from zmig.buildctx import Artifact, ImageContext
 from zmig.errors import ArtifactMissing, ZmigError
-from zmig.tools import Runner
+from zmig.tools import Runner, find_tool
 from zmig.workspace import RefWorkspace
 
 EXTRACT = Path(__file__).parent / "extract"
@@ -202,6 +202,27 @@ def init_levels(img: ImageContext, ws: RefWorkspace, runner: Runner) -> dict[str
             )
 
     return _cached(img, "initlevels", produce)
+
+
+def build_dependencies(img: ImageContext, runner: Runner) -> dict[str, list[str]] | None:
+    """{object: [its source and every header it included]} from `ninja -t deps` in the
+    image's build directory (absolute paths, as ninja recorded them). None when ninja has
+    no dependency records (a --fast build compiles nothing)."""
+    if not (img.dir / "build.ninja").is_file():
+        return None
+    proc = runner.run(
+        [find_tool("ninja"), "-C", img.dir, "-t", "deps"], check=False, unset_env=["PYTHONPATH"]
+    )
+    if proc.returncode != 0:
+        return None
+    out: dict[str, list[str]] = {}
+    current: list[str] | None = None
+    for line in proc.stdout.splitlines():
+        if line and not line[0].isspace() and "#deps" in line:
+            current = out.setdefault(line.split(":", 1)[0], [])
+        elif line.startswith("    ") and current is not None:
+            current.append(line.strip())
+    return out or None
 
 
 def app_undefined_symbols(img: ImageContext, app: Path, runner: Runner) -> set[str] | None:

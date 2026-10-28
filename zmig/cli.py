@@ -13,12 +13,21 @@ from pathlib import Path
 
 from zmig import __version__, analyzers
 from zmig.boards import alias_tables, map_board
-from zmig.buildctx import BuildMode, BuildSpec, build, build_with_salvage, hash_tree, sdk_identity
+from zmig.buildctx import (
+    BuildMode,
+    BuildSpec,
+    SalvageResult,
+    build,
+    build_with_salvage,
+    hash_tree,
+    sdk_identity,
+)
 from zmig.cache import Cache, default_cache_root
 from zmig.errors import ZmigError
 from zmig.findings import Category, Confidence, Finding, NotChecked, Report, Severity, plural
 from zmig.forks import compare_tree, guess_version_tag
 from zmig.manifest import load_manifest, scan_user_workspace
+from zmig.modulecheck import ModuleNeed, diagnose
 from zmig.plan import PlanContext
 from zmig.refs import ResolvedRef, resolve_ref
 from zmig.report import render
@@ -31,7 +40,7 @@ from zmig.tools import (
     tool_version,
 )
 from zmig.verdict import upgrade_path
-from zmig.workspace import materialize
+from zmig.workspace import RefWorkspace, materialize
 
 log = logging.getLogger("zmig")
 
@@ -266,13 +275,33 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     log.warning("  %s: %s", args.from_ref, old.status)
     log.warning("building %s for %s at %s (%s)...", app, to_board, args.to_ref, mode)
     salvage = build_with_salvage(new_ws, spec(to_board), cache, runner)
+    needs, added = _missing_modules(salvage, new_ws, runner)
+    if added:
+        # A module the target needs but the scan's module list lacks would stop every
+        # build-based analyzer (regression: bms-firmware at v4.2 lost its whole target
+        # build to cmsis_6). Report it, and analyze the target built with it.
+        log.warning(
+            "the target build needs module(s) %s (%s); rebuilding it with them added",
+            ", ".join(added),
+            "; ".join(n.why for n in needs),
+        )
+        new_ws = materialize(new_r, cache, runner, [*args.modules, *added])
+        first_contexts = [salvage.original.to_json()]
+        salvage = build_with_salvage(new_ws, spec(to_board), cache, runner)
+        log.warning("  %s with %s: %s", args.to_ref, ", ".join(added), salvage.effective.status)
+    else:
+        first_contexts = []
     # Tool messages quote absolute paths of the built app copies; report them as <app>.
     runner.redactions[str(app.resolve())] = "<app>"
     for built in (old, salvage.original, salvage.salvaged):
         if built is not None:
             runner.redactions[str(built.src)] = "<app>"
 
-    contexts = [old.to_json(), salvage.original.to_json()]
+    contexts = [
+        old.to_json(),
+        *({**c, "superseded_by_module_recovery": list(added)} for c in first_contexts),
+        {**salvage.original.to_json(), **({"modules_added": list(added)} if added else {})},
+    ]
     if salvage.salvaged is not None:
         contexts.append(
             {
@@ -312,6 +341,8 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         all_guide_entries=args.all_guide_entries,
         deployed_image=args.deployed_image.expanduser().resolve() if args.deployed_image else None,
         wire_allowlist=args.wire_allowlist.expanduser().resolve() if args.wire_allowlist else None,
+        module_needs=tuple(needs),
+        modules_added=tuple(added),
     )
     report.findings, report.analyzers, report.not_checked = analyzers.run_build_analyzers(
         selected, ctx
@@ -332,6 +363,23 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     report.upgrade_path = upgrade_path(ctx.shared, report.findings, report.analyzers)
     _emit(report, runner, args)
     return EXIT_OK
+
+
+def _missing_modules(
+    salvage: SalvageResult, ws: RefWorkspace, runner: Runner
+) -> tuple[list[ModuleNeed], list[str]]:
+    """Modules a failed target build shows it needs, and which of them can be added
+    (declared in the target manifest, so `west update` can fetch them)."""
+    if salvage.effective.status == "ok":
+        return [], []
+    text = "\n".join(
+        b.log.read_text()
+        for b in (salvage.original, salvage.salvaged)
+        if b is not None and b.log.is_file()
+    )
+    active = {m.name for m in ws.modules(runner)}
+    needs = diagnose(text, ws.zephyr, load_manifest(ws.root), active)
+    return needs, [n.module for n in needs]
 
 
 def _resolve_plan_from(

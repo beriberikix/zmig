@@ -80,3 +80,31 @@ def test_smp_svr_p1_verdict(tmp_path: Path) -> None:
     u = r["upgrade_path"]
     assert u["verdict"] == "needs-changes" and set(u["remedies"]) == {"config-pin"}
     assert u["unchecked"] == ["storage"]  # littlefs mounts through a devicetree fstab
+
+
+SDK_0168 = Path(os.environ.get("ZMIG_SDK_0168", CACHE / "sdks" / "zephyr-sdk-0.16.8"))
+
+
+@pytest.mark.skipif(not SDK_0168.is_dir(), reason=f"SDK 0.16.8 not at {SDK_0168}")
+def test_target_needs_a_module_the_scan_lacks(tmp_path: Path) -> None:
+    """bms-firmware v4.0 -> v4.2 (docs/DOGFOOD-2-baseline.md): Cortex-M needs cmsis_6 from
+    v4.2, the pre-upgrade module list has only cmsis, and the whole target build was lost
+    to `cmsis_core.h: No such file or directory`. On nRF the same gap stops the configure
+    (a cmsis_6 glue Kconfig symbol with `&& 0` dependencies). zmig now names the module,
+    where it's required and declared, and analyzes the target built with it."""
+    os.environ.pop("PYTHONPATH", None)
+    args = ["scan", "--app", str(ROOT / "tests/fixtures/hints-app")]
+    args += ["--board", "nrf52840dk/nrf52840", "--from", "v4.1.0", "--to", "v4.2.0"]
+    args += ["--sdk", str(SDK_0168), "--module", "hal_nordic", "--module", "cmsis"]
+    args += ["--analyzers", "modules", "--format", "json", "--out", str(tmp_path)]
+    assert main(args) == 0
+    r: dict[str, Any] = json.loads((tmp_path / "report.json").read_text())
+    assert [c["status"] for c in r["contexts"]] == ["ok", "configure-failed", "ok"]
+    assert r["contexts"][1]["superseded_by_module_recovery"] == ["cmsis_6"]
+    assert r["contexts"][2]["modules_added"] == ["cmsis_6"]
+    (need,) = [f for f in r["findings"] if f["kind"] == "module-required"]
+    assert need["severity"] == "breaking"
+    assert need["new"]["module"] == "cmsis_6"
+    assert need["new"]["added_by_zmig"] is True
+    assert need["new"]["site"].startswith("warning: CMSIS_CORE_HAS_SYSTEM_CORE_CLOCK")
+    assert need["new"]["declared"].startswith("west.yml:")
