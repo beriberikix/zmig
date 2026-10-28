@@ -103,6 +103,7 @@
           "status": {
             "enum": [
               "ok",
+              "partial",
               "skipped",
               "error"
             ]

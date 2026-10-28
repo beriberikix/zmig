@@ -347,6 +347,8 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     report.findings, report.analyzers, report.not_checked = analyzers.run_build_analyzers(
         selected, ctx
     )
+    # Tool versions analyzers recorded (the libclang the API diff used).
+    report.environment.update(ctx.shared.get("environment", {}))
     report.not_checked.append(
         NotChecked(
             "salvage of files the app doesn't own",

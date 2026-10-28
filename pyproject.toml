@@ -38,6 +38,12 @@ mcuboot = [
     "pyyaml",
 ]
 
+# libclang for the public API/ABI diff (docs/DESIGN-P2.md). The wheel bundles libclang.so;
+# ZMIG_LIBCLANG=/path/to/libclang.so selects a system one instead.
+api = [
+    "libclang==18.1.1",
+]
+
 [project.scripts]
 zmig = "zmig.cli:main"
 

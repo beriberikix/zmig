@@ -22,7 +22,8 @@ if TYPE_CHECKING:
     from zmig.plan import PlanContext
     from zmig.scan import ScanContext
 
-Status = Literal["ok", "skipped", "error"]
+# "partial": ran, but some inputs couldn't be interpreted (listed in not_checked).
+Status = Literal["ok", "partial", "skipped", "error"]
 
 
 @dataclass(frozen=True)

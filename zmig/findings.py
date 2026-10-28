@@ -208,7 +208,7 @@ class NotChecked:
 @dataclass(frozen=True)
 class AnalyzerStatus:
     name: str
-    status: str  # ok | skipped | error
+    status: str  # ok | partial | skipped | error
     reason: str | None = None
 
     def to_json(self) -> JSON:
