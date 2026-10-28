@@ -160,3 +160,60 @@ Full suites at `615cbc1`: 113 unit tests pass. The build/SDK suite passed 56/56 
    above.
 
 P3 and P4 weren't started.
+
+---
+
+## 7. Review additions (2026-10-28)
+
+### 7.1 A third metric: actionable
+
+**Definition.** An in-scope item is *actionable* if at least one finding scored for it
+(caught or partly) has an `action` text that names a file the maintainers edited for that
+item. "Names" means the file's path or basename appears in the text. It's reported next to
+strict and lenient recall, and replaces neither. Evidence is never changed to improve it:
+the evidence is what proves the hazard.
+
+Measured on the P2 runs (`615cbc1`):
+
+| Config | Items | Actionable | Which |
+|---|---|---|---|
+| ZMK | 18 | **1 (6%)** | #5: `API-SYSCALLS-NOT-GENERATED-*` says "register it in your CMakeLists.txt with zephyr_syscall_header(…)" (the maintainers edited `app/CMakeLists.txt` and `app/prj.conf`) |
+| Golioth B, B-rak, B-esp, B-native | 2 + 3 + 2 + 1 | **0** | e.g. B-rak G3: "Remove the assignment, or find its replacement…" (the file is in the title and evidence, not the action) |
+| bms A1, A1-native, A1-oled | 2 + 5 + 3 | **0** | e.g. "Add cmsis_6 to your workspace (the name-allowlist …)" (the maintainers edited `west.yml`, which isn't named); "Enable the node in an overlay" (the overlay isn't named) |
+| **Held-out total** | 18 | **0 (0%)** | |
+
+Most actions are generic ("Read MG-… and update the lines listed", "Check whether it points
+at a real problem"). Measured this way, zmig says what breaks far more often than it says
+where to fix it.
+
+### 7.2 The held-out lenient recall is at its ceiling
+
+**Held-out lenient recall, 11 of 18, is the most any tool can reach on this set.** The
+other 7 items have no revealing artifact in any scanned build:
+
+- G2 in 4 Golioth configs: a `configdefault` whose condition is false, and `MCUMGR` is off;
+- B2 in 3 bms-firmware configs: the ThingSet SDK's upgrade-related changes don't affect the
+  compiled files, and `chosen thingset,eeprom` is set.
+
+Further analyzer work can't move lenient recall on this set. It can only move strict recall
+(4 items are partly: B5, B6, and ZMK-style location misses) and precision. Measuring recall
+gains needs new pairs or configurations whose changes have artifacts.
+
+### 7.3 Which results were measured on projects I had tuned on
+
+A project counts as tuned on from the first run whose output led to a zmig change, even
+when the change was an allowed misleading-output fix or one you asked for.
+
+| Project / config | Clean measurements (no zmig change informed by it yet) | Measurements after zmig changes it informed |
+|---|---|---|
+| ZMK | none: it was the development project from DOGFOOD-1 on | DOGFOOD-1, DOGFOOD-2, DOGFOOD-3 baseline and P2: all tuned (Step 2 classes derived from it; P2's macro-body fix found on it) |
+| smp_svr | none | DOGFOOD-1, and its use as an init-order check in Step 2 |
+| Golioth B (nucleo_h563zi) | **DOGFOOD-2 baseline only** | Step 2 onward: M1, M2/M3 and M4 were found on B's baseline output |
+| bms A1 (bms_16s100_sc) | **DOGFOOD-2 baseline only** | Step 2 onward: M4, M5; module-set detection (your item 1) was derived from its cmsis_6 failure; the SBOM compiled-includes fix was found on it |
+| Golioth B-rak, B-esp | **DOGFOOD-3 baseline** | P2 numbers: M8 was found on their baseline output |
+| Golioth B-native | **DOGFOOD-3 baseline** | P2 numbers: no fix came from it, but it ran on code changed by fixes from the others. Its results are unchanged |
+| bms A1-native, A1-oled | **DOGFOOD-3 baseline**, with one caveat: the Kconfig rules for absent modules (TinyCrypt, mbedtls) were extended after seeing A1-native's *verification* build log, before the oracle and the baseline run | P2 numbers: M9–M12 were found on their baseline output |
+
+The clean numbers are the DOGFOOD-2 baseline for B and A1, and the DOGFOOD-3 baseline for
+the five configurations added there. Every later number is on projects whose output has
+informed zmig changes.
