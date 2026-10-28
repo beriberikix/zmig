@@ -469,3 +469,32 @@ def test_report_separates_checked_from_not_checked() -> None:
         "hazards": 0,
     }
     assert "findings" not in statuses["sbom"]  # didn't run: no count
+
+
+def test_located_link_errors_keep_their_source_line() -> None:
+    """CANnectivity at v4.2: '…/led.c:225: undefined reference' with no 'ld:' prefix was
+    reported as '1 error (step)' (docs/DOGFOOD-4-baseline.md M14)."""
+    log = (
+        "FAILED: [code=1] zephyr/zephyr_pre0.elf zephyr/zephyr_pre0.map\n"
+        "/ws/apps/x/app/src/led.c:225: undefined reference to `smf_set_handled'\n"
+        "collect2: error: ld returned 1 exit status\n"
+        "/sdk/bin/ld.bfd: oled.c:33: undefined reference to `cfb_print'\n"
+        "/sdk/bin/ld.bfd: region `FLASH' overflowed by 123 bytes\n"
+    )
+    errs = {(e.kind, e.file, e.line, e.message) for e in build_errors(log)}
+    assert errs == {
+        ("linker", "/ws/apps/x/app/src/led.c", 225, "undefined reference to `smf_set_handled'"),
+        ("linker", "oled.c", 33, "undefined reference to `cfb_print'"),
+        ("linker", "", 0, "region `FLASH' overflowed by 123 bytes"),
+    }
+
+
+def test_dtc_assigned_phandles_are_not_node_changes() -> None:
+    """CANnectivity: led0 and counter2 'changed: phandle' (docs/DOGFOOD-4-baseline.md M13)."""
+    from zmig.analyzers.devicetree import _dts_view
+
+    old = {"labels": ["led_ready"], "raw_values": {"gpios": "<&gpioa 5 0>", "phandle": "<0x12>"}}
+    new = {"labels": ["led_ready"], "raw_values": {"gpios": "<&gpioa 5 0>", "phandle": "<0x15>"}}
+    assert _dts_view(old) == _dts_view(new)
+    new["raw_values"]["gpios"] = "<&gpioa 6 0>"
+    assert _dts_view(old) != _dts_view(new)

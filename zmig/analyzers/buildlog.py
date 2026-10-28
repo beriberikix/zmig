@@ -54,6 +54,14 @@ _LINKER = re.compile(
     r"cannot find|multiple definition).*)$",
     re.M,
 )
+# A link error the linker attributes to a source line, printed with or without the "ld:"
+# prefix (regression: CANnectivity's "…/led.c:225: undefined reference to
+# `smf_set_handled'" became "1 error (step)", docs/DOGFOOD-4-baseline.md M14).
+_LINKER_AT = re.compile(
+    r"^(?:.*?\bld(?:\.bfd|\.lld)?: )?(?P<file>[^\s:]+\.(?:c|cc|cpp|S|s|h)):(?P<line>\d+): "
+    r"(?P<msg>(?:undefined reference|multiple definition).*)$",
+    re.M,
+)
 _FAILED = re.compile(r"^FAILED: (?:\[code=\d+\] )?(?P<target>\S+)", re.M)
 _IMAGE = re.compile(r"/builds/[0-9a-f]+/(?P<image>[\w.-]+)/zephyr/")
 
@@ -71,11 +79,18 @@ def build_errors(log: str) -> list[BuildError]:
             )
         )
     failed = [m for m in _FAILED.finditer(log)]
-    for m in _LINKER.finditer(log):
+    located = {m.start(): m for m in _LINKER_AT.finditer(log)}
+    for m in [*_LINKER.finditer(log), *located.values()]:
+        if m.re is _LINKER and m.start() in located:
+            continue  # the located form of the same line is taken below
         # The linker doesn't name the image; the nearest preceding FAILED step does.
         prev = [f for f in failed if f.start() < m.start()]
         img = _IMAGE.search(log[prev[-1].start() : prev[-1].end() + 300]) if prev else None
-        out.append(BuildError("linker", m["msg"].strip(), image=img["image"] if img else ""))
+        image = img["image"] if img else ""
+        if m.re is _LINKER_AT:
+            out.append(BuildError("linker", m["msg"].strip(), m["file"], int(m["line"]), image))
+        else:
+            out.append(BuildError("linker", m["msg"].strip(), image=image))
     if not out:
         for m in failed:
             out.append(BuildError("step", f"FAILED: {m['target']}"))

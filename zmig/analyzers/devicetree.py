@@ -25,17 +25,28 @@ from zmig.findings import (
     tool_output,
 )
 from zmig.scan import ScanContext
-from zmig.usage import Loc, NodeRef, describe, dt_token, resolve
+from zmig.usage import SOURCE_SUFFIXES, Loc, NodeRef, describe, dt_token, resolve
 
 
 def _ev(locs: list[Loc]) -> tuple[JSON, ...]:
     return tuple(file_line(loc.path, loc.line, loc.text) for loc in locs)
 
 
+# Numbers dtc assigns to referenced nodes: a renumbering between builds changes nothing
+# (regression: CANnectivity's led0 and counter2 "changed: phandle",
+# docs/DOGFOOD-4-baseline.md M13).
+_ASSIGNED_BY_DTC = frozenset({"phandle", "linux,phandle"})
+
+
+def _written(node: dict[str, Any]) -> dict[str, Any]:
+    """The properties written in the DTS, without the ones dtc assigns."""
+    return {k: v for k, v in node["raw_values"].items() if k not in _ASSIGNED_BY_DTC}
+
+
 def _dts_view(node: dict[str, Any]) -> tuple[Any, ...]:
     """What zephyr.dts shows for a node: labels and the properties written in the DTS.
     edtlib's `props` also holds binding defaults, which change when only a binding does."""
-    return (sorted(node["labels"]), node["raw_values"])
+    return (sorted(node["labels"]), _written(node))
 
 
 def _prop_by_token(node: dict[str, Any], token: str) -> str | None:
@@ -116,7 +127,13 @@ class DevicetreeAnalyzer:
 
         # Nodes the app references.
         by_ref: dict[NodeRef, list[Loc]] = {}
+        built = ctx.build_files
         for ref, loc in ctx.usage.dt_nodes:
+            # A reference in a source file this build doesn't compile isn't this build's
+            # (regression: CANnectivity's src/dfu.c, only built with MCUboot DFU,
+            # docs/DOGFOOD-4-baseline.md M15). Overlays are judged by outside_build().
+            if built is not None and loc.path.endswith(SOURCE_SUFFIXES) and loc.path not in built:
+                continue
             by_ref.setdefault(ref, []).append(loc)
         for ref, locs in sorted(by_ref.items(), key=lambda kv: describe(kv[0])):
             po, pn = resolve(ref, old), resolve(ref, new)
@@ -177,13 +194,15 @@ class DevicetreeAnalyzer:
             # appeared, disappeared or changed with the binding alone.
             # What the DTS writes (raw text) vs. binding defaults that appeared,
             # disappeared or changed with the binding alone.
-            ro, rn = o["raw_values"], n["raw_values"]
+            ro, rn = _written(o), _written(n)
             written = ro.keys() | rn.keys()
             changed = {k: [ro.get(k), rn.get(k)] for k in sorted(written) if ro.get(k) != rn.get(k)}
             defaults = {
                 k: [o["props"].get(k), n["props"].get(k)]
                 for k in sorted(o["props"].keys() | n["props"].keys())
-                if k not in written and o["props"].get(k) != n["props"].get(k)
+                if k not in written
+                and k not in _ASSIGNED_BY_DTC
+                and o["props"].get(k) != n["props"].get(k)
             }
             if _binding(o["binding"]) != _binding(n["binding"]):
                 changed["(binding)"] = [o["binding"], n["binding"]]
