@@ -1,9 +1,12 @@
 # zmig watch: example GitHub Actions workflow (docs/DESIGN-WATCH.md §6).
 #
-# UNTESTED: this file has never run in GitHub Actions. Every `uses:` is pinned to the commit
-# its tag pointed to on 2026-10-28 (`git ls-remote`); every action input below is from
-# memory and is UNVERIFIED until checked against that action's README at the pinned commit.
-# The test procedure is in docs/DESIGN-WATCH.md §8.
+# Ran in GitHub Actions on 2026-10-28 in a private test repo (docs/CI-TEST.md has the
+# runs); the fixes those runs needed are in this file. Every `uses:` is pinned to the
+# commit its tag pointed to on 2026-10-28 (`git ls-remote`). "verified" below means a real
+# run with exactly these inputs passed; "UNVERIFIED" means it never ran successfully:
+# - the cron schedules (only workflow_dispatch ran; it takes the same path);
+# - the SARIF upload (it ran, but code scanning was not enabled on the test repo);
+# - the fork-PR conditions (needs a second account).
 #
 # Copy to .github/workflows/zmig-watch.yml and edit the ZMIG_* values for your app.
 
@@ -25,6 +28,8 @@ env:
   # The zmig package to install, pinned by commit. zmig isn't on PyPI. The baseline
   # records the zmig build, so upgrade zmig in a PR that changes this pin and includes
   # `zmig watch ... --rebase-baseline --reason ...` (DESIGN-WATCH.md §3.6).
+  # A private zmig repo needs a read-only token in a secret, e.g.
+  #   git+https://x-access-token:${{ secrets.ZMIG_READ }}@github.com/OWNER/zmig@COMMIT_SHA
   ZMIG_PIP: "zmig[zephyr,api] @ git+https://github.com/OWNER/zmig@COMMIT_SHA"
   ZMIG_ARGS: >-
     --shallow
@@ -45,34 +50,38 @@ jobs:
     permissions:
       contents: read
       security-events: write   # SARIF upload (same-repo PRs and scheduled runs only)
+      actions: read            # upload-sarif reads the workflow run (CI run 40764423331 failed without it)
       pull-requests: write     # the PR comment (same-repo PRs only)
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4; inputs UNVERIFIED
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4; verified
 
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5; inputs UNVERIFIED
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5; verified
         with:
           python-version: "3.12"
 
       - name: Host tools
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build device-tree-compiler dwarves abigail-tools
 
-      # Cache key: west.yml and the zmig version only, never the baseline (a baseline
-      # edit doesn't change what's cached). The scheduled run on the default branch
-      # populates it; PR runs restore it. Whether a PR can restore a cache saved by the
-      # default branch, and the per-repository cache size limit, are UNVERIFIED: check
-      # them against the current GitHub Actions cache documentation.
+      # Cache key: zmig version, west.yml hash and run id, never the baseline (a baseline
+      # edit doesn't change what's cached). The scheduled run on the default branch saves
+      # it (1.65 GB in the test repo); PR runs restore the latest by prefix (verified: 74 s).
+      # The per-repository cache size limit and eviction under nightly churn (one new
+      # entry per nightly) are UNVERIFIED: check them against GitHub's cache docs.
+      # Restore and save are separate steps: actions/cache's post-step only saves when the
+      # job succeeds, and a nightly that finds something fails (CI run 40764423331 saved
+      # nothing). Scheduled/dispatched runs save under a per-run key; PRs only restore.
       - name: Restore zmig cache (mirror, workspaces, parse cache)
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4; inputs UNVERIFIED
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830  # v4; verified (a PR restored the default branch's cache)
         with:
           path: |
             ~/.cache/zmig/mirrors
             ~/.cache/zmig/workspaces
             ~/.cache/zmig/api
-          key: zmig-${{ env.ZMIG_VERSION }}-${{ hashFiles('west.yml') }}
-          restore-keys: zmig-${{ env.ZMIG_VERSION }}-
+          key: zmig-${{ env.ZMIG_VERSION }}-${{ hashFiles('west.yml') }}-${{ github.run_id }}
+          restore-keys: zmig-${{ env.ZMIG_VERSION }}-${{ hashFiles('west.yml') }}-
 
       - name: Zephyr SDK ${{ env.ZEPHYR_SDK }} (ARM toolchain only)
-        # Release asset names are UNVERIFIED.
+        # Release asset names verified (gh release view, and the CI runs).
         run: |
           cd ..
           base=https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v$ZEPHYR_SDK
@@ -105,9 +114,22 @@ jobs:
           fi
           exit $code
 
+      - name: Save zmig cache (scheduled and dispatched runs, even when zmig failed)
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830  # v4; verified
+        with:
+          path: |
+            ~/.cache/zmig/mirrors
+            ~/.cache/zmig/workspaces
+            ~/.cache/zmig/api
+          key: zmig-${{ env.ZMIG_VERSION }}-${{ hashFiles('west.yml') }}-${{ github.run_id }}
+
       - name: Upload SARIF
+        # Code scanning may be unavailable (private repo without GitHub Code Security: CI
+        # run 40765935133). The step then fails, but the job's result stays zmig's.
+        continue-on-error: true
         if: always() && hashFiles('zmig.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@4bfa242aa49c5f7c6770b98670d354a7dfac05f8  # v3; inputs UNVERIFIED
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4 (v3 is deprecated); inputs UNVERIFIED (code scanning was disabled)
         with:
           sarif_file: zmig.sarif
           category: zmig
@@ -128,7 +150,7 @@ jobs:
 
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4; inputs UNVERIFIED
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4; verified
         with:
           name: zmig-watch
           path: zmig-out

@@ -488,3 +488,15 @@ def test_unseen_is_not_fixed_when_a_gap_blocks() -> None:
     assert "#### Fixed" not in text
     # Without a blocking gap, the same absences are "fixed".
     assert len(compare(report, b, TODAY, pinned).of("fixed")) == 7
+
+
+def test_update_baseline_keeps_rebase_provenance() -> None:
+    """CI test repo PR #2: --update-baseline after a rebase dropped `rebased_from`."""
+    old = baseline_of(load("cannectivity-c1-prefix"))
+    rb = rebase_baseline(old, load("cannectivity-c1"), ACC, "0.1.0", "newbuild")
+    rebased = Baseline(Path("b.json"), rb.data)
+    to = {"spec": "x", "resolved": "x", "sha": load("cannectivity-c1")["inputs"]["to"]["sha"]}
+    acc = Acceptance("later", "other", "2026-11-01T00:00:00Z", None)
+    data = make_baseline(load("cannectivity-c1"), {}, to, acc, "0.1.0", rebased, "newbuild")
+    assert all(e.get("rebased_from") for e in data["accepted"])
+    assert {e["reason"] for e in data["accepted"]} == {"test"}

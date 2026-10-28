@@ -215,6 +215,18 @@ def _entry(finding: JSON, ctx: FingerprintContext, acc: Acceptance) -> JSON:
     }
 
 
+# What --update-baseline keeps from an entry that is still found: who accepted it, when,
+# why, until when, and where it came from in a rebase.
+KEPT_ON_UPDATE = (
+    "reason",
+    "accepted_by",
+    "accepted_at",
+    "accepted_commit",
+    "until",
+    "rebased_from",
+)
+
+
 def make_baseline(
     report: JSON,
     config: JSON,
@@ -237,7 +249,7 @@ def make_baseline(
         old = kept[e["fingerprint"]]
         if old:
             prior = old.pop(0)
-            for k in ("reason", "accepted_by", "accepted_at", "accepted_commit", "until"):
+            for k in KEPT_ON_UPDATE:
                 if k in prior:
                     e[k] = prior[k]
                 else:

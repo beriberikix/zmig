@@ -5,9 +5,10 @@ Status: **approved with changes** (review of 2026-10-28), then implemented:
 - **Implemented and tested locally:** fingerprints, the baseline file, the exit-code
   policy, SARIF and PR-comment output. They're in `zmig/watch.py` (comparison, no
   builds) and `zmig/watchcmd.py` (the command).
-- **Not run in CI:** the GitHub Actions workflow
-  ([examples/zmig-watch.yml](examples/zmig-watch.yml)) has never run on GitHub. §8 says
-  what's needed to test it.
+- **Run in CI (2026-10-28):** the GitHub Actions workflow
+  ([examples/zmig-watch.yml](examples/zmig-watch.yml)) ran in a private test repo:
+  nightly, PR, new finding, baseline change, expired acceptances. Results are in
+  [CI-TEST.md](CI-TEST.md); fork PRs are not run (they need a second account).
 
 P3 isn't in scope.
 
@@ -476,7 +477,13 @@ region.
 
 ## 6. GitHub Actions
 
-The full file is [examples/zmig-watch.yml](examples/zmig-watch.yml). It is **untested**.
+The full file is [examples/zmig-watch.yml](examples/zmig-watch.yml). It **ran in GitHub
+Actions** on 2026-10-28, in a private test repo. The runs, the four workflow bugs they
+found and the fixes are in [CI-TEST.md](CI-TEST.md). Still unverified:
+
+- the cron triggers;
+- the SARIF upload (code scanning was not enabled);
+- fork PRs.
 
 ### 6.1 Triggers and modes
 
@@ -630,7 +637,10 @@ Script: [examples/watch-cold.sh](examples/watch-cold.sh), 2026-10-28, on the sam
 
   Decide after §8.3's measurements.
 
-## 8. Testing the workflow (not done; what you need)
+## 8. Testing the workflow
+
+Done on 2026-10-28; results in [CI-TEST.md](CI-TEST.md). Below is the plan as written
+before the runs.
 
 ### 8.1 What you need
 
