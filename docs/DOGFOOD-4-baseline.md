@@ -106,7 +106,7 @@ No crashes: both runs exited 0, and every report passes the verdict invariants.
   DOGFOOD-3, cite only files the build compiled (ninja dependency records); a finding with
   no such evidence becomes info.
 
-## 6. After the M13–M15 fixes (`2aca9a9`), listed separately
+## 6. After the M13–M15 fixes (`50970f6`), listed separately
 
 The same two configurations were re-run with the same refs and warm builds: about 3 s
 each. The fixes don't change recall or the verdict (direct-ok, low), and invariants still
