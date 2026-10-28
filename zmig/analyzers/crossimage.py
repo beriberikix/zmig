@@ -111,7 +111,7 @@ class CrossImageAnalyzer:
     ) -> list[tuple[str, str, str, list[JSON], Any]]:
         """(key, title, action, evidence, data) for each disagreement in build `b`."""
         out: list[tuple[str, str, str, list[JSON], Any]] = []
-        ref = b.workspace.resolved.ref.spec
+        ref = b.workspace.resolved.ref.label
         imgs = [i for i in b.images if i.has(Artifact.CONFIG)]
         boot = next((i for i in imgs if i.role == "bootloader"), None)
         anchor = boot or next((i for i in imgs if i.role == "app"), None)
@@ -201,7 +201,7 @@ class CrossImageAnalyzer:
         )
         sb_cfg = b.dir / "zephyr" / ".config"
         sb = parse_dotconfig(sb_cfg.read_text()) if sb_cfg.is_file() else {}
-        ref = b.workspace.resolved.ref.spec
+        ref = b.workspace.resolved.ref.label
         out: list[tuple[str, str, str, list[JSON], Any]] = []
 
         def on(c: ConfigValues, opt: str) -> bool:

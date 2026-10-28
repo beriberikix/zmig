@@ -794,7 +794,18 @@ class McubootAnalyzer:
             if sysbuild_config(ctx.new.dir) is not None
             else {}
         )
+        # Only pairs whose sysbuild trigger is on at the target apply (regression: smp_svr's
+        # CONFIG_REBOOT=y, from MCUmgr's reset command, matched the firmware-updater pair
+        # of SB_CONFIG_MCUBOOT_MODE_FIRMWARE_UPDATER_BOOT_MODE_ENTRANCE, which is off).
+        # One check per trigger: a trigger can pair one app option with several
+        # bootloader options.
+        sb_values = sysbuild_config(ctx.new.dir) or {}
+        reported: set[str] = set()
         for p in tp:
+            if sb_values.get(p.trigger.removeprefix("SB_CONFIG_")) != "y":
+                continue
+            if p.trigger in reported:
+                continue
             a_opt, b_opt = (
                 p.app.option.removeprefix("CONFIG_"),
                 p.bootloader.option.removeprefix("CONFIG_"),
@@ -865,6 +876,7 @@ class McubootAnalyzer:
                             f"<zephyr {ctx.new_spec}>/{path}", int(line or 1), f"config {sym}"
                         )
                     )
+            reported.add(p.trigger)
             out.append(
                 {
                     "check": f"agreement {p.trigger}",

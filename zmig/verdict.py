@@ -195,8 +195,16 @@ def upgrade_path(
                 if c["status"] == "unknown"
             )
         )
+    # Categories nothing was established for: a hazard elsewhere still decides the
+    # verdict (precedence), but the remedies are then a lower bound, and the report says so
+    # (regression: smp_svr was "needs-changes" with storage unchecked, worded as if the
+    # listed changes were enough).
+    unchecked = sorted(n for n, c in cats.items() if c["status"] == "unknown")
+    if unchecked and verdict in ("needs-changes", "blocked"):
+        basis.append("remedies are a lower bound: not established for " + ", ".join(unchecked))
     return {
         "verdict": verdict,
+        "unchecked": unchecked,
         "confidence": confidence,
         "categories": cats,
         "remedies": remedies,

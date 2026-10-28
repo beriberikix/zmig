@@ -140,6 +140,25 @@ def plan_hops(crossed: list[Minor], anchors: set[Minor], max_gap: int) -> list[M
     return hops
 
 
+def fork_of(mirror: Mirror, sha: str) -> tuple[str, int, list[str]] | None:
+    """(nearest upstream tag, commits on top of it that no upstream tag or branch contains,
+    a few of their subjects) if `sha` isn't upstream; None if it is. Local checkouts are
+    fetched under refs/zmig/local, which is excluded from "upstream"."""
+    g: list[str | Path] = [mirror.git, "--git-dir", mirror.path]
+    own = mirror.runner.run(
+        [*g, "rev-list", "--count", sha, "--not", "--tags", "--branches"], check=False
+    ).stdout.strip()
+    if not own.isdigit() or int(own) == 0:
+        return None
+    tag = mirror.runner.run(
+        [*g, "describe", "--tags", "--abbrev=0", "--match", "v*", sha], check=False
+    ).stdout.strip()
+    subjects = mirror.runner.run(
+        [*g, "log", "--format=%h %s", "-5", sha, "--not", "--tags", "--branches"], check=False
+    ).stdout.splitlines()
+    return tag, int(own), subjects
+
+
 class HopsAnalyzer:
     name: ClassVar[str] = "hops"
     kind: ClassVar[Literal["workspace"]] = "workspace"
@@ -156,7 +175,31 @@ class HopsAnalyzer:
         lts = {m for m, info in lts_info.items() if not info.planned}
         boundaries = {_minor(k): v for k, v in data["boundaries"].items()}
         findings: list[Finding] = []
-        old_spec, new_spec = ctx.old.resolved.ref.spec, ctx.new.resolved.ref.spec
+        old_spec, new_spec = ctx.old.resolved.ref.label, ctx.new.resolved.ref.label
+        forks = {}
+        for label, sha in (
+            (old_spec, ctx.old.resolved.ref.sha),
+            (new_spec, ctx.new.resolved.ref.sha),
+        ):
+            if (f := fork_of(mirror, sha)) is not None:
+                forks[label] = f
+                findings.append(
+                    Finding(
+                        category=Category.HOP,
+                        kind="ref-is-fork",
+                        subject=label,
+                        title=f"{label} is not an upstream Zephyr commit: {f[1]} commits on top "
+                        f"of {f[0] or 'an upstream commit'} that no upstream tag or branch "
+                        "contains",
+                        severity=Severity.INFO,
+                        confidence=Confidence.HIGH,
+                        action="Release notes and migration guides describe upstream; review the "
+                        "fork's own commits too, and carry them to the target.",
+                        analyzer=self.name,
+                        scope=ctx.scope,
+                        new={"base_tag": f[0], "own_commits": f[1], "latest": f[2]},
+                    )
+                )
 
         for m in crossed:
             if m in boundaries:
@@ -202,7 +245,14 @@ class HopsAnalyzer:
                     severity=Severity.RISKY,
                     confidence=Confidence.MEDIUM,
                     action="Run `zmig plan`/`zmig scan` for each step and get it building and "
-                    "passing tests before the next, so every step is a bisectable state.",
+                    "passing tests before the next, so every step is a bisectable state."
+                    + (
+                        " The steps name upstream tags, but this upgrade is between fork "
+                        f"commits ({', '.join(forks)}): use your fork's equivalent of each step, "
+                        "if it has one."
+                        if forks
+                        else ""
+                    ),
                     analyzer=self.name,
                     scope=ctx.scope,
                     new={

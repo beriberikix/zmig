@@ -82,11 +82,11 @@ class ScanContext:
 
     @property
     def old_spec(self) -> str:
-        return self.old.workspace.resolved.ref.spec
+        return self.old.workspace.resolved.ref.label
 
     @property
     def new_spec(self) -> str:
-        return self.new.workspace.resolved.ref.spec
+        return self.new.workspace.resolved.ref.label
 
     # --- what the user's app contributes to this image --------------------------------
 

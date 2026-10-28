@@ -164,7 +164,7 @@ class BleAnalyzer:
             got = self._keys(ctx, b, cfg)
             if got is None:
                 unknowns.append(
-                    f"key names at {b.workspace.resolved.ref.spec}: no SBOM or seeds missing"
+                    f"key names at {b.workspace.resolved.ref.label}: no SBOM or seeds missing"
                 )
             else:
                 keys[side] = got
@@ -334,7 +334,7 @@ class BleAnalyzer:
         files = _compiled(b.app)
         if files is None:
             return None
-        ref = b.workspace.resolved.ref.spec
+        ref = b.workspace.resolved.ref.label
         src = Source(
             b.workspace.resolved.mirror.path, b.workspace.resolved.ref.sha, ctx.runner, bare=True
         )
@@ -346,7 +346,8 @@ class BleAnalyzer:
             if "prefix_from" in spec:
                 d = src.grep(rf"^\s*#\s*define\s+{spec['prefix_from']}\(", cfg["trees"])
                 if not d:
-                    return None
+                    # Not defined at this ref (e.g. v3.2): nothing registers through it.
+                    continue
                 path, line, _ = d[0]
                 body = " ".join((src.show(path) or [])[line - 1 : line + 4])
                 lit = _STR.findall(body)
@@ -377,7 +378,8 @@ class BleAnalyzer:
             )
         for fn, spec in cfg["store_functions"].items():
             if not src.grep(rf"^\w.*\b{fn}\(", cfg["trees"]):
-                return None
+                # Not at this ref (it appeared after v3.5): keys come from the other sources.
+                continue
             for path, line, text in src.grep(rf"\b{fn}\(\s*\"", cfg["trees"]):
                 if path not in files:
                     continue

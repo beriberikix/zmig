@@ -27,7 +27,7 @@ from zmig.tools import Runner, find_tool
 from zmig.workspace import Module, RefWorkspace, west_argv
 
 # Bump when the build recipe changes in a way that invalidates cached builds.
-RECIPE_VERSION = 10
+RECIPE_VERSION = 12
 
 BuildMode = Literal["full", "fast"]
 BuildStatus = Literal["ok", "configure-failed", "build-failed"]
@@ -154,7 +154,7 @@ class BuildContext:
 
     def to_json(self) -> dict[str, object]:
         return {
-            "ref": self.workspace.resolved.ref.spec,
+            "ref": self.workspace.resolved.ref.label,
             "board": self.spec.board,
             "mode": self.spec.mode,
             "sysbuild": self.spec.sysbuild,
@@ -396,6 +396,11 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
         # Required by `west spdx` on every version; set on both sides of a comparison,
         # so it never shows up as a difference.
         "-DCONFIG_BUILD_OUTPUT_META=y",
+        # The workspace's Zephyr, whatever the app's find_package(Zephyr) hints say: ZMK's
+        # app uses `HINTS ../zephyr` (a west layout zmig's app copy doesn't have) and
+        # relies on the user package registry otherwise, which the SDK pinning disables
+        # (and which could name another Zephyr on this machine).
+        f"-DZephyr_DIR={ws.zephyr / 'share' / 'zephyr-package' / 'cmake'}",
         *sdk_args,
         *spec.cmake_args,
     ]
@@ -407,10 +412,15 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
     run_env = {"env": env, "unset_env": unset, "check": False, "merge_output": True}
     conf = runner.run(argv, cwd=ws.root, **run_env)  # type: ignore[arg-type]
     configure_text = f"$ {' '.join(argv)}\n{conf.stdout}"
-    if spec.sdk is not None:
-        # Keep the evidence even when the check fails.
+    if spec.sdk is not None and conf.returncode == 0:
+        # Keep the evidence even when the check fails. A failed configure is reported as
+        # such below (regression: ZMK's configure failure surfaced as "could not confirm the
+        # toolchain", with no pointer to the log).
         log.write_text(configure_text)
-        verify_sdk(configure_text, spec.sdk)
+        try:
+            verify_sdk(configure_text, spec.sdk)
+        except ZmigError as e:
+            raise ZmigError(f"{e} (configure log: {log})") from e
     found = discover_images(bdir, spec)
     segments = split_configure_log(configure_text, found)
     default = _default_image(bdir, spec)
@@ -436,8 +446,13 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
                 _cmake_query(d)
                 proc = runner.run([cmake, "-DCONFIG_BUILD_OUTPUT_META=y", str(d)], cwd=d, **run_env)  # type: ignore[arg-type]
                 build_text[name] = f"$ cmake -DCONFIG_BUILD_OUTPUT_META=y {d}\n{proc.stdout}"
-            proc = runner.run([cmake, "--build", str(d)], **run_env)  # type: ignore[arg-type]
-            build_text[name] = build_text.get(name, "") + f"$ cmake --build {d}\n{proc.stdout}"
+            # Keep going past failed steps (ninja -k 0), so one missing header doesn't hide
+            # every other compile error (regression: ZMK's v3.5 build stopped at the
+            # syscall headers).
+            proc = runner.run([cmake, "--build", str(d), "--", "-k", "0"], **run_env)  # type: ignore[arg-type]
+            build_text[name] = (
+                build_text.get(name, "") + f"$ cmake --build {d} -- -k 0\n{proc.stdout}"
+            )
             parts.append(build_text[name])
             if proc.returncode != 0:
                 statuses[name] = "build-failed"
@@ -482,7 +497,7 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
                 statuses[name],
                 spec.mode,
                 board,
-                ws.resolved.ref.spec,
+                ws.resolved.ref.label,
             )
         )
     marker.write_text(
@@ -527,7 +542,7 @@ def _image_from_json(
         x["status"],
         spec.mode,
         x.get("board", spec.board),
-        ws.resolved.ref.spec,
+        ws.resolved.ref.label,
     )
 
 
@@ -593,6 +608,39 @@ def find_dt_property(app: Path, files: list[str], prop: str) -> tuple[str, int] 
     return None
 
 
+_KCONFIG_ENTRY = re.compile(
+    r"^(menuconfig|config|choice|endchoice|menu|endmenu|if|endif|source|rsource|osource|"
+    r"orsource|comment|mainmenu)\b"
+)
+
+
+def kconfig_block(lines: list[str], start: int) -> range:
+    """0-based line range of the Kconfig entry starting at `start`: a `choice` through
+    its `endchoice`, otherwise up to the next top-level entry (trailing blanks excluded)."""
+    if lines[start].lstrip().startswith("choice"):
+        depth = 0
+        for i in range(start, len(lines)):
+            word = lines[i].strip().split(" ", 1)[0]
+            depth += {"choice": 1, "endchoice": -1}.get(word, 0)
+            if depth == 0:
+                return range(start, i + 1)
+        return range(start, len(lines))
+    end = start + 1
+    while end < len(lines) and not _KCONFIG_ENTRY.match(lines[end]):
+        end += 1
+    while end > start + 1 and not lines[end - 1].strip():
+        end -= 1
+    return range(start, end)
+
+
+def _has_prompt(lines: list[str], block: range) -> bool:
+    return any(
+        re.match(r'^\s*(bool|tristate|int|hex|string)\s+"', lines[i])
+        or re.match(r'^\s*prompt\s+"', lines[i])
+        for i in block
+    )
+
+
 def locate_salvage_edits(log_text: str, app: Path) -> list[SalvageEdit]:
     """Map the configure errors in a log to the app lines that caused them."""
     from zmig.diagnostics import app_relative, parse_log
@@ -612,6 +660,32 @@ def locate_salvage_edits(log_text: str, app: Path) -> list[SalvageEdit]:
             loc = find_last_assignment(app, confs, d.symbol)
         elif d.kind == "dt-undeclared-property":
             loc = find_dt_property(app, overlays, d.symbol)
+        elif d.kind in ("kconfig-definition", "kconfig-loop"):
+            # Kconfig entries in the app's own files: an override of a symbol (or choice)
+            # the tree no longer defines, or an app definition that now collides with one
+            # the tree defines (part of a dependency loop, and carrying its own prompt).
+            # The whole entry is commented out, line by line.
+            for raw in d.locations:
+                path, _, num = raw.rpartition(":")
+                rel = app_relative((path,), app)
+                if not rel or not (app / rel[0]).is_file():
+                    continue
+                lines = (app / rel[0]).read_text().splitlines()
+                start = int(num) - 1
+                if not 0 <= start < len(lines) or not _KCONFIG_ENTRY.match(lines[start]):
+                    continue
+                block = kconfig_block(lines, start)
+                if d.kind == "kconfig-loop" and (
+                    len(d.locations) < 2
+                    or all(app_relative((x.rpartition(":")[0],), app) for x in d.locations)
+                    or not _has_prompt(lines, block)
+                ):
+                    continue
+                for i in block:
+                    key = (rel[0], i + 1)
+                    if key not in edits:
+                        edits[key] = SalvageEdit(rel[0], i + 1, lines[i], d.message)
+            continue
         if loc is not None and loc not in edits:
             text = (app / loc[0]).read_text().splitlines()[loc[1] - 1]
             edits[loc] = SalvageEdit(loc[0], loc[1], text, d.message)

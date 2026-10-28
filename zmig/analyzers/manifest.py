@@ -47,7 +47,7 @@ class ManifestAnalyzer:
 
     def analyze(self, ctx: PlanContext) -> AnalyzerResult:
         old, new = ctx.old_manifest, ctx.new_manifest
-        old_ref, new_ref = ctx.old.resolved.ref.spec, ctx.new.resolved.ref.spec
+        old_ref, new_ref = ctx.old.resolved.ref.label, ctx.new.resolved.ref.label
         user = ctx.user.projects if ctx.user else {}
         findings: list[Finding] = []
         others: dict[str, list[str]] = {"added": [], "removed": [], "changed": []}

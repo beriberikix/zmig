@@ -117,7 +117,7 @@ def materialize(
     lock_workspace(root.with_name(root.name + ".lock"))
     resolved.mirror.checkout(resolved.ref, root / "zephyr", resolved.dirty)
     if not (root / "zephyr" / "west.yml").is_file():
-        raise ZmigError(f"{resolved.ref.spec} has no west.yml; is it a Zephyr tree?")
+        raise ZmigError(f"{resolved.ref.label} has no west.yml; is it a Zephyr tree?")
     cfg = root / ".west" / "config"
     if not cfg.is_file():
         cfg.parent.mkdir(parents=True, exist_ok=True)
@@ -130,7 +130,7 @@ def materialize(
     known = set(load_manifest(root))
     missing = sorted(set(modules) - known)
     if missing:
-        log.warning("not in %s's manifest, skipped: %s", resolved.ref.spec, ", ".join(missing))
+        log.warning("not in %s's manifest, skipped: %s", resolved.ref.label, ", ".join(missing))
     modules = [m for m in modules if m in known]
     ws.activate(modules, runner)
     if modules:

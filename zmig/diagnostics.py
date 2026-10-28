@@ -18,6 +18,9 @@ DiagKind = Literal[
     "kconfig-undefined",  # assignment to a symbol that doesn't exist
     "kconfig-not-taken",  # assigned value differs from the resulting value
     "kconfig-promptless",  # assignment to a symbol without a prompt
+    "kconfig-definition",  # a Kconfig entry that no longer makes sense (e.g. an override of
+    # a symbol the tree no longer defines: "defined without a type")
+    "kconfig-loop",  # kconfiglib's "Dependency loop" (e.g. a name the tree now defines too)
     "dt-undeclared-property",  # property not declared in the node's binding
     "dt-error",  # any other devicetree error
     "board-invalid",  # the board name doesn't exist in this tree
@@ -46,6 +49,21 @@ _DT_UNDECLARED = re.compile(
     r"devicetree error: '(?P<prop>[^']+)' appears in (?P<node>\S+) in \S+, but is not "
     r"declared in 'properties:' in (?P<binding>\S+)"
 )
+# kconfiglib's definition warnings (Kconfig "warnings are errors" in Zephyr's kconfig.py):
+# an app's Kconfig override (`config X` + `default ...`) of a symbol the tree no longer
+# defines has no type; an override of a choice that no longer exists has no type/prompt.
+_DEFINITION = re.compile(
+    r"^warning: (?P<sym><choice \w+>|\w+) \(defined at (?P<locs>[^)]*)\) "
+    r"(?P<what>defined without a type|defined with type unknown|defined without a prompt)",
+    re.M,
+)
+_CHOICE_DEFAULT = re.compile(
+    r"^warning: the default selection (?P<default>\w+) \(undefined\) of <choice "
+    r"(?P<sym>\w+)> \(defined at (?P<locs>[^)]*)\) is not contained in the choice",
+    re.M,
+)
+_LOOP = re.compile(r"Dependency loop\n=+\n(?P<body>.*?)(?:\nCMake Error|\Z)", re.S)
+_LOOP_SYM = re.compile(r"^(?:\.\.\.[a-z ]+? )?(?P<sym>\w+) \(defined at (?P<locs>[^)]*)\)", re.M)
 _DT_ERROR = re.compile(r"^devicetree error: (?P<msg>.*)$", re.M)
 _BOARD_INVALID = re.compile(r"No board named '(?P<board>[^']+)' found")
 _OVERLAY = re.compile(r"^-- Found devicetree overlay: (?P<path>.+)$", re.M)
@@ -64,6 +82,8 @@ class Diagnostic:
     binding: str = ""  # DT binding file
     file: str = ""  # source file, when the message names one
     line: int = 0
+    # Every "defined at" location the message lists (path:line), in order.
+    locations: tuple[str, ...] = ()
     message: str = ""  # the original message, for evidence
 
 
@@ -109,6 +129,54 @@ def parse_log(text: str) -> LogFacts:
         diags.append(
             Diagnostic("kconfig-promptless", symbol=m["sym"], message=" ".join(m[0].split()))
         )
+
+    def locs(text: str) -> tuple[str, ...]:
+        return tuple(x.strip() for x in text.split(", ") if re.search(r":\d+$", x.strip()))
+
+    def first(loc: tuple[str, ...]) -> tuple[str, int]:
+        if not loc:
+            return "", 0
+        path, _, line = loc[0].rpartition(":")
+        return path, int(line)
+
+    for m in _DEFINITION.finditer(text):
+        ls = locs(m["locs"])
+        diags.append(
+            Diagnostic(
+                "kconfig-definition",
+                symbol=m["sym"].removeprefix("<choice ").removesuffix(">"),
+                file=first(ls)[0],
+                line=first(ls)[1],
+                locations=ls,
+                message=" ".join(m[0].split()),
+            )
+        )
+    for m in _CHOICE_DEFAULT.finditer(text):
+        ls = locs(m["locs"])
+        diags.append(
+            Diagnostic(
+                "kconfig-definition",
+                symbol=m["sym"],
+                value=m["default"],
+                file=first(ls)[0],
+                line=first(ls)[1],
+                locations=ls,
+                message=" ".join(m[0].split()),
+            )
+        )
+    for m in _LOOP.finditer(text):
+        for step in _LOOP_SYM.finditer(m["body"]):
+            ls = locs(step["locs"])
+            diags.append(
+                Diagnostic(
+                    "kconfig-loop",
+                    symbol=step["sym"],
+                    file=first(ls)[0],
+                    line=first(ls)[1],
+                    locations=ls,
+                    message=" ".join(step[0].split()),
+                )
+            )
     undeclared = set()
     for m in _DT_UNDECLARED.finditer(text):
         undeclared.add(m.start())

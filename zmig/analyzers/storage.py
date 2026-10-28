@@ -112,7 +112,9 @@ class StorageAnalyzer:
                     (ctx.new.workspace, ctx.new_spec),
                 ):
                     if not (ws.zephyr / t).is_dir():
-                        unknowns.append(f"backend tree {t} ({b}) missing at {ref}")
+                        # The backend can't be enabled from a tree that isn't there (ZMS
+                        # before v4.0, secure storage before v4.1); not a gap in the check.
+                        checked.append(f"backend tree {t} ({b}) not present at {ref}")
 
         def backend_of(sym: str, ks: Symbols) -> str | None:
             for loc in (ks.get(sym) or {}).get("locations", []):
@@ -276,8 +278,16 @@ class StorageAnalyzer:
                     {"backend": b, "lost": lost, "switched": switched, "why": why}
                 )
             else:
+                # Parameters of on-media data exist at both refs; a symbol the source didn't
+                # define can't describe data a device wrote (regression: smp_svr's new
+                # FUSE/virtiofs symbols, None -> 0, were reported with a config pin).
                 vals = [
-                    s for s in changed if (ks_n.get(s) or ks_o.get(s) or {}).get("type") != "bool"
+                    s
+                    for s in changed
+                    if (ks_n.get(s) or ks_o.get(s) or {}).get("type") != "bool"
+                    and s in ks_o
+                    and s in ks_n
+                    and cv_o.get(s) is not None
                 ]
                 bools = [s for s in changed if s not in vals]
                 if vals:
@@ -457,10 +467,16 @@ class StorageAnalyzer:
                 )
                 for s in seeds
             ]
-            if any(d.status == "not-found" for d in diffs):
+            # A seed absent at both refs has nothing to compare (e.g. settings' ZMS IDs
+            # before ZMS existed); absent at one ref is a gap.
+            gaps = [
+                d
+                for d in diffs
+                if d.status == "not-found" and len(d.names[0].get("missing_at", [])) < 2
+            ]
+            if gaps:
                 unknowns.append(
-                    f"{b}: seeds not found: "
-                    + ", ".join(d.seed.label for d in diffs if d.status == "not-found")
+                    f"{b}: seeds not found at one ref: " + ", ".join(d.seed.label for d in gaps)
                 )
             bad = [d for d in diffs if d.status in ("changed", "not-interpreted")]
             if bad:
@@ -606,7 +622,7 @@ class StorageAnalyzer:
             files = _zephyr_files(app)
             if files is None or not app.has(Artifact.EDT):
                 unknowns.append(
-                    f"partitions at {b_ctx.workspace.resolved.ref.spec}: no SBOM or devicetree"
+                    f"partitions at {b_ctx.workspace.resolved.ref.label}: no SBOM or devicetree"
                 )
                 continue
             tree = edt(app, b_ctx.workspace, ctx.runner)
@@ -639,7 +655,7 @@ class StorageAnalyzer:
             if not any_found:
                 unknowns.append(
                     "no enabled storage backend's compiled code references a partition at "
-                    f"{b_ctx.workspace.resolved.ref.spec}"
+                    f"{b_ctx.workspace.resolved.ref.label}"
                 )
         return out
 

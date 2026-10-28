@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from zmig.findings import Finding, Report, Severity
 
 MARK = {Severity.BREAKING: "BREAKING", Severity.RISKY: "risky   ", Severity.INFO: "info    "}
@@ -16,7 +18,12 @@ def _where(f: Finding) -> str:
 
 def render_human(report: Report) -> str:
     inp, c = report.inputs, report.counts()
-    lines = [f"zmig {report.command}: {inp['from']['spec']} → {inp['to']['spec']}"]
+
+    def label(r: dict[str, object]) -> str:
+        spec = str(r["spec"])
+        return f"{Path(spec).name}@{str(r['sha'])[:12]}" if r.get("kind") == "path" else spec
+
+    lines = [f"zmig {report.command}: {label(inp['from'])} → {label(inp['to'])}"]
     if board := inp.get("board"):
         lines[0] += f"  ({board['from']} → {board['to']})"
     lines.append(f"{c['breaking']} breaking, {c['risky']} risky, {c['info']} info")

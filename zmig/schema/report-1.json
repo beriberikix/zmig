@@ -204,6 +204,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "unchecked": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

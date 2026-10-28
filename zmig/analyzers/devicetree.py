@@ -7,6 +7,7 @@ C sources (zmig.usage), and devicetree errors from the target configure.
 
 from __future__ import annotations
 
+import re
 from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
@@ -184,8 +185,25 @@ class DevicetreeAnalyzer:
                 for k in sorted(o["props"].keys() | n["props"].keys())
                 if k not in written and o["props"].get(k) != n["props"].get(k)
             }
-            if o["binding"] != n["binding"]:
+            if _binding(o["binding"]) != _binding(n["binding"]):
                 changed["(binding)"] = [o["binding"], n["binding"]]
+            # Properties only the target has (e.g. easydma-maxcnt-bits, new_props to nRF SoC
+            # .dtsi files in v3.5) are reported apart: nothing the app relied on changed.
+            new_props = {k: v for k, v in changed.items() if v[0] is None and k != "(binding)"}
+            if new_props and len(new_props) == len(changed):
+                add(
+                    "node-properties-new_props",
+                    f"{describe(ref)}:{pn}",
+                    f"{describe(ref)} ({pn}) has new properties in {ctx.new_spec}: "
+                    f"{', '.join(sorted(new_props))}",
+                    Severity.INFO,
+                    Confidence.HIGH,
+                    "New hardware description, usually used by the driver; check it if you "
+                    "configure this node's behavior yourself.",
+                    _ev(locs),
+                    new_v=new_props,
+                )
+                changed = {}
             if changed:
                 add(
                     "node-changed",
@@ -294,7 +312,8 @@ class DevicetreeAnalyzer:
             p
             for p in common
             if p not in other
-            and (on[p]["binding"], on[p]["specs"]) != (nn[p]["binding"], nn[p]["specs"])
+            and (_binding(on[p]["binding"]), on[p]["specs"])
+            != (_binding(nn[p]["binding"]), nn[p]["specs"])
         ]
         gone = sorted(p for p in on.keys() - nn.keys() if p not in used_old_paths)
         added = sorted(nn.keys() - on.keys())
@@ -321,3 +340,12 @@ class DevicetreeAnalyzer:
                 },
             )
         return AnalyzerResult(findings)
+
+
+_APP_COPY = re.compile(r"^(?:.*/)?apps/[0-9a-f]+/[^/]+/")
+
+
+def _binding(path: str | None) -> str | None:
+    """A binding path with zmig's per-build app copy (apps/<hash>/<app>/) normalized
+    (regression: every app-provided binding in ZMK looked changed between refs)."""
+    return _APP_COPY.sub("<app>/", path) if path else path

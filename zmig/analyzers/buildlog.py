@@ -10,11 +10,12 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import ClassVar, Literal
+from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact, BuildContext, is_host_board
-from zmig.diagnostics import BuildWarning, parse_warnings
+from zmig.diagnostics import BuildWarning, app_relative, parse_log, parse_warnings
+from zmig.errors import ArtifactMissing
 from zmig.findings import (
     JSON,
     Category,
@@ -27,6 +28,7 @@ from zmig.findings import (
 )
 from zmig.scan import ScanContext
 from zmig.size import footprint
+from zmig.snapshots import kconfig_symbols
 
 MAX_ERRORS = 5
 TOP_SYMBOLS = 10
@@ -76,7 +78,7 @@ def build_errors(log: str) -> list[BuildError]:
 # add(kind, subject, title, severity, action, evidence, old, new)
 Add = Callable[..., None]
 _COMPILER_ERROR = re.compile(
-    r"^(?P<file>[^\s:]+):(?P<line>\d+):(?:\d+:)? error: (?P<msg>.*)$", re.M
+    r"^(?P<file>[^\s:]+):(?P<line>\d+):(?:\d+:)? (?:fatal )?error: (?P<msg>.*)$", re.M
 )
 
 
@@ -127,6 +129,7 @@ class BuildlogAnalyzer:
                 )
             )
 
+        findings += self._kconfig_definitions(ctx)
         salvaged = " (after salvage)" if ctx.salvage else ""
         log = ctx.new_img.log.read_text()
         if ctx.new_img.status == "configure-failed":
@@ -287,3 +290,124 @@ class BuildlogAnalyzer:
             Confidence.MEDIUM if host else Confidence.HIGH,
             ("build.host-runtime-inflated",) if host else (),
         )
+
+    def _kconfig_definitions(self, ctx: ScanContext) -> list[Finding]:
+        """Kconfig entries in the app's own files that the target tree rejects (from the
+        target configure as the user wrote it; reported whether or not salvage worked).
+
+        kconfig-definition   an app override of a symbol or choice the target no longer
+                             defines ("defined without a type", a choice default that isn't
+                             in the choice)
+        kconfig-loop         a dependency loop through a symbol the app defines and the
+                             target tree now defines too: a name collision, when the source
+                             build's Kconfig had it from the app only
+        """
+        raw = ctx.new_raw_img or ctx.new_img
+        if raw is None or raw.status != "configure-failed" or not raw.log.is_file():
+            return []
+        # Locations name the app copy each configure used: the raw build's or, for later
+        # salvage rounds, the salvaged one.
+        copies = [ctx.new_raw.src, ctx.new.src]
+
+        # Each salvage round builds a new copy (apps/<content hash>/<app>), so intermediate
+        # rounds name copies that are neither of these: match any copy of this app.
+        copy_re = re.compile(rf"/apps/[0-9a-f]+/{re.escape(ctx.new_raw.src.name)}/(?P<rel>.+)$")
+
+        def rel(path: str) -> tuple[str, ...]:
+            for c in copies:
+                if r := app_relative((path,), c):
+                    return r
+            m = copy_re.search(path)
+            return (m["rel"],) if m else ()
+
+        # The first configure stops at the first error class (e.g. a dependency loop);
+        # later salvage rounds find the rest, and each salvage edit keeps its message.
+        text = raw.log.read_text() + "\n\n" + "\n\n".join(e.reason for e in ctx.salvage)
+        diags = parse_log(text).diagnostics
+        out: list[Finding] = []
+        seen: set[tuple[str, str]] = set()
+        old_syms: dict[str, Any] | None = None
+        if ctx.old_img is not None and ctx.old_img.has(Artifact.CONFIG):
+            try:
+                old_syms = kconfig_symbols(ctx.old_img, ctx.old.workspace, ctx.runner)
+            except ArtifactMissing:
+                old_syms = None
+        for d in diags:
+            if d.kind not in ("kconfig-definition", "kconfig-loop") or (d.kind, d.symbol) in seen:
+                continue
+            seen.add((d.kind, d.symbol))
+            mine = [x for x in d.locations if rel(x.rpartition(":")[0])]
+            if not mine:
+                continue
+            ev = tuple(
+                file_line(
+                    rel(x.rpartition(":")[0])[0],
+                    int(x.rpartition(":")[2]),
+                    f"{'choice' if 'choice' in d.message else 'config'} {d.symbol}",
+                )
+                for x in mine[:6]
+            )
+            where = ", ".join(
+                f"{rel(x.rpartition(':')[0])[0]}:{x.rpartition(':')[2]}" for x in mine[:3]
+            ) + (f" (+{len(mine) - 3})" if len(mine) > 3 else "")
+            if d.kind == "kconfig-definition":
+                gone = d.value or d.symbol
+                out.append(
+                    Finding(
+                        category=Category.BUILD,
+                        kind="kconfig-override-orphaned",
+                        subject=f"CONFIG_{d.symbol}",
+                        title=f"The app overrides CONFIG_{d.symbol} ({where}), but "
+                        f"{'its default ' + d.value if d.value else 'the symbol'} is not "
+                        f"defined at {ctx.new_spec}; Kconfig rejects the configure",
+                        severity=Severity.BREAKING,
+                        confidence=Confidence.HIGH,
+                        action=f"Find what replaced CONFIG_{gone} at the target (Kconfig "
+                        "findings and migration guide entries name candidates) and update or "
+                        "remove the override.",
+                        analyzer=self.name,
+                        scope=ctx.scope,
+                        evidence=ev,
+                        new={"message": d.message, "locations": list(mine)},
+                    )
+                )
+                continue
+            # Loop: is this the app's name newly defined upstream?
+            upstream = [x for x in d.locations if x not in mine]
+            if not upstream:
+                continue
+            heur: tuple[str, ...]
+            if old_syms is not None:
+                before = [
+                    loc
+                    for loc in (old_syms.get(d.symbol) or {}).get("locations", [])
+                    if not app_relative(
+                        ((ctx.old.workspace.zephyr / loc.rpartition(":")[0]).as_posix(),),
+                        ctx.old.src,
+                    )
+                ]
+                if before:
+                    continue  # the tree defined it at the source too: a normal override
+                conf, heur = Confidence.HIGH, ()
+            else:
+                conf, heur = Confidence.MEDIUM, ("buildlog.collision-without-source-snapshot",)
+            out.append(
+                Finding(
+                    category=Category.BUILD,
+                    kind="kconfig-name-collision",
+                    subject=f"CONFIG_{d.symbol}",
+                    title=f"CONFIG_{d.symbol} is defined by the app ({where}) and, from "
+                    f"{ctx.new_spec} on, by Zephyr ({', '.join(upstream[:2])}); the two "
+                    "definitions form a dependency loop",
+                    severity=Severity.BREAKING,
+                    confidence=conf,
+                    action="Rename the app's symbol (and the devicetree compatible if it has "
+                    "one), or switch to the upstream driver.",
+                    analyzer=self.name,
+                    scope=ctx.scope,
+                    evidence=ev,
+                    heuristics=heur,
+                    new={"app": list(mine), "upstream": upstream, "message": d.message},
+                )
+            )
+        return out

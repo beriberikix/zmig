@@ -47,6 +47,15 @@ class Ref:
         return self.dirty_hash is not None
 
     @property
+    def label(self) -> str:
+        """How the ref is shown in findings: the spec, except that a local checkout is
+        shown by its directory name and commit (regression: absolute scratch paths in
+        every title of the ZMK dogfood report)."""
+        if self.kind == "path":
+            return f"{Path(self.spec).name}@{self.sha[:12]}"
+        return self.spec
+
+    @property
     def key(self) -> str:
         """Identity of the tree contents, for cache keys."""
         return self.sha if self.dirty_hash is None else f"{self.sha}-dirty-{self.dirty_hash}"

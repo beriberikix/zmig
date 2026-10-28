@@ -60,6 +60,17 @@ class WireAnalyzer:
             for o, n in pair_images(ctx.old, ctx.new)
             if o.has(Artifact.CONFIG) and n.has(Artifact.CONFIG)
         ]
+        unconfigured = sorted(
+            f"{o.name} ({'source' if not o.has(Artifact.CONFIG) else 'target'})"
+            for o, n in pair_images(ctx.old, ctx.new)
+            if not (o.has(Artifact.CONFIG) and n.has(Artifact.CONFIG))
+        )
+        if unconfigured:
+            # Regression (ZMK dogfood): with the target unconfigured, every Kconfig entry
+            # looked "not found" and the category was reported clean.
+            reason = f"no resolved configuration to compare for: {', '.join(unconfigured)}"
+            set_category(ctx.shared, "wire", "unknown", "low", [], reason=reason)
+            return AnalyzerResult(not_checked=[NotChecked("wire formats", reason, self.name)])
         findings: list[Finding] = []
         missing: list[str] = []
         checked_ids: list[str] = []

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 from zmig.findings import Category, Finding, Report, Severity
@@ -11,7 +12,10 @@ from zmig.findings import Category, Finding, Report, Severity
 
 def _ref(r: dict[str, Any]) -> str:
     dirty = " (dirty)" if r.get("dirty") else ""
-    return f"`{r['spec']}` ({r['sha'][:12]}){dirty}"
+    # A local checkout: its directory name, not the absolute path (the full path stays in
+    # report.json).
+    spec = Path(r["spec"]).name if r.get("kind") == "path" else r["spec"]
+    return f"`{spec}` ({r['sha'][:12]}){dirty}"
 
 
 def _short(v: Any) -> str:
@@ -259,7 +263,13 @@ def _field_upgrade(u: dict[str, Any]) -> list[str]:
         "## Field upgrade",
         "",
         f"**Verdict: {u['verdict']}** ({u['confidence']} confidence): "
-        f"{VERDICT_TEXT.get(u['verdict'], '')}.",
+        f"{VERDICT_TEXT.get(u['verdict'], '')}"
+        + (
+            f" (at least; not established for: {', '.join(u['unchecked'])})"
+            if u.get("unchecked") and u["verdict"] in ("needs-changes", "blocked")
+            else ""
+        )
+        + ".",
         "",
         "| Category | Status | Confidence | Notes |",
         "|---|---|---|---|",

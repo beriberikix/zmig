@@ -254,7 +254,9 @@ class KconfigAnalyzer:
                     locs,
                     old=ov.get(sym),
                 )
-            elif ov.get(sym) != nv.get(sym):
+            elif (ov.get(sym) or "n") != (nv.get(sym) or "n"):
+                # Unset and "n" read the same in code (regression: ZMK's
+                # CONFIG_LV_USE_THEME_MONO was reported as "changed from n to n").
                 add(
                     "read-value-changed",
                     sym,

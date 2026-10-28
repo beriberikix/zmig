@@ -352,7 +352,7 @@ class LayoutAnalyzer:
             e["refs"].append(ref)
 
         for b, tree in ((ctx.old, trees[0]), (ctx.new, trees[1])):
-            ref = b.workspace.resolved.ref.spec
+            ref = b.workspace.resolved.ref.label
             sboms = {i.name: _compiled(i) for i in b.images}
             # MCUboot repo paths compiled into the bootloader image.
             boot = bootloader_role(b).image

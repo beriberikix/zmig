@@ -441,7 +441,7 @@ def load_documents(old: BuildContext, new: BuildContext) -> list[Document]:
             if local.is_file():
                 docs.append(
                     Document(
-                        path, version, new.workspace.resolved.ref.spec, local.read_text(), kind
+                        path, version, new.workspace.resolved.ref.label, local.read_text(), kind
                     )
                 )
                 continue

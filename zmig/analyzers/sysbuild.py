@@ -123,7 +123,7 @@ class SysbuildAnalyzer:
         known = {Path(f).name for f in IMAGE_FILES.values()}
         others = sorted(
             {
-                f"{f.name}@{b.workspace.resolved.ref.spec}"
+                f"{f.name}@{b.workspace.resolved.ref.label}"
                 for b in (ctx.old, ctx.new)
                 for f in (b.workspace.zephyr / "share/sysbuild/image_configurations").glob(
                     "*.cmake"

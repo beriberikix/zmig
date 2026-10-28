@@ -350,3 +350,14 @@ def test_report_rendering_separates_pre_existing_and_lists_not_checked() -> None
     )
     human = render(r, "human")
     assert "Field upgrade: blocked (low confidence); remedies: reflash x1" in human
+
+
+def test_verdict_with_unchecked_categories_is_a_lower_bound() -> None:
+    from zmig.verdict import upgrade_path
+
+    shared = _clean_shared()
+    shared["categories"]["storage"] = {"status": "unknown", "confidence": "low", "checked": []}
+    pin = _f(Category.MCUBOOT, "m", Severity.BREAKING, Remedy.CONFIG_PIN)
+    u = upgrade_path(shared, [pin], _ok())
+    assert u["verdict"] == "needs-changes" and u["unchecked"] == ["storage"]
+    assert any("lower bound" in b for b in u["basis"])
