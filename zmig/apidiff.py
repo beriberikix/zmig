@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 # Bump when what a parse records changes (invalidates the per-build snapshots).
-API_VERSION = 9
+API_VERSION = 11
 
 # GCC options clang rejects or that don't matter for parsing (prefix match).
 GCC_ONLY = (
@@ -224,6 +224,24 @@ def parse(
 
     K = ci.CursorKind
     sources: dict[str, list[str]] = {}
+    uses = value_uses(tu, show)
+
+    def use_of(ext: Any, outermost: bool) -> str:
+        """How the expression a reference forms (the name itself, or for a macro the
+        outermost expression its expansion produces) uses the value."""
+        s, e = ext.start, ext.end
+        own = show(os.path.normpath(s.file.name)) if s.file else None
+        if own is None:
+            return "unknown"
+        if not outermost:
+            return uses.get((own, s.line, s.column, e.line, e.column), "unknown")
+        best: tuple[tuple[int, int], str] | None = None
+        for (f, sl, sc, el, ec), u in uses.items():
+            inside = f == own and (sl, sc) == (s.line, s.column) and (el, ec) <= (e.line, e.column)
+            if inside and (best is None or (el, ec) > best[0]):
+                best = ((el, ec), u)
+        return best[1] if best else "unknown"
+
     for c in tu.cursor.walk_preorder():
         loc = c.location
         if loc.file is None:
@@ -277,7 +295,14 @@ def parse(
                     "where": f"{decl_path(d.location)}:{d.location.line}",
                     "deprecated": False,
                 }
-            res.refs.append({"name": d.spelling, "kind": "macro", "at": f"{own}:{line}"})
+            res.refs.append(
+                {
+                    "name": d.spelling,
+                    "kind": "macro",
+                    "at": f"{own}:{line}",
+                    "use": use_of(c.extent, True),
+                }
+            )
             continue
         if c.kind in (K.CALL_EXPR, K.DECL_REF_EXPR, K.TYPE_REF, K.MEMBER_REF_EXPR):
             ref = c.referenced
@@ -321,7 +346,10 @@ def parse(
                     )
                 continue
             if kind:
-                res.refs.append({"name": ref.spelling, "kind": kind, "at": f"{own}:{line}"})
+                r = {"name": ref.spelling, "kind": kind, "at": f"{own}:{line}"}
+                if kind == "enum":
+                    r["use"] = use_of(c.extent, False)
+                res.refs.append(r)
     object_like = sorted(
         n for n, d in res.decls.items() if d["kind"] == "macro" and not d["function_like"]
     )
@@ -520,4 +548,99 @@ def evaluate_macros(index: Any, file: str, args: list[str], names: list[str]) ->
                 )
             lib.clang_EvalResult_dispose(res)
         out[name] = v
+    return out
+
+
+_COMPARE = {"==", "!=", "<", ">", "<=", ">="}
+_ASSIGN = {"=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="}
+# What a use of a value can do with it (docs/DESIGN-P2.md review of P2, item 3). Only
+# "other" uses let a changed value be demoted; anything unrecognized stays risky.
+VALUE_USES = ("stored", "passed", "compared", "narrowed", "other", "unknown")
+
+
+def _operator(c: Any) -> str | None:
+    """The operator of a BINARY_OPERATOR cursor: the first token after its left operand."""
+    kids = list(c.get_children())
+    if len(kids) != 2:
+        return None
+    end = kids[0].extent.end.offset
+    for t in c.get_tokens():
+        if t.extent.start.offset >= end and t.kind.name == "PUNCTUATION":
+            return str(t.spelling)
+    return None
+
+
+def value_use(stack: list[Any]) -> str:
+    """How the expression at the end of `stack` (its ancestors before it) uses its value."""
+    import clang.cindex as ci
+
+    K = ci.CursorKind
+    child = stack[-1]
+    for anc in reversed(stack[:-1]):
+        k = anc.kind
+        if k in (K.PAREN_EXPR, K.UNEXPOSED_EXPR, K.CONDITIONAL_OPERATOR):
+            child = anc
+            continue
+        if k in (K.UNARY_OPERATOR, K.CXX_UNARY_EXPR):
+            toks = [t.spelling for t in anc.get_tokens()]
+            if toks and toks[0] in ("sizeof", "_Alignof", "__alignof__"):
+                return "other"  # sizeof/_Alignof (CXX_UNARY_EXPR in libclang): no value
+            child = anc
+            continue
+        if k == K.BINARY_OPERATOR:
+            op = _operator(anc)
+            if op in _COMPARE:
+                return "compared"
+            if op in _ASSIGN:
+                kids = list(anc.get_children())
+                return "stored" if kids and kids[-1] == child else "unknown"
+            if op is None:
+                return "unknown"
+            child = anc  # arithmetic/bitwise: the value flows on
+            continue
+        if k == K.COMPOUND_ASSIGNMENT_OPERATOR:
+            return "stored"
+        if k == K.CALL_EXPR:
+            return "passed"
+        if k in (K.VAR_DECL, K.FIELD_DECL, K.INIT_LIST_EXPR, K.RETURN_STMT):
+            return "stored"
+        if k == K.CSTYLE_CAST_EXPR:
+            return "narrowed"
+        if k in (K.CASE_STMT, K.IF_STMT, K.SWITCH_STMT, K.WHILE_STMT, K.DO_STMT, K.FOR_STMT):
+            return "compared"
+        if k == K.COMPOUND_STMT:
+            return "other"  # an expression statement: the value is discarded
+        if k == K.ARRAY_SUBSCRIPT_EXPR:
+            return "other"
+        return "unknown"
+    return "unknown"
+
+
+def value_uses(tu: Any, show: Any) -> dict[tuple[str, int, int, int, int], str]:
+    """{(file, start line, start col, end line, end col): use} for every expression in
+    project code, from its ancestors."""
+    import clang.cindex as ci
+
+    out: dict[tuple[str, int, int, int, int], str] = {}
+
+    def visit(c: Any, stack: list[Any]) -> None:
+        stack.append(c)
+        s, e = c.extent.start, c.extent.end
+        if c.kind.is_expression() and s.file is not None:
+            own = show(os.path.normpath(s.file.name))
+            if own is not None:
+                key = (own, s.line, s.column, e.line, e.column)
+                out.setdefault(key, value_use(stack))
+        for k in c.get_children():
+            if (
+                k.kind == ci.CursorKind.MACRO_INSTANTIATION
+                or k.kind == ci.CursorKind.MACRO_DEFINITION
+            ):
+                continue
+            visit(k, stack)
+        stack.pop()
+
+    for top in tu.cursor.get_children():
+        if top.location.file is not None and show(os.path.normpath(top.location.file.name)):
+            visit(top, [tu.cursor])
     return out

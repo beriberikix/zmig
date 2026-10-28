@@ -194,3 +194,66 @@ def test_uses_inside_zephyr_macro_bodies_are_not_project_uses(tmp_path: Path) ->
               lambda f: "m.c" if f.endswith("/m.c") else None, str(tmp_path))  # fmt: skip
     refs = sorted((x["name"], x["at"]) for x in r.refs)
     assert refs == [("Z_ARG", "m.c:4"), ("Z_LOG", "m.c:3")]
+
+
+def test_value_changes_demoted_only_when_provably_unused_as_a_value(tmp_path: Path) -> None:
+    """Review of P2, item 3: an enum/macro value change is info only when no use stores,
+    passes, compares or narrows the value."""
+    from zmig.analyzers.api import ApiAnalyzer
+    from zmig.apidiff import parse
+    from zmig.findings import Severity
+
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "main.c").write_text(
+        "#include <zephyr/v.h>\n"
+        "void api(int v);\n"
+        "unsigned long f(int v) {\n"
+        "    int x = E_STORED;\n"
+        "    api(E_PASSED);\n"
+        "    if (v == E_COMPARED) { x++; }\n"
+        "    char c = (char)E_NARROWED;\n"
+        "    return sizeof(E_SIZE) + sizeof(M_SIZE) + x + c;\n"
+        "}\n"
+    )
+    out = []
+    for side, base in (("old", 1), ("new", 10)):
+        inc = tmp_path / side / "include" / "zephyr"
+        inc.mkdir(parents=True)
+        names = ["E_STORED", "E_PASSED", "E_COMPARED", "E_NARROWED", "E_SIZE"]
+        enum = ", ".join(f"{n} = {base + i}" for i, n in enumerate(names))
+        (inc / "v.h").write_text(f"enum e {{ {enum} }};\n#define M_SIZE {base}u\n")
+        r = parse(str(app / "main.c"), f"cc -I{tmp_path / side / 'include'} -c {app / 'main.c'}",
+                  {}, lambda f, a=str(app): f[len(a) + 1:] if f.startswith(a + "/") else None,
+                  str(tmp_path / side))  # fmt: skip
+        out.append(
+            {
+                "file": "main.c",
+                "decls": r.decls,
+                "refs": r.refs,
+                "diags": r.diags,
+                "errors": r.errors,
+            }
+        )
+    uses = {x["name"]: x.get("use") for x in out[0]["refs"] if "use" in x}
+    assert uses == {
+        "E_STORED": "stored",
+        "E_PASSED": "passed",
+        "E_COMPARED": "compared",
+        "E_NARROWED": "narrowed",
+        "E_SIZE": "other",
+        "M_SIZE": "other",
+    }
+    ws = SimpleNamespace(zephyr=tmp_path, root=tmp_path / "new")
+    ctx = SimpleNamespace(new=SimpleNamespace(workspace=ws), new_spec="new", scope=("s",))
+    found = {
+        f.subject: f.severity for f in ApiAnalyzer()._declaration_changes(ctx, [out[0]], [out[1]])
+    }  # type: ignore[arg-type]
+    assert found == {
+        "E_STORED": Severity.RISKY,
+        "E_PASSED": Severity.RISKY,
+        "E_COMPARED": Severity.RISKY,
+        "E_NARROWED": Severity.RISKY,
+        "E_SIZE": Severity.INFO,
+        "M_SIZE": Severity.INFO,
+    }

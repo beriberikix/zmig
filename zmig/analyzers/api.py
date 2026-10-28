@@ -270,9 +270,11 @@ class ApiAnalyzer:
                 new_decls.setdefault(k, v)
         parsed_at_target = {t["file"] for t in tgt}
         uses: dict[str, list[str]] = {}
+        value_uses: dict[str, set[str]] = {}
         for t in src:
             for r in t["refs"]:
                 uses.setdefault(r["name"], []).append(r["at"])
+                value_uses.setdefault(r["name"], set()).add(r.get("use", "unknown"))
         old_diag_sites = {(d["at"], d.get("kind")) for t in src for d in t["diags"]}
         new_diags = [
             d for t in tgt for d in t["diags"] if (d["at"], d.get("kind")) not in old_diag_sites
@@ -373,7 +375,10 @@ class ApiAnalyzer:
             decl_new = tool_output("declaration at the target", f"{n['where']}: {shown(n)}")
             if what == "field" and (o.get("type"), n.get("type")) in typedef_changes:
                 continue  # the same change as a typedef reported for these lines
-            change = self._change(name, what, o, n, sites, callback_diags, truncations, explained)
+            change = self._change(
+                name, what, o, n, sites, callback_diags, truncations, explained,
+                value_uses.get(name, {"unknown"}),
+            )  # fmt: skip
             if change is not None:
                 sev, why, extra_sites = change
                 add(f"{what}-changed", name,
@@ -619,6 +624,7 @@ class ApiAnalyzer:
         callback_diags: list[dict[str, Any]],
         truncations: list[dict[str, Any]],
         explained: set[str],
+        value_use: frozenset[str] | set[str] = frozenset({"unknown"}),
     ) -> tuple[Severity, str, list[str]] | None:
         """(severity, action, extra sites) when the declaration changed in a way §10.3
         reports; None otherwise."""
@@ -645,15 +651,37 @@ class ApiAnalyzer:
                     "changes the value (see the lines listed); widen those.",
                     [],
                 )
+            if value_use <= {"other"}:
+                return (
+                    Severity.INFO,
+                    "Your code never stores, passes, compares or narrows it (only discards "
+                    "it or takes its size), so the new value can't change behavior.",
+                    [],
+                )
             return (
                 Severity.RISKY,
-                "Check how your code uses the value (comparisons, storage, the wire).",
+                "Check how your code uses the value: "
+                + ", ".join(sorted(value_use))
+                + " (comparisons, storage, the wire).",
                 [],
             )
         if what == "enum":
-            if o.get("value") != n.get("value"):
-                return Severity.RISKY, "Its value changed: check stored or transmitted values.", []
-            return None
+            if o.get("value") == n.get("value"):
+                return None
+            if value_use <= {"other"}:
+                return (
+                    Severity.INFO,
+                    "Your code never stores, passes, compares or narrows it, so the new "
+                    "value can't change behavior.",
+                    [],
+                )
+            return (
+                Severity.RISKY,
+                "Its value changed and your code "
+                + ", ".join(sorted(value_use))
+                + " it: check stored, transmitted or compared values.",
+                [],
+            )
         if o.get("type") == n.get("type"):
             if what == "field" and o.get("offset") != n.get("offset"):
                 return (
