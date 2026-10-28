@@ -624,18 +624,28 @@ Script: [examples/watch-cold.sh](examples/watch-cold.sh), 2026-10-28, on the sam
 - **The shallow run moved 4.4× fewer bytes in about half the time.** The fetches are
   partly latency-bound, so time doesn't scale with bytes.
 
-### 7.4 Against the budget
+### 7.4 Against the budget (revised after the CI runs, [CI-TEST.md](CI-TEST.md))
 
-- **Analysis and builds** fit the PR budget when the workspaces are present:
-  - two builds take ≤ 2 min for these projects;
-  - analysis takes ≤ 1 min with the parse cache (DOGFOOD-3 §8);
-  - a moved target adds one more build and analysis (c-target: 35 s; §2.5).
-- **The open question is getting the workspaces onto the runner.** The two options are:
-  1. a cache restore of about 5 GB, with throughput unknown;
-  2. a shallow fetch, whose time is unknown at runner network speed. Here it took 5.2 min
-     at 150 KB/s for 47 MB of objects plus a Zephyr tree.
+**The 10-minute PR figure holds only with a warm cache.** Measured on GitHub-hosted
+`ubuntu-24.04` in the private test repo (CANnectivity, `--shallow`):
 
-  Decide after §8.3's measurements.
+| Run | End to end | Where the time went |
+|---|---|---|
+| PR, warm cache | **about 5 min** | cache restore 72–74 s (1.65 GB); zmig 85–128 s |
+| PR, cold cache | **8–19 min** | the Zephyr mirror clone: 48 s in one run, **over 11 min** in another, same day |
+| Nightly (`workflow_dispatch`), cold | 6.5–7 min with the 48 s clone | moved target: two target scans |
+
+- **The nightly on the default branch is the cache populator.** Only scheduled and
+  dispatched runs save the cache. A PR that starts before a nightly has saved one runs
+  cold. In the test repo, the nightly's save finished one minute after a PR's restore
+  missed.
+- **Analysis and builds aren't the problem:** two builds take ≤ 2 min and analysis ≤ 1 min
+  with the parse cache. A moved target adds one more build and analysis.
+- **What decides the PR p95 is cache hit rate and the cold clone time.** If PRs miss often:
+  1. schedule the nightly well before working hours;
+  2. trigger a cache-populating run after zmig or `west.yml` changes (the key changes);
+  3. or move to a self-hosted runner with a persistent `~/.cache/zmig`.
+- **Still unmeasured:** the cache size limit and eviction under one new entry per nightly.
 
 ## 8. Testing the workflow
 
