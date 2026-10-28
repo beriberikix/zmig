@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 # Bump when what a parse records changes (invalidates the per-build snapshots).
-API_VERSION = 2
+API_VERSION = 5
 
 # GCC options clang rejects or that don't matter for parsing (prefix match).
 GCC_ONLY = (
@@ -60,6 +60,17 @@ GCC_ONLY = (
 # Options that take the next argument and only concern output.
 _OUTPUT_OPTS = ("-o", "-MT", "-MF", "-MQ")
 _ALWAYS_DROP = ("-c", "-MD", "-MMD", "-MP")
+
+# A value that no longer fits where the project puts it (a 64-bit event in a uint32_t).
+TRUNCATION_DIAG = re.compile(r"changes value from|loses integer precision")
+_UNNAMED = re.compile(r"\((?:anonymous|unnamed)(?: (?:struct|union|enum))? at [^)]*\)")
+
+
+def norm_type(spelling: str) -> str:
+    """A type spelling comparable across refs: an unnamed record's spelling names its file
+    and line ("struct x::(unnamed at /…/workspaces/<sha>/…/zcbor.h:52:2)")."""
+    return _UNNAMED.sub("(anonymous)", spelling)
+
 
 _NOT_FOUND = re.compile(r"'([^']+)' file not found")
 
@@ -134,8 +145,13 @@ def clang_args(command: str, file: str) -> tuple[list[str], str | None, list[str
         ).stdout.strip()
         if gcc_inc:
             pre += ["-isystem", gcc_inc]
-    pre += ["-Wno-everything", "-Wincompatible-function-pointer-types",
-            "-Wincompatible-pointer-types"]  # fmt: skip
+    pre += [
+        "-Wno-everything",
+        "-Wincompatible-function-pointer-types",
+        "-Wincompatible-pointer-types",
+        "-Wconstant-conversion",
+        "-Wshorten-64-to-32",
+    ]
     return pre + out, t, dropped
 
 
@@ -170,6 +186,7 @@ def parse(
     show: Any,
     zephyr_root: str,
     build_dir: str = "",
+    macro_values: dict[str, Any] | None = None,
 ) -> TuResult:
     """Parse one TU. `roots` decide what's project code; `show(path)` gives the project
     path as shown, None for non-project code; non-project declarations are keyed with a
@@ -219,17 +236,46 @@ def parse(
             if c.kind == K.FUNCTION_DECL and c.spelling not in res.decls:
                 res.decls[c.spelling] = {
                     "kind": "function",
-                    "type": c.type.get_canonical().spelling,
+                    "type": norm_type(c.type.get_canonical().spelling),
+                    "where": f"{decl_path(loc)}:{line}",
+                    "deprecated": c.availability == ci.AvailabilityKind.DEPRECATED,
+                }
+            elif c.kind == K.ENUM_CONSTANT_DECL and c.spelling not in res.decls:
+                res.decls[c.spelling] = {
+                    "kind": "enum",
+                    "value": c.enum_value,
+                    "type": norm_type(c.type.get_canonical().spelling),
                     "where": f"{decl_path(loc)}:{line}",
                     "deprecated": c.availability == ci.AvailabilityKind.DEPRECATED,
                 }
             elif c.kind == K.TYPEDEF_DECL and c.spelling not in res.decls:
                 res.decls[c.spelling] = {
                     "kind": "typedef",
-                    "type": c.underlying_typedef_type.get_canonical().spelling,
+                    "type": norm_type(c.underlying_typedef_type.get_canonical().spelling),
                     "where": f"{decl_path(loc)}:{line}",
                     "deprecated": c.availability == ci.AvailabilityKind.DEPRECATED,
                 }
+            continue
+        if c.kind == K.MACRO_INSTANTIATION:
+            # Matched at the preprocessor's instantiation site, never by text.
+            d = c.referenced
+            if d is None or d.location.file is None or where(d.location)[0] is not None:
+                continue
+            dfile = os.path.normpath(d.location.file.name)
+            if build_dir and dfile.startswith(build_dir + os.sep):
+                continue
+            if d.spelling not in res.decls:
+                toks = [t.spelling for t in d.get_tokens()]
+                fn_like = _function_like(d)
+                res.decls[d.spelling] = {
+                    "kind": "macro",
+                    "function_like": fn_like,
+                    "arity": _arity(toks) if fn_like else None,
+                    "tokens": " ".join(toks[1:])[:400],
+                    "where": f"{decl_path(d.location)}:{d.location.line}",
+                    "deprecated": False,
+                }
+            res.refs.append({"name": d.spelling, "kind": "macro", "at": f"{own}:{line}"})
             continue
         if c.kind in (K.CALL_EXPR, K.DECL_REF_EXPR, K.TYPE_REF, K.MEMBER_REF_EXPR):
             ref = c.referenced
@@ -242,7 +288,22 @@ def parse(
                 kind = "function"
             elif ref.kind == K.TYPEDEF_DECL:
                 kind = "typedef"
+            elif ref.kind == K.ENUM_CONSTANT_DECL:
+                kind = "enum"
             elif ref.kind == K.FIELD_DECL:
+                owner = _record_name(ref.semantic_parent)
+                if not owner:
+                    continue
+                key = f"{owner}.{ref.spelling}"
+                if key not in res.decls:
+                    res.decls[key] = {
+                        "kind": "field",
+                        "type": norm_type(ref.type.get_canonical().spelling),
+                        "offset": ref.get_field_offsetof(),
+                        "where": f"{decl_path(ref.location)}:{ref.location.line}",
+                        "deprecated": ref.availability == ci.AvailabilityKind.DEPRECATED,
+                    }
+                res.refs.append({"name": key, "kind": "field", "at": f"{own}:{line}"})
                 # A field whose type is a typedef: the project uses that typedef.
                 decl = ref.type.get_declaration()
                 if decl.kind == K.TYPEDEF_DECL:
@@ -252,6 +313,16 @@ def parse(
                 continue
             if kind:
                 res.refs.append({"name": ref.spelling, "kind": kind, "at": f"{own}:{line}"})
+    object_like = sorted(
+        n for n, d in res.decls.items() if d["kind"] == "macro" and not d["function_like"]
+    )
+    extra = ["-I", stubs.name] if stubs is not None else []
+    # A macro's value is the same in every TU of one build: evaluate each once.
+    known = macro_values if macro_values is not None else {}
+    todo = [n for n in object_like if n not in known]
+    known.update(evaluate_macros(index, file, [*args, *extra], todo))
+    for name in object_like:
+        res.decls[name].update(known.get(name, {}))
     if stubs is not None:
         stubs.cleanup()
     for d in tu.diagnostics:
@@ -259,7 +330,11 @@ def parse(
             f = d.location.file.name if d.location.file else ""
             res.errors.append(f"{show(f) or decl_path(d.location)}:{d.location.line}: {d.spelling}")
             continue
-        if not CALLBACK_DIAG.search(d.spelling):
+        if CALLBACK_DIAG.search(d.spelling):
+            dkind = "callback"
+        elif TRUNCATION_DIAG.search(d.spelling):
+            dkind = "truncation"
+        else:
             continue
         site: tuple[str | None, int] = where(d.location)
         if site[0] is None:
@@ -270,6 +345,123 @@ def parse(
                     site = s
                     break
         if site[0] is not None:
-            res.diags.append({"at": f"{site[0]}:{site[1]}", "message": d.spelling})
+            res.diags.append({"at": f"{site[0]}:{site[1]}", "message": d.spelling, "kind": dkind})
     res.refs = [dict(t) for t in {tuple(sorted(r.items())) for r in res.refs}]
     return res
+
+
+def _record_name(parent: Any) -> str:
+    """A field's struct/union, named for comparison across refs: an anonymous one by the
+    nearest named record around it ("net_mgmt_event_callback.<anonymous>"); its own
+    spelling holds an absolute path. "" when no named record encloses it (a typedef'd
+    anonymous struct): such fields aren't compared, rather than risk a false removal."""
+    import clang.cindex as ci
+
+    records = (ci.CursorKind.STRUCT_DECL, ci.CursorKind.UNION_DECL)
+    parts: list[str] = []
+    while (
+        parent is not None
+        and parent.kind in records
+        and (
+            not parent.spelling or "(anonymous" in parent.spelling or "(unnamed" in parent.spelling
+        )
+    ):
+        parts.append("<anonymous>")
+        parent = parent.semantic_parent
+    if parent is None or parent.kind not in records:
+        return ""
+    return ".".join([parent.spelling, *reversed(parts)])
+
+
+def _unnamed(spelling: str) -> bool:
+    return not spelling or "(anonymous" in spelling or "(unnamed" in spelling
+
+
+def _function_like(cursor: Any) -> bool:
+    """clang_Cursor_isMacroFunctionLike (not wrapped by the libclang 18 bindings)."""
+    import ctypes
+
+    import clang.cindex as ci
+
+    f = ci.conf.lib.clang_Cursor_isMacroFunctionLike
+    f.argtypes = [ci.Cursor]
+    f.restype = ctypes.c_uint
+    return bool(f(cursor))
+
+
+def _arity(tokens: list[str]) -> int:
+    """Parameter count of a function-like macro from its definition tokens
+    (NAME ( a , b ) body...)."""
+    if len(tokens) < 3 or tokens[1] != "(":
+        return 0
+    depth, count, seen = 0, 0, False
+    for t in tokens[1:]:
+        if t == "(":
+            depth += 1
+            continue
+        if t == ")":
+            depth -= 1
+            if depth == 0:
+                break
+            continue
+        if depth == 1:
+            if t == ",":
+                count += 1
+            else:
+                seen = True
+    return count + 1 if seen else 0
+
+
+def evaluate_macros(index: Any, file: str, args: list[str], names: list[str]) -> dict[str, Any]:
+    """Value, type and size of each object-like macro as an expression in this TU (the TU's
+    own text with a probe per macro appended, parsed with the same flags). Macros that
+    aren't constant expressions get only their type, or nothing."""
+    import ctypes
+
+    import clang.cindex as ci
+
+    if not names:
+        return {}
+    try:
+        src = Path(file).read_text(errors="replace")
+    except OSError:
+        return {}
+    probes = "".join(f"\n__typeof__(({n})) __zmig_probe_{i} = ({n});" for i, n in enumerate(names))
+    tu = index.parse(
+        file,
+        args=args,
+        unsaved_files=[(file, src + "\n" + probes + "\n")],
+        options=0x200,  # KeepGoing
+    )
+    lib = ci.conf.lib
+    lib.clang_Cursor_Evaluate.argtypes = [ci.Cursor]
+    lib.clang_Cursor_Evaluate.restype = ctypes.c_void_p
+    for fn, res_t in (
+        ("clang_EvalResult_getKind", ctypes.c_int),
+        ("clang_EvalResult_isUnsignedInt", ctypes.c_uint),
+        ("clang_EvalResult_getAsUnsigned", ctypes.c_ulonglong),
+        ("clang_EvalResult_getAsLongLong", ctypes.c_longlong),
+    ):
+        getattr(lib, fn).argtypes = [ctypes.c_void_p]
+        getattr(lib, fn).restype = res_t
+    lib.clang_EvalResult_dispose.argtypes = [ctypes.c_void_p]
+    out: dict[str, Any] = {}
+    for c in tu.cursor.get_children():
+        if c.kind != ci.CursorKind.VAR_DECL or not c.spelling.startswith("__zmig_probe_"):
+            continue
+        name = names[int(c.spelling.rsplit("_", 1)[1])]
+        t = c.type.get_canonical()
+        if t.kind == ci.TypeKind.INVALID:
+            continue
+        v: dict[str, Any] = {"vtype": norm_type(t.spelling), "vsize": t.get_size()}
+        res = lib.clang_Cursor_Evaluate(c)
+        if res:
+            if lib.clang_EvalResult_getKind(res) == 1:  # CXEval_Int
+                v["value"] = (
+                    lib.clang_EvalResult_getAsUnsigned(res)
+                    if lib.clang_EvalResult_isUnsignedInt(res)
+                    else lib.clang_EvalResult_getAsLongLong(res)
+                )
+            lib.clang_EvalResult_dispose(res)
+        out[name] = v
+    return out

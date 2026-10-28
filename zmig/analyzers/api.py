@@ -151,6 +151,7 @@ class ApiAnalyzer:
         def run(img: ImageContext, b: Any, roots: dict[str, str], todo: dict[str, Any]) -> Any:
             def produce(out: Path) -> None:
                 results = []
+                values: dict[str, Any] = {}
                 for rel, e in sorted(todo.items()):
                     r: TuResult = parse_tu(
                         e["file"],
@@ -159,6 +160,7 @@ class ApiAnalyzer:
                         lambda f: project_path(f, roots),
                         str(b.workspace.root),
                         str(b.dir),
+                        values,
                     )
                     results.append(
                         {
@@ -214,16 +216,20 @@ class ApiAnalyzer:
         for t in src:
             for r in t["refs"]:
                 uses.setdefault(r["name"], []).append(r["at"])
-        old_diag_sites = {d["at"] for t in src for d in t["diags"]}
-        callback_diags = [d for t in tgt for d in t["diags"] if d["at"] not in old_diag_sites]
+        old_diag_sites = {(d["at"], d.get("kind")) for t in src for d in t["diags"]}
+        new_diags = [
+            d for t in tgt for d in t["diags"] if (d["at"], d.get("kind")) not in old_diag_sites
+        ]
+        callback_diags = [d for d in new_diags if d.get("kind", "callback") == "callback"]
+        truncations = [d for d in new_diags if d.get("kind") == "truncation"]
 
         findings: list[Finding] = []
 
         def add(kind: str, name: str, title: str, sev: Severity, action: str,
                 sites: list[str], old: Any, new: Any, decl_ev: list[JSON]) -> None:  # fmt: skip
             ev: list[JSON] = []
-            for s in sorted(set(sites), key=_site_key):
-                path, _, line = s.rpartition(":")
+            for site in sorted(set(sites), key=_site_key):
+                path, _, line = site.rpartition(":")
                 ev.append(file_line(path, int(line), name))
             findings.append(
                 Finding(
@@ -242,7 +248,31 @@ class ApiAnalyzer:
                 )
             )
 
+        def shown(d: dict[str, Any]) -> str:
+            if d["kind"] == "macro":
+                if d.get("function_like"):
+                    return f"function-like macro, {d.get('arity')} parameter(s)"
+                if "vtype" in d:
+                    val = f" = {d['value']}" if d.get("value") is not None else ""
+                    return f"({d['vtype']}, {d.get('vsize')} bytes){val}"
+                return str(d.get("tokens", ""))[:120]
+            if d["kind"] == "enum":
+                return f"= {d.get('value')}"
+            if d["kind"] == "field":
+                return f"{d['type']} at bit offset {d.get('offset')}"
+            return str(d.get("type", ""))
+
+        label = {"function": "Function", "typedef": "Typedef", "macro": "Macro",
+                 "enum": "Enum constant", "field": "Field"}  # fmt: skip
         explained: set[str] = set()
+        typedef_changes = {
+            (old_decls[k]["type"], new_decls[k]["type"])
+            for k in uses
+            if k in old_decls
+            and k in new_decls
+            and old_decls[k]["kind"] == "typedef"
+            and old_decls[k]["type"] != new_decls[k]["type"]
+        }
         for name in sorted(uses):
             o = old_decls.get(name)
             if o is None:
@@ -252,72 +282,155 @@ class ApiAnalyzer:
             covered = any(s.rpartition(":")[0] in parsed_at_target for s in sites)
             n = new_decls.get(name)
             what = o["kind"]
-            decl_old = tool_output("declaration at the source", f"{o['where']}: {o['type']}")
+            what_l = label.get(what, what)
+            decl_old = tool_output("declaration at the source", f"{o['where']}: {shown(o)}")
+            if n is None and what == "macro":
+                # A macro whose new form the target parse couldn't expand (its arity
+                # changed) is never instantiated there: read its definition instead.
+                n = _macro_at(ctx.new.workspace, o["where"], name)
             if n is None:
-                macro = _macro_definition(ctx.new.workspace.zephyr, name) if covered else None
+                if not covered:
+                    continue
+                macro = (
+                    _macro_definition(ctx.new.workspace.zephyr, name)
+                    if what == "function"
+                    else None
+                )
                 if macro:
                     # Calls still compile through a function-like macro of the same name
                     # (regression: k_ms_to_ticks_ceil64 became a macro in v3.5, used by ZMK
                     # only through K_MSEC); taking its address doesn't.
                     add(f"{what}-became-macro", name,
-                        f"{what.capitalize()} {name}, which your code uses, is a macro in "
+                        f"{what_l} {name}, which your code uses, is a macro in "
                         f"{ctx.new_spec}", Severity.INFO,
                         "Calls keep working; code that takes its address or #undefs it "
-                        "doesn't.", sites, o["type"], macro,
+                        "doesn't.", sites, o.get("type"), macro,
                         [decl_old, tool_output("macro at the target", macro)])  # fmt: skip
                     continue
-                if covered:
-                    add(f"{what}-removed", name,
-                        f"{what.capitalize()} {name}, which your code uses, no longer exists "
-                        f"in {ctx.new_spec}", Severity.BREAKING,
-                        "Find its replacement in the migration guides.", sites, o["type"],
-                        None, [decl_old])  # fmt: skip
+                add(f"{what}-removed", name,
+                    f"{what_l} {name}, which your code uses, no longer exists in "
+                    f"{ctx.new_spec}", Severity.BREAKING,
+                    "Find its replacement in the migration guides.", sites, shown(o), None,
+                    [decl_old])  # fmt: skip
                 continue
-            decl_new = tool_output("declaration at the target", f"{n['where']}: {n['type']}")
-            if n["type"] != o["type"]:
-                cb_sites = [d["at"] for d in callback_diags if f"'{name}'" in d["message"]]
-                explained |= set(cb_sites)
-                fn_ptr = "(*)" in n["type"]
-                # Only const/volatile added or removed: callers still compile (regression:
-                # sys_dlist_peek_head(const sys_dnode_t *) on Golioth was breaking).
-                cv_only = _strip_cv(n["type"]) == _strip_cv(o["type"])
-                if cv_only and not cb_sites:
-                    sev = Severity.INFO if what == "function" else Severity.RISKY
-                elif what == "function" or cb_sites or fn_ptr:
-                    sev = Severity.BREAKING
-                else:
-                    sev = Severity.RISKY
+            decl_new = tool_output("declaration at the target", f"{n['where']}: {shown(n)}")
+            if what == "field" and (o.get("type"), n.get("type")) in typedef_changes:
+                continue  # the same change as a typedef reported for these lines
+            change = self._change(name, what, o, n, sites, callback_diags, truncations, explained)
+            if change is not None:
+                sev, why, extra_sites = change
                 add(f"{what}-changed", name,
-                    f"{what.capitalize()} {name}, which your code uses, changed: "
-                    f"{o['type']} → {n['type']}", sev,
-                    "Update the code that calls, implements or stores it"
-                    + (" (your callbacks no longer match it)." if cb_sites else "."),
-                    sites + cb_sites, o["type"], n["type"], [decl_old, decl_new])  # fmt: skip
+                    f"{what_l} {name}, which your code uses, changed: {shown(o)} → {shown(n)}",
+                    sev, why, sites + extra_sites, shown(o), shown(n),
+                    [decl_old, decl_new])  # fmt: skip
             elif n.get("deprecated") and not o.get("deprecated"):
                 add(f"{what}-deprecated", name,
-                    f"{what.capitalize()} {name}, which your code uses, is deprecated in "
-                    f"{ctx.new_spec}", Severity.RISKY,
-                    "Move off it before the release that removes it.", sites, None, None,
-                    [decl_new])  # fmt: skip
+                    f"{what_l} {name}, which your code uses, is deprecated in {ctx.new_spec}",
+                    Severity.RISKY, "Move off it before the release that removes it.", sites,
+                    None, None, [decl_new])  # fmt: skip
 
-        # Callbacks the project passes or assigns whose expected type changed, where the
-        # slot isn't a typedef reported above (a struct field, a parameter).
-        groups: dict[str, list[str]] = {}
-        for d in callback_diags:
+        # New diagnostics no declaration change above explains: callbacks the project
+        # provides whose expected type changed where the slot isn't a reported typedef (a
+        # struct field, a parameter), and values that no longer fit.
+        groups: dict[tuple[str, str], list[str]] = {}
+        for d in new_diags:
             if d["at"] in explained:
                 continue
-            m = re.search(
-                r"(?:assigning to|initializing|passing|returning) '([^']+)'", d["message"]
-            )
-            groups.setdefault(m[1] if m else d["message"], []).append(d["at"])
-        for expected, sites in sorted(groups.items()):
-            msg = next(d["message"] for d in callback_diags if d["at"] == sites[0])
-            add("callback-type-changed", expected,
-                f"Callbacks your code provides no longer match the type Zephyr expects at "
-                f"{ctx.new_spec}: {expected}", Severity.BREAKING,
-                f"Change their signatures to match ({msg[:200]}).", sites, None,
-                {"expected": expected, "message": msg}, [])  # fmt: skip
+            if d.get("kind", "callback") == "callback":
+                m = _EXPECTED.search(d["message"])
+                groups.setdefault(("callback", m[1] if m else d["message"]), []).append(d["at"])
+            else:
+                groups.setdefault(("truncation", d["message"]), []).append(d["at"])
+        for (kind, key), sites in sorted(groups.items()):
+            if kind == "callback":
+                msg = next(d["message"] for d in callback_diags if d["at"] == sites[0])
+                add("callback-type-changed", key,
+                    f"Callbacks your code provides no longer match the type Zephyr expects at "
+                    f"{ctx.new_spec}: {key}", Severity.BREAKING,
+                    f"Change their signatures to match ({msg[:200]}).", sites, None,
+                    {"expected": key, "message": msg}, [])  # fmt: skip
+            else:
+                add("value-truncated", key[:80],
+                    f"A value your code stores no longer fits at {ctx.new_spec}: {key[:160]}",
+                    Severity.RISKY,
+                    "Widen the variable or parameter it's stored in.", sites, None,
+                    {"message": key}, [])  # fmt: skip
         return findings
+
+    @staticmethod
+    def _change(
+        name: str,
+        what: str,
+        o: dict[str, Any],
+        n: dict[str, Any],
+        sites: list[str],
+        callback_diags: list[dict[str, Any]],
+        truncations: list[dict[str, Any]],
+        explained: set[str],
+    ) -> tuple[Severity, str, list[str]] | None:
+        """(severity, action, extra sites) when the declaration changed in a way §10.3
+        reports; None otherwise."""
+        at = set(sites)
+        if what == "macro":
+            if o.get("function_like") != n.get("function_like"):
+                return Severity.RISKY, "It changed between object-like and function-like.", []
+            if o.get("function_like"):
+                if o.get("arity") != n.get("arity"):
+                    return Severity.BREAKING, "Update every use to the new parameters.", []
+                return None  # a body change alone says nothing (§4)
+            if "vtype" not in o or "vtype" not in n:
+                return None  # not an expression at one of the refs: not compared
+            width = o.get("vsize") != n.get("vsize")
+            value = o.get("value") != n.get("value")
+            if not width and not value:
+                return None
+            cut = [d["at"] for d in truncations if d["at"] in at]
+            explained.update(cut)
+            if width and cut:
+                return (
+                    Severity.BREAKING,
+                    "Its type got wider and your code stores it in a narrower type, which "
+                    "changes the value (see the lines listed); widen those.",
+                    [],
+                )
+            return (
+                Severity.RISKY,
+                "Check how your code uses the value (comparisons, storage, the wire).",
+                [],
+            )
+        if what == "enum":
+            if o.get("value") != n.get("value"):
+                return Severity.RISKY, "Its value changed: check stored or transmitted values.", []
+            return None
+        if o.get("type") == n.get("type"):
+            if what == "field" and o.get("offset") != n.get("offset"):
+                return (
+                    Severity.INFO,
+                    "Only its position moved; source code is unaffected, binaries built "
+                    "against the old layout aren't.",
+                    [],
+                )
+            return None
+        cb_sites = [
+            d["at"]
+            for d in callback_diags
+            if d["at"] in at or (what == "typedef" and f"'{name}'" in d["message"])
+        ]
+        explained.update(cb_sites)
+        if _strip_cv(n["type"]) == _strip_cv(o["type"]) and not cb_sites:
+            # Only const/volatile added or removed: callers still compile (regression:
+            # sys_dlist_peek_head(const sys_dnode_t *) on Golioth was breaking).
+            sev = Severity.INFO if what == "function" else Severity.RISKY
+            return sev, "Only const/volatile qualifiers changed.", []
+        fn_ptr = "(*)" in str(n.get("type"))
+        if what == "function" or cb_sites or fn_ptr:
+            return (
+                Severity.BREAKING,
+                "Update the code that calls, implements or stores it"
+                + (" (your callbacks no longer match it)." if cb_sites else "."),
+                cb_sites,
+            )
+        return Severity.RISKY, "Check the code that uses it.", []
 
     @staticmethod
     def _lost_syscalls(ctx: ScanContext, header: str, lost: list[tuple[str, int, str]]) -> Finding:
@@ -368,7 +481,9 @@ def _site_key(s: str) -> tuple[str, int]:
 
 
 def _strip_cv(t: str) -> str:
-    return " ".join(re.sub(r"\b(?:const|volatile)\b", " ", t).split())
+    """A type spelling without const/volatile, spacing normalized around punctuation."""
+    t = re.sub(r"\b(?:const|volatile)\b", " ", t)
+    return re.sub(r"\s*([(),*\[\]])\s*", r"\1", " ".join(t.split()))
 
 
 def _macro_definition(zephyr: Path, name: str) -> str | None:
@@ -385,4 +500,29 @@ def _macro_definition(zephyr: Path, name: str) -> str | None:
         for i, line in enumerate(text.splitlines(), 1):
             if pat.match(line):
                 return f"zephyr/{f.relative_to(zephyr)}:{i}: {line.strip()[:120]}"
+    return None
+
+
+def _macro_at(ws: Any, where: str, name: str) -> dict[str, Any] | None:
+    """The definition of macro `name` at the target, looked up in the header that defined
+    it at the source (`where` is relative to the workspace root): function-like with its
+    arity, or object-like (no value: it wasn't evaluated)."""
+    path = where.rpartition(":")[0]
+    for f in (Path(str(ws.root)) / path,):
+        if not f.is_file():
+            continue
+        for i, line in enumerate(f.read_text(errors="replace").splitlines(), 1):
+            m = re.match(rf"^\s*#\s*define\s+{re.escape(name)}(\(([^)]*)\))?", line)
+            if not m:
+                continue
+            fn = m[1] is not None
+            params = [p for p in (m[2] or "").split(",") if p.strip()]
+            return {
+                "kind": "macro",
+                "function_like": fn,
+                "arity": len(params) if fn else None,
+                "tokens": line.strip()[:400],
+                "where": f"{path}:{i}",
+                "deprecated": False,
+            }
     return None
