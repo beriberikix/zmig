@@ -105,3 +105,27 @@ No crashes: both runs exited 0, and every report passes the verdict invariants.
   (`src/dfu.c:25`, an MCUboot DFU file not in C1's build). Fix: like the SBOM fix in
   DOGFOOD-3, cite only files the build compiled (ninja dependency records); a finding with
   no such evidence becomes info.
+
+## 6. After the M13–M15 fixes (`2aca9a9`), listed separately
+
+The same two configurations were re-run with the same refs and warm builds: about 3 s
+each. The fixes don't change recall or the verdict (direct-ok, low), and invariants still
+pass. The only differences in breaking or risky findings:
+
+| Config | Before | After | Fix |
+|---|---|---|---|
+| C1, C2 | `The target build fails: 1 error (step)`, no evidence | `The target build fails: 2 errors (linker)  [src/led.c:225]` | M14 |
+| C1 | 3 risky `… changed: phandle` (led0, mcuboot_led0, counter2) | gone | M13 |
+
+**M15 shown on its own.** With M13 disabled by monkeypatch, C1 still reports the led0 and
+counter2 phandle findings, but no longer reports mcuboot_led0. Its only evidence was
+`src/dfu.c:25`, which C1 doesn't compile, so the finding is dropped. No finding cites
+`dfu.c` (`grep -c dfu.c` = 0).
+
+**Precision after the fixes:** C1 7/8 (88%), C2 7/8 (88%), total 14/16 (88%), up from 74%.
+Every removed finding was one §3 scored harmless.
+
+**Seen, not fixed (M16).** With M13 disabled, the counter2 finding's evidence is overlays
+for other boards (`boards/candlelight_stm32f072xb.overlay:27`, in a `usb2canfdv1` build).
+That's the overlay counterpart of M15. It produces no output now, because M13 removes the
+finding, so it's only recorded here.
