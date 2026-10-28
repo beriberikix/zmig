@@ -590,13 +590,32 @@ Creating either archive took about 0.55 s, from a warm page cache.
   The shallow fetch of the same two took 60 s.
 - **A shallow fetch moves about 5× fewer bytes** than zmig's current fetch:
   `materialize` runs `west update --narrow` without `--depth`, which is full history.
-  Shallow fetching is **not implemented** in zmig; it was measured with west directly.
+  `--shallow` (§7.4) now adds `-o=--depth=1`.
 - **Excluded from the numbers above:**
   - GitHub Actions cache throughput: a restore there comes from remote storage, not local
     disk, so the 1–4 s above isn't a prediction for it;
   - a shallow fetch of Zephyr itself, which CI needs if it doesn't cache the 1.1 GB mirror;
   - hosted-runner network speed, which is likely far above 150 KB/s but is unmeasured.
   §8.3 lists what to measure on a real runner.
+
+### 7.4 Cold `zmig scan`, `--shallow` vs full
+
+Script: [examples/watch-cold.sh](examples/watch-cold.sh), 2026-10-28, on the same network.
+
+- **Setup:** CANnectivity C1, `7823374` → `30de5e8`. Each run gets a fresh zmig cache,
+  except the Zephyr mirror, which is hardlinked in (cloning it here would take hours).
+- **Cold means:** empty workspaces, module clones, builds and parse cache. SDK installed.
+
+| | Wall clock | Module fetches (src / target / target + cmsis_6) | Module git objects downloaded | Findings |
+|---|---|---|---|---|
+| `--shallow` | **292 s** | 1m40s / 2m09s / 19s | 67 MB | 17 (5 breaking, 3 risky, 9 info) |
+| full (today's default) | **567 s** | 3m23s / 3m54s / 1m28s | 295 MB | the same 17 IDs |
+
+- **Findings and verdict are identical:** all 17 finding IDs, verdict direct-ok (low).
+- **`not_checked` differs by exactly one entry.** Only the shallow run has "fork triage of
+  modules": module history is unavailable (shallow clones: cmsis, cmsis_6, hal_stm32).
+- **The shallow run moved 4.4× fewer bytes in about half the time.** The fetches are
+  partly latency-bound, so time doesn't scale with bytes.
 
 ### 7.3 Against the budget
 
