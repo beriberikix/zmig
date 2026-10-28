@@ -101,9 +101,25 @@ def fingerprint(finding: JSON, ctx: FingerprintContext) -> str:
     return hashlib.sha256(material.encode()).hexdigest()[:16]
 
 
+# `file.c:123` in values (compiler sites): the line goes, like in the fingerprint.
+_PATH_LINE = re.compile(r"(\.[A-Za-z]{1,4}):\d+\b")
+
+
+def _without_lines(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _without_lines(v) for k, v in value.items() if k not in ("line", "lines")}
+    if isinstance(value, list):
+        return [_without_lines(v) for v in value]
+    if isinstance(value, str):
+        return _PATH_LINE.sub(r"\1", value)
+    return value
+
+
 def value_digest(finding: JSON, ctx: FingerprintContext) -> str:
-    """Hash of the finding's `new` value, to tell "same finding, changed value" apart."""
-    text = ctx.normalize(json.dumps(finding.get("new"), sort_keys=True))
+    """Hash of the finding's `new` value, to tell "same finding, changed value" apart.
+    Line numbers are left out (regression: an unrelated 5-line shift in CANnectivity's
+    led.c made three accepted findings "updated")."""
+    text = ctx.normalize(json.dumps(_without_lines(finding.get("new")), sort_keys=True))
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 

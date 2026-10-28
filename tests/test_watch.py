@@ -90,6 +90,23 @@ def test_fingerprints_ignore_the_target_ref_and_line_shifts(name: str) -> None:
     assert fps(r) == fps(load(name))
 
 
+def test_line_shifts_inside_values_are_not_value_changes() -> None:
+    """The c-shift stability run: errors' `line` and compiler `sites` moved by 5."""
+    r = load("cannectivity-c1")
+    b = baseline_of(r)
+    shifted = json.loads(
+        json.dumps(r)
+        .replace('"line": 225', '"line": 230')
+        .replace("src/led.c:349", "src/led.c:354")
+        .replace("src/led.c:225", "src/led.c:230")
+    )
+    assert {i.state for i in compare(shifted, b, TODAY).items} == {"unchanged"}
+    changed = copy.deepcopy(r)
+    f = next(x for x in changed["findings"] if x["kind"] == "target-build-failed")
+    f["new"]["errors"][0]["message"] = "undefined reference to `something_else'"
+    assert [i.state for i in compare(changed, b, TODAY).items].count("updated") == 1
+
+
 def test_target_build_failed_subject_is_the_target_sha() -> None:
     """Regression guard: this subject *is* the target SHA, so without normalization every
     target movement would make it new."""
