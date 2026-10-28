@@ -23,7 +23,7 @@ from zmig.buildctx import (
     sdk_identity,
 )
 from zmig.cache import Cache, default_cache_root
-from zmig.errors import ZmigError
+from zmig.errors import UsageError, ZmigError
 from zmig.findings import Category, Confidence, Finding, NotChecked, Report, Severity, plural
 from zmig.forks import compare_tree, guess_version_tag
 from zmig.manifest import load_manifest, scan_user_workspace
@@ -111,11 +111,109 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[common],
         help="build the app at both versions and report what changed for it",
     )
+    scan.add_argument("--from", dest="from_ref", required=True)
+    scan.add_argument("--to", dest="to_ref", required=True)
+    _scan_args(scan)
+
+    watch = sub.add_parser(
+        "watch",
+        parents=[common],
+        help="CI mode: scan, compare with a committed baseline, exit nonzero on new findings",
+        description="Exit codes: 0 ok; 1 internal error; 2 usage, config mismatch or no "
+        "baseline; 3 new finding outside the baseline; 4 inconclusive (unless "
+        "--allow-inconclusive). See docs/DESIGN-WATCH.md.",
+    )
+    watch.add_argument(
+        "--from",
+        dest="from_ref",
+        default="manifest",
+        help="'manifest' (the Zephyr revision the project's west.yml pins; the default) or a ref",
+    )
+    watch.add_argument(
+        "--to",
+        dest="to_ref",
+        default=None,
+        help="target: a ref, track:next-release or track:main. Default: the baseline's "
+        "recorded target SHA (pinned; what pull-request runs use)",
+    )
+    _scan_args(watch)
+    watch.add_argument(
+        "--baseline", type=Path, default=Path(".zmig/baseline.json"), help="baseline file"
+    )
+    watch.add_argument(
+        "--init", action="store_true", help="create the baseline from this run (needs --to)"
+    )
+    watch.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="rewrite the baseline's accepted set to this run's findings (needs --reason)",
+    )
+    watch.add_argument("--reason", help="why findings are accepted (--init, --update-baseline)")
+    watch.add_argument(
+        "--until", help="expiry date (YYYY-MM-DD) for entries this --init/--update-baseline adds"
+    )
+    watch.add_argument(
+        "--fail-on",
+        choices=["breaking", "risky"],
+        default="breaking",
+        help="lowest severity of a new finding that fails the run (default: breaking)",
+    )
+    watch.add_argument(
+        "--allow-inconclusive",
+        action="store_true",
+        help="exit 0 with a warning instead of 4 when the run couldn't check everything",
+    )
+    watch.add_argument(
+        "--on-target-movement",
+        choices=["fail", "warn"],
+        default="fail",
+        help="new findings due to the target moving since the baseline: fail (exit 3, "
+        "the default) or warn",
+    )
+    watch.add_argument(
+        "--no-attribute",
+        action="store_true",
+        help="when the target moved, don't re-scan against the baseline's target to label "
+        "new findings by cause",
+    )
+    watch.add_argument(
+        "--include-rc", action="store_true", help="track:next-release also considers -rc tags"
+    )
+    watch.add_argument(
+        "--manifest",
+        type=Path,
+        default=None,
+        help="west.yml for --from manifest (default: the nearest one above --app)",
+    )
+    watch.add_argument("--sarif", type=Path, help="write SARIF with baselineState here")
+    watch.add_argument("--pr-comment", type=Path, help="write the PR comment (Markdown) here")
+    watch.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        help="compare an existing report.json instead of scanning",
+    )
+    watch.add_argument(
+        "--pinned-report",
+        type=Path,
+        default=None,
+        help="with --report: the same project's report against the baseline's target",
+    )
+    watch.add_argument("--today", default=None, help=argparse.SUPPRESS)
+
+    for name, what in (
+        ("fix", "codemods"),
+        ("verify", "post-migration verification"),
+    ):
+        s = sub.add_parser(name, parents=[common], help=f"{what} (not in the MVP)")
+        s.add_argument("rest", nargs=argparse.REMAINDER)
+    return p
+
+
+def _scan_args(scan: argparse.ArgumentParser) -> None:
     scan.add_argument("--app", type=Path, required=True)
     scan.add_argument("--board", required=True, help="board[@rev][/qualifiers] at --from")
     scan.add_argument("--to-board", help="board name at --to (default: mapped automatically)")
-    scan.add_argument("--from", dest="from_ref", required=True)
-    scan.add_argument("--to", dest="to_ref", required=True)
     scan.add_argument("--sysbuild", action="store_true")
     scan.add_argument(
         "--fast",
@@ -168,15 +266,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="extra argument passed to CMake at both versions (repeatable)",
     )
 
-    for name, what in (
-        ("fix", "codemods"),
-        ("verify", "post-migration verification"),
-        ("watch", "CI mode"),
-    ):
-        s = sub.add_parser(name, parents=[common], help=f"{what} (not in the MVP)")
-        s.add_argument("rest", nargs=argparse.REMAINDER)
-    return p
-
 
 def _environment(runner: Runner) -> dict[str, str | None]:
     return {
@@ -222,6 +311,11 @@ def _historic_alias_tables(old: ResolvedRef, new: ResolvedRef) -> Iterator[tuple
 
 
 def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
+    _emit(scan_report(args, cache, runner), runner, args)
+    return EXIT_OK
+
+
+def scan_report(args: argparse.Namespace, cache: Cache, runner: Runner) -> Report:
     for tool in ("git", "cmake", "ninja", "dtc"):
         find_tool(tool)
     check_zephyr_python()
@@ -366,8 +460,7 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     report.upgrade_path = upgrade_path(
         ctx.shared, report.findings, report.analyzers, salvage.effective.status
     )
-    _emit(report, runner, args)
-    return EXIT_OK
+    return report
 
 
 def _missing_modules(
@@ -495,7 +588,14 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_scan(args, cache, runner)
         if args.command == "plan":
             return cmd_plan(args, cache, runner)
+        if args.command == "watch":
+            from zmig.watchcmd import cmd_watch
+
+            return cmd_watch(args, cache, runner)
         raise ZmigError(f"`zmig {args.command}` is outside the MVP scope (see docs/DESIGN.md)")
+    except UsageError as e:
+        print(f"zmig: error: {e}", file=sys.stderr)
+        return EXIT_USAGE
     except ZmigError as e:
         print(f"zmig: error: {e}", file=sys.stderr)
         return EXIT_ERROR

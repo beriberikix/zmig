@@ -19,3 +19,8 @@ class RefNotFound(ZmigError):
 
 class ArtifactMissing(ZmigError):
     """A build artifact an analyzer needs was not produced."""
+
+
+class UsageError(ZmigError):
+    """The command line or its inputs are inconsistent (e.g. a baseline made for another
+    board). The CLI prints the message and exits 2."""

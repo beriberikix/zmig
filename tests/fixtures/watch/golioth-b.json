@@ -1,0 +1,1513 @@
+{
+  "schema": "https://zmig.dev/schema/report/1",
+  "schema_version": "1.3",
+  "zmig_version": "0.1.0",
+  "command": "scan",
+  "inputs": {
+    "from": {
+      "spec": "v4.1.0",
+      "sha": "7823374e872145b5bd018bfe447839eb36042611",
+      "kind": "tag",
+      "url": "https://github.com/zephyrproject-rtos/zephyr",
+      "dirty": false
+    },
+    "to": {
+      "spec": "v4.2.0",
+      "sha": "413b789deb391d3a37d06b463288a5fe765ee57e",
+      "kind": "tag",
+      "url": "https://github.com/zephyrproject-rtos/zephyr",
+      "dirty": false
+    },
+    "app": "/home/user/.cache/zmig/dogfood/d5/gx/golioth-firmware-sdk/examples/zephyr/hello",
+    "app_tree_hash": "a361d493d0841059bba3911f14284621e28d34b595ed2b4b91f7fe4aa34012b0",
+    "board": {
+      "from": "nucleo_h563zi/stm32h563xx",
+      "to": "nucleo_h563zi/stm32h563xx",
+      "mapping": "same"
+    },
+    "build_mode": "full",
+    "sysbuild": false
+  },
+  "environment": {
+    "python": "3.14.4",
+    "west": "West version: v1.5.0",
+    "cmake": "cmake version 4.2.3",
+    "ninja": "1.13.2",
+    "dtc": "Version: DTC 1.7.2",
+    "git": "git version 2.53.0",
+    "sdk": {
+      "path": "/home/user/.cache/zmig/sdks/zephyr-sdk-0.16.8",
+      "version": "0.16.8"
+    },
+    "libclang": "clang version 18.1.1"
+  },
+  "contexts": [
+    {
+      "ref": "v4.1.0",
+      "board": "nucleo_h563zi/stm32h563xx",
+      "mode": "full",
+      "sysbuild": false,
+      "status": "ok",
+      "key": "d877d0e2f87f7026",
+      "images": [
+        {
+          "name": "hello",
+          "role": "app",
+          "role_source": "the default image (domains.yaml), or the only image",
+          "status": "ok",
+          "board": "nucleo_h563zi/stm32h563xx"
+        }
+      ],
+      "sdk": {
+        "path": "/home/user/.cache/zmig/sdks/zephyr-sdk-0.16.8",
+        "version": "0.16.8"
+      }
+    },
+    {
+      "ref": "v4.2.0",
+      "board": "nucleo_h563zi/stm32h563xx",
+      "mode": "full",
+      "sysbuild": false,
+      "status": "ok",
+      "key": "4aaa57f9b6899b81",
+      "images": [
+        {
+          "name": "hello",
+          "role": "app",
+          "role_source": "the default image (domains.yaml), or the only image",
+          "status": "ok",
+          "board": "nucleo_h563zi/stm32h563xx"
+        }
+      ],
+      "sdk": {
+        "path": "/home/user/.cache/zmig/sdks/zephyr-sdk-0.16.8",
+        "version": "0.16.8"
+      }
+    }
+  ],
+  "analyzers": [
+    {
+      "name": "api",
+      "status": "ok",
+      "findings": 3,
+      "hazards": 3
+    },
+    {
+      "name": "ble",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "board",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "buildlog",
+      "status": "ok",
+      "findings": 3,
+      "hazards": 2
+    },
+    {
+      "name": "crossimage",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "devicetree",
+      "status": "ok",
+      "findings": 2,
+      "hazards": 0
+    },
+    {
+      "name": "guide",
+      "status": "ok",
+      "findings": 3,
+      "hazards": 0
+    },
+    {
+      "name": "images",
+      "status": "ok",
+      "findings": 1,
+      "hazards": 0
+    },
+    {
+      "name": "initorder",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "kconfig",
+      "status": "ok",
+      "findings": 5,
+      "hazards": 0
+    },
+    {
+      "name": "layout",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "mcuboot",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "modules",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "sbom",
+      "status": "ok",
+      "findings": 5,
+      "hazards": 4
+    },
+    {
+      "name": "storage",
+      "status": "ok",
+      "findings": 2,
+      "hazards": 0
+    },
+    {
+      "name": "sysbuild",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "wire",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    }
+  ],
+  "summary": {
+    "counts": {
+      "breaking": 2,
+      "risky": 7,
+      "info": 15
+    },
+    "top": [
+      "API-MACRO-CHANGED-ecad1e6d",
+      "API-TYPEDEF-CHANGED-6363121e",
+      "API-FIELD-CHANGED-3108245e",
+      "BUILD-NEW-WARNING-3ce9e193",
+      "BUILD-NEW-WARNING-fca02eb3"
+    ]
+  },
+  "findings": [
+    {
+      "id": "API-MACRO-CHANGED-ecad1e6d",
+      "category": "api",
+      "kind": "macro-changed",
+      "subject": "NET_EVENT_IPV4_ADDR_ADD",
+      "title": "Macro NET_EVENT_IPV4_ADDR_ADD, which your code uses, changed: (unsigned long, 4 bytes) = 3758358529 \u2192 (unsigned long long, 8 bytes) = 16154411863377969153",
+      "severity": "breaking",
+      "confidence": "high",
+      "old": "(unsigned long, 4 bytes) = 3758358529",
+      "new": "(unsigned long long, 8 bytes) = 16154411863377969153",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c",
+          "line": 69,
+          "text": "NET_EVENT_IPV4_ADDR_ADD"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/net/net_event.h:247: (unsigned long, 4 bytes) = 3758358529"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the target",
+          "excerpt": "zephyr/include/zephyr/net/net_event.h:343: (unsigned long long, 8 bytes) = 16154411863377969153"
+        }
+      ],
+      "action": "Its type got wider and your code stores it in a narrower type, which changes the value (see the lines listed); widen those.",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "API-TYPEDEF-CHANGED-6363121e",
+      "category": "api",
+      "kind": "typedef-changed",
+      "subject": "net_mgmt_event_handler_t",
+      "title": "Typedef net_mgmt_event_handler_t, which your code uses, changed: void (*)(struct net_mgmt_event_callback *, unsigned int, struct net_if *) \u2192 void (*)(struct net_mgmt_event_callback *, unsigned long long, struct net_if *)",
+      "severity": "breaking",
+      "confidence": "high",
+      "old": "void (*)(struct net_mgmt_event_callback *, unsigned int, struct net_if *)",
+      "new": "void (*)(struct net_mgmt_event_callback *, unsigned long long, struct net_if *)",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c",
+          "line": 36,
+          "text": "net_mgmt_event_handler_t"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/net/net_mgmt.h:135: void (*)(struct net_mgmt_event_callback *, unsigned int, struct net_if *)"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the target",
+          "excerpt": "zephyr/include/zephyr/net/net_mgmt.h:153: void (*)(struct net_mgmt_event_callback *, unsigned long long, struct net_if *)"
+        }
+      ],
+      "action": "Update the code that calls, implements or stores it (your callbacks no longer match it).",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "API-FIELD-CHANGED-3108245e",
+      "category": "api",
+      "kind": "field-changed",
+      "subject": "net_mgmt_event_callback.<anonymous>.event_mask",
+      "title": "Field net_mgmt_event_callback.<anonymous>.event_mask, which your code uses, changed: unsigned int at bit offset 0 \u2192 unsigned long long at bit offset 0",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "unsigned int at bit offset 0",
+      "new": "unsigned long long at bit offset 0",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c",
+          "line": 26,
+          "text": "net_mgmt_event_callback.<anonymous>.event_mask"
+        },
+        {
+          "type": "file_line",
+          "path": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c",
+          "line": 37,
+          "text": "net_mgmt_event_callback.<anonymous>.event_mask"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/net/net_mgmt.h:180: unsigned int at bit offset 0"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the target",
+          "excerpt": "zephyr/include/zephyr/net/net_mgmt.h:198: unsigned long long at bit offset 0"
+        }
+      ],
+      "action": "Check the code that uses it.",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "BUILD-NEW-WARNING-3ce9e193",
+      "category": "build",
+      "kind": "new-warning",
+      "subject": "compiler:<zephyr>/include/zephyr/net/net_event.h:conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1'",
+      "title": "New compiler warning at v4.2.0: conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1'",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "file": "<zephyr>/include/zephyr/net/net_event.h",
+        "flag": "-Woverflow",
+        "sites": [
+          "golioth-firmware-sdk/examples/zephyr/common/net_connect.c:69"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c",
+          "line": 69,
+          "text": "conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1'"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "target build (compiler), raised at",
+          "excerpt": "<zephyr>/include/zephyr/net/net_event.h: conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1'"
+        }
+      ],
+      "action": "Check whether it points at a real problem.",
+      "related": [],
+      "analyzer": "buildlog",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "BUILD-NEW-WARNING-fca02eb3",
+      "category": "build",
+      "kind": "new-warning",
+      "subject": "compiler:<module:golioth-firmware-sdk/>/examples/zephyr/common/net_connect.c:assignment to 'net_mgmt_event_handler_t' {aka 'void (*)(struct net_mgmt_event_callback *, long long unsigned int, struct ne",
+      "title": "New compiler warning at v4.2.0: assignment to 'net_mgmt_event_handler_t' {aka 'void (*)(struct net_mgmt_event_callback *, long long unsigned int, struct net_if *)'} from in",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "file": "<module:golioth-firmware-sdk/>/examples/zephyr/common/net_connect.c",
+        "flag": "-Wincompatible-pointer-types",
+        "sites": [
+          "golioth-firmware-sdk/examples/zephyr/common/net_connect.c:36"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c",
+          "line": 36,
+          "text": "assignment to 'net_mgmt_event_handler_t' {aka 'void (*)(struct net_mgmt_event_callback *, long long unsigned int, struct net_if *)'} from incompatible pointer type 'void (*)(struct net_mgmt_event_callback *, uint32_t, struct net_if *)' {aka 'void (*)(struct net_mgmt_event_callback *, unsigned int, struct net_if *)'}"
+        }
+      ],
+      "action": "Check whether it points at a real problem.",
+      "related": [],
+      "analyzer": "buildlog",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-HEADER-CHANGED-24bcf578",
+      "category": "sbom",
+      "kind": "header-changed",
+      "subject": "zephyr/logging/log.h",
+      "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": "+17/-0 lines in 1 commits",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "src/main.c",
+          "line": 7,
+          "text": "#include <zephyr/logging/log.h>"
+        }
+      ],
+      "action": "Review the API changes in that header against your calls.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-HEADER-CHANGED-e7c787b9",
+      "category": "sbom",
+      "kind": "header-changed",
+      "subject": "zephyr/kernel.h",
+      "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+195/-37 lines in 14 commits)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": "+195/-37 lines in 14 commits",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "src/main.c",
+          "line": 13,
+          "text": "#include <zephyr/kernel.h>"
+        }
+      ],
+      "action": "Review the API changes in that header against your calls.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-MODULE-REPINNED-022f33fb",
+      "category": "sbom",
+      "kind": "module-repinned",
+      "subject": "mbedtls",
+      "title": "Module mbedtls moves from 4952e1328529 to 85440ef5fffa; 31 files compiled into hello changed (31 modified, 0 added, 0 removed)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "4952e1328529ee549d412b498ea71c54f30aa3b1",
+      "new": {
+        "sha": "85440ef5fffa95d0e9971e9163719189cf34d979",
+        "changed": [
+          "library/aesni.c",
+          "library/asn1write.c",
+          "library/base64.c",
+          "library/bignum_core.c",
+          "library/ccm.c",
+          "library/cipher.c",
+          "library/cipher_wrap.c",
+          "library/ecp.c",
+          "library/error.c",
+          "library/lmots.c",
+          "library/lms.c",
+          "library/net_sockets.c",
+          "library/pem.c",
+          "library/psa_util.c",
+          "library/ssl_client.c",
+          "library/ssl_debug_helpers_generated.c",
+          "library/ssl_msg.c",
+          "library/ssl_tls.c",
+          "library/ssl_tls12_client.c",
+          "library/ssl_tls12_server.c",
+          "library/ssl_tls13_client.c",
+          "library/ssl_tls13_keys.c",
+          "library/ssl_tls13_server.c",
+          "library/threading.c",
+          "library/version_features.c",
+          "library/x509_create.c",
+          "library/x509_crl.c",
+          "library/x509_crt.c",
+          "library/x509_csr.c",
+          "library/x509write_crt.c",
+          "library/x509write_csr.c"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "evidence": [],
+      "action": "Read the module's changelog for that range.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-MODULE-REPINNED-85ed84b2",
+      "category": "sbom",
+      "kind": "module-repinned",
+      "subject": "hal-stm32",
+      "title": "Module hal-stm32 moves from 55043bcc35ff to 1e753266ddfb; 4 files compiled into hello changed (3 modified, 0 added, 1 removed)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "55043bcc35fffa3b4a8c75a696d932b5020aad09",
+      "new": {
+        "sha": "1e753266ddfb4b07a8a0b1ec566e9637ea45d5ef",
+        "changed": [
+          "stm32cube/stm32h5xx/drivers/src/stm32h5xx_hal.c",
+          "stm32cube/stm32h5xx/drivers/src/stm32h5xx_hal_eth.c",
+          "stm32cube/stm32h5xx/drivers/src/stm32h5xx_hal_rcc_ex.c"
+        ],
+        "added": [],
+        "removed": [
+          "stm32cube/stm32h5xx/drivers/src/stm32h5xx_ll_rng.c"
+        ]
+      },
+      "evidence": [],
+      "action": "Read the module's changelog for that range.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "BUILD-FOOTPRINT-263db9aa",
+      "category": "build",
+      "kind": "footprint",
+      "subject": "nucleo_h563zi/stm32h563xx",
+      "title": "ROM 251306 \u2192 258936 bytes (+7630), RAM 92222 \u2192 90959 bytes (-1263)",
+      "severity": "info",
+      "confidence": "high",
+      "old": {
+        "rom": 251306,
+        "ram": 92222
+      },
+      "new": {
+        "rom": 258936,
+        "ram": 90959,
+        "host_runtime_inflated": false,
+        "symbols": [
+          {
+            "symbol": "context_sendto",
+            "delta": 576
+          },
+          {
+            "symbol": "context_sendto.constprop.0",
+            "delta": -572
+          },
+          {
+            "symbol": "net_try_send_data",
+            "delta": 442
+          },
+          {
+            "symbol": "cmd_net_link_speed",
+            "delta": 440
+          },
+          {
+            "symbol": "phy_mii_initialize_dynamic_link",
+            "delta": 352
+          },
+          {
+            "symbol": "phy_mii_initialize",
+            "delta": -336
+          },
+          {
+            "symbol": "cmd_net_dns",
+            "delta": 324
+          },
+          {
+            "symbol": "eth_initialize",
+            "delta": -324
+          },
+          {
+            "symbol": "phy_mii_cfg_link",
+            "delta": 292
+          },
+          {
+            "symbol": "eth_iface_init",
+            "delta": 288
+          }
+        ]
+      },
+      "evidence": [],
+      "action": "The symbols that grew or shrank most are listed; check them against your memory budget.",
+      "related": [],
+      "analyzer": "buildlog",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-CHANGED-d62a0c73",
+      "category": "devicetree",
+      "kind": "node-changed",
+      "subject": "&zephyr_udc0:/soc/usb@40016000",
+      "title": "&zephyr_udc0 (/soc/usb@40016000) changed: clocks, maximum-speed (only in files this build doesn't use: boards/rak5010_nrf52840.overlay)",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "clocks": [
+          "< &rcc 0xa4 0x1000000 >, < &rcc 0x7 0x18c400e4 >",
+          "< &rcc 0xa4 0x1000000 >,\n         < &rcc 0x7 0x18c400e4 >"
+        ],
+        "maximum-speed": [
+          null,
+          "\"full-speed\""
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/rak5010_nrf52840.overlay",
+          "line": 9,
+          "text": "&zephyr_udc0 {"
+        }
+      ],
+      "action": "Check these property changes against how your code uses the node.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [
+        "outside-build"
+      ],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-OTHER-NODES-8b0874b9",
+      "category": "devicetree",
+      "kind": "other-nodes",
+      "subject": "unreferenced",
+      "title": "45 nodes your app doesn't reference changed, disappeared or appeared; 2 more nodes only changed binding",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "changed": [
+          "/connector",
+          "/soc",
+          "/soc/adc@42028000",
+          "/soc/can@4000a400",
+          "/soc/can@4000a800",
+          "/soc/ethernet@40028000",
+          "/soc/ethernet@40028000/mdio/ethernet-phy@0",
+          "/soc/flash-controller@40022000",
+          "/soc/flash-controller@40022000/flash@8000000",
+          "/soc/i2c@40005400",
+          "/soc/i2c@40005800",
+          "/soc/i2c@44002800",
+          "/soc/i2c@44002c00",
+          "/soc/i2s@40003800",
+          "/soc/i2s@40003c00",
+          "/soc/i2s@40013000",
+          "/soc/i3c@40005c00",
+          "/soc/i3c@44003000",
+          "/soc/interrupt-controller@44022000",
+          "/soc/memory@20000000",
+          "/soc/memory@20040000",
+          "/soc/memory@20050000",
+          "/soc/memory@40036400",
+          "/soc/rtc@44007800",
+          "/soc/sdmmc@46008000",
+          "/soc/sdmmc@46008c00",
+          "/soc/serial@40004400",
+          "/soc/serial@40004800",
+          "/soc/serial@40006400",
+          "/soc/serial@40006800",
+          "/soc/serial@40006c00",
+          "/soc/serial@40013800",
+          "/soc/serial@44002400",
+          "/soc/spi@40003800",
+          "/soc/spi@40003c00",
+          "/soc/spi@40013000",
+          "/soc/spi@40014c00",
+          "/soc/spi@40015000",
+          "/soc/spi@44002000",
+          "/soc/spi@47001400",
+          "/soc/timers@40012c00",
+          "/soc/timers@40013400",
+          "/soc/timers@44004c00",
+          "/st-morpho-header"
+        ],
+        "removed": [],
+        "added": [
+          "/soc/ethernet@40028000/ethernet"
+        ],
+        "binding_changed": [
+          "/cpus",
+          "/soc/digi_dietemp@40008c00"
+        ]
+      },
+      "evidence": [],
+      "action": "None needed unless you start using them.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "GUIDE-COVERAGE-25b6980c",
+      "category": "guide",
+      "kind": "coverage",
+      "subject": "documents",
+      "title": "Read 160 entries from 2 documents; 2 touch your app",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "documents": [
+          {
+            "doc": "doc/releases/migration-guide-4.2.rst",
+            "ref": "v4.2.0",
+            "version": "4.2"
+          },
+          {
+            "doc": "doc/releases/release-notes-4.2.rst",
+            "ref": "v4.2.0",
+            "version": "4.2"
+          }
+        ],
+        "entries": 160,
+        "matched": [
+          "MG-4.2-0046",
+          "MG-4.2-0074"
+        ]
+      },
+      "evidence": [],
+      "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+      "related": [],
+      "analyzer": "guide",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "IMAGES-IMAGES-SUMMARY-c75d0ac8",
+      "category": "images",
+      "kind": "images-summary",
+      "subject": "images",
+      "title": "1 image at v4.2.0: hello (app, 127 compiled files changed)",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": [
+        {
+          "image": "hello",
+          "role": "app",
+          "status": [
+            "ok",
+            "ok"
+          ],
+          "compiled_files": {
+            "changed": 127,
+            "added": 9,
+            "removed": 3
+          }
+        }
+      ],
+      "evidence": [],
+      "action": "Per-image findings follow, grouped by image.",
+      "related": [],
+      "analyzer": "images",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-DEFAULT-CHANGED-fa3998d1",
+      "category": "kconfig",
+      "kind": "default-changed",
+      "subject": "CONFIG_8 symbols",
+      "title": "8 Kconfig symbols: other symbols resolve to a different value in v4.2.0",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "CACHE": [
+          "n",
+          "y"
+        ],
+        "MBEDTLS_CFG_FILE": [
+          "\"config-tls-generic.h\"",
+          "\"config-mbedtls.h\""
+        ],
+        "NET_RX_STACK_SIZE": [
+          "1500",
+          "1792"
+        ],
+        "PHY_INIT_PRIORITY": [
+          "81",
+          "70"
+        ],
+        "RUNTIME_NMI": [
+          "y",
+          "n"
+        ],
+        "SCHED_DUMB": [
+          "y",
+          "n"
+        ],
+        "TIMESLICE_SIZE": [
+          "0",
+          "20"
+        ],
+        "WAITQ_DUMB": [
+          "y",
+          "n"
+        ]
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-NEWLY-SET-a489067c",
+      "category": "kconfig",
+      "kind": "newly-set",
+      "subject": "CONFIG_46 symbols",
+      "title": "46 Kconfig symbols: symbols are newly enabled or set in v4.2.0",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "ARCH_DEVICE_STATE_ALIGN": "4",
+        "ARCH_HAS_VECTOR_TABLE_RELOCATION": "y",
+        "ARCH_SUPPORTS_COREDUMP_STACK_PTR": "y",
+        "ARMV8_1_M_PMU_EVENTCNT": "8",
+        "CACHE_HAS_DRIVER": "y",
+        "CACHE_LOG_LEVEL": "3",
+        "CACHE_LOG_LEVEL_DEFAULT": "y",
+        "CACHE_MANAGEMENT": "y",
+        "CACHE_STM32": "y",
+        "CACHE_STM32_ICACHE_DIRECT_MAPPING": "y",
+        "COMMON_LIBC_TIME": "y",
+        "CORTEX_M_SYSTICK_LPM_TIMER_NONE": "y",
+        "CPU_LOAD_LOG_LEVEL": "3",
+        "CPU_LOAD_LOG_LEVEL_DEFAULT": "y",
+        "CPU_LOAD_LOG_PERIODICALLY": "0",
+        "DCACHE": "y",
+        "DEVICE_DEINIT_SUPPORT": "y",
+        "DNS_RESOLVER_MAX_ANSWER_SIZE": "512",
+        "DNS_RESOLVER_MAX_NAME_LEN": "20",
+        "DT_HAS_ST_STM32_ETHERNET_CONTROLLER_ENABLED": "y",
+        "ETH_DSA_SUPPORT_DEPRECATED": "y",
+        "EXTERNAL_CACHE": "y",
+        "ICACHE": "y",
+        "LOG_FLUSH_SLEEP_US": "10000",
+        "MBEDTLS_PKCS1_V15": "y",
+        "MBEDTLS_PKCS1_V21": "y",
+        "MBEDTLS_RSA_C": "y",
+        "NET_CONN_PACKET_CLONE_TIMEOUT": "100",
+        "NET_DHCPV4_DNS_SERVER_VIA_INTERFACE": "y",
+        "NET_DHCPV4_INIT_REBOOT": "y",
+        "NET_DHCPV6_DNS_SERVER_VIA_INTERFACE": "y",
+        "NET_INITIAL_IPV4_MCAST_LOOP": "y",
+        "NET_IPV4_MTU": "576",
+        "NET_SHELL_PKT_FILTER_SUPPORTED": "y",
+        "SCHED_SIMPLE": "y",
+        "SHELL_TX_TIMEOUT_MS": "500",
+        "STM32_BACKUP_PROTECTION": "y",
+        "SYSTEM_WORKQUEUE_WORK_TIMEOUT_MS": "0",
+        "TOOLCHAIN_SUPPORTS_VLA_IN_STATEMENTS": "y",
+        "UART_STM32U5_ERRATA_DMAT_NOCLEAR": "y",
+        "VIRTIO_LOG_LEVEL": "3",
+        "VIRTIO_LOG_LEVEL_DEFAULT": "y",
+        "WAITQ_SIMPLE": "y",
+        "XSI_SINGLE_PROCESS_LOG_LEVEL": "3",
+        "XSI_SINGLE_PROCESS_LOG_LEVEL_DEFAULT": "y",
+        "ZEPHYR_CMSIS_6_MODULE": "y"
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-NO-LONGER-SET-74c7c5b8",
+      "category": "kconfig",
+      "kind": "no-longer-set",
+      "subject": "CONFIG_23 symbols",
+      "title": "23 Kconfig symbols: symbols set before are absent in v4.2.0",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "ETH_DSA_SUPPORT": "y",
+        "ETH_STM32_AUTO_NEGOTIATION_ENABLE": "y",
+        "ETH_STM32_CARRIER_CHECK_RX_IDLE_TIMEOUT_MS": "500",
+        "ETH_STM32_HAL_PHY_ADDRESS": "0",
+        "EVENTFD_MAX": "7",
+        "KOBJECT_DATA_AREA_RESERVE_EXTRA_PERCENT": "100",
+        "KOBJECT_RODATA_AREA_EXTRA_BYTES": "16",
+        "KOBJECT_TEXT_AREA": "256",
+        "MAX_PTHREAD_COUNT": "0",
+        "MAX_PTHREAD_KEY_COUNT": "0",
+        "MAX_TIMER_COUNT": "0",
+        "MSG_COUNT_MAX": "0",
+        "POSIX_LIMITS_RTSIG_MAX": "0",
+        "POSIX_MAX_FDS": "16",
+        "POSIX_MAX_OPEN_FILES": "16",
+        "PRIVILEGED_STACK_SIZE": "1024",
+        "SEM_NAMELEN_MAX": "0",
+        "SEM_VALUE_MAX": "0",
+        "TIMER_DELAYTIMER_MAX": "0",
+        "UART_STM32U5_ERRATA_DMAT": "y",
+        "USE_STM32_LL_RNG": "y",
+        "WINSTREAM_CONSOLE_STATIC": "y",
+        "WINSTREAM_CONSOLE_STATIC_SIZE": "32768"
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-SYMBOL-DEPRECATED-ba6df930",
+      "category": "kconfig",
+      "kind": "symbol-deprecated",
+      "subject": "CONFIG_ETH_NATIVE_POSIX",
+      "title": "CONFIG_ETH_NATIVE_POSIX is deprecated in v4.2.0 (only in files this build doesn't use: socs/native.conf, socs/native_64.conf)",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": null,
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "socs/native.conf",
+          "line": 3,
+          "text": "CONFIG_ETH_NATIVE_POSIX=n"
+        },
+        {
+          "type": "file_line",
+          "path": "socs/native_64.conf",
+          "line": 3,
+          "text": "CONFIG_ETH_NATIVE_POSIX=n"
+        }
+      ],
+      "action": "Move off it before the release that removes it.",
+      "related": [
+        "GUIDE-ENTRY-MATCH-7613c10e"
+      ],
+      "analyzer": "kconfig",
+      "heuristics": [
+        "outside-build"
+      ],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-SYMBOL-REMOVED-f4c32f9b",
+      "category": "kconfig",
+      "kind": "symbol-removed",
+      "subject": "CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE",
+      "title": "CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE, set in boards/rak5010_nrf52840.conf, no longer exists in v4.2.0 (only in files this build doesn't use: boards/rak5010_nrf52840.conf)",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": null,
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/rak5010_nrf52840.conf",
+          "line": 27,
+          "text": "CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE=160"
+        }
+      ],
+      "action": "Remove the assignment, or find its replacement in the migration guides.",
+      "related": [
+        "GUIDE-ENTRY-MATCH-f0ba680d"
+      ],
+      "analyzer": "kconfig",
+      "heuristics": [
+        "outside-build"
+      ],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-ZEPHYR-SOURCES-9ccfe46b",
+      "category": "sbom",
+      "kind": "zephyr-sources",
+      "subject": "zephyr",
+      "title": "Zephyr files compiled: 235 \u2192 241 (8 added, 2 removed, 93 changed); 353 upstream commits touch the files the target compiles",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "added": [
+          "zephyr/drivers/cache/cache_stm32.c",
+          "zephyr/lib/crc/crc32k_4_2_sw.c",
+          "zephyr/lib/libc/common/source/time/time.c",
+          "zephyr/lib/os/clock.c",
+          "zephyr/lib/utils/last_section_id.c",
+          "zephyr/soc/st/stm32/common/stm32_backup_domain.c",
+          "zephyr/soc/st/stm32/common/stm32_cache.c",
+          "zephyr/subsys/net/lib/shell/filter.c"
+        ],
+        "removed": [
+          "zephyr/kernel/init_static.c",
+          "zephyr/kernel/priority_queues.c"
+        ],
+        "changed": [
+          "zephyr/arch/arm/core/cortex_m/cpu_idle.c",
+          "zephyr/arch/arm/core/cortex_m/irq_init.c",
+          "zephyr/arch/arm/core/cortex_m/irq_manage.c",
+          "zephyr/arch/arm/core/cortex_m/isr_wrapper.c",
+          "zephyr/arch/arm/core/cortex_m/prep_c.c",
+          "zephyr/arch/arm/core/cortex_m/reset.S",
+          "zephyr/arch/arm/core/cortex_m/thread.c",
+          "zephyr/arch/arm/core/mpu/arm_core_mpu.c",
+          "zephyr/arch/arm/core/mpu/arm_mpu.c",
+          "zephyr/arch/common/isr_tables.c",
+          "zephyr/drivers/clock_control/clock_stm32_ll_h5.c",
+          "zephyr/drivers/console/uart_console.c",
+          "zephyr/drivers/entropy/entropy_stm32.c",
+          "zephyr/drivers/ethernet/eth_stm32_hal.c",
+          "zephyr/drivers/ethernet/phy/phy_mii.c",
+          "zephyr/drivers/flash/flash_stm32.c",
+          "zephyr/drivers/flash/flash_stm32l5x.c",
+          "zephyr/drivers/flash/flash_util.c",
+          "zephyr/drivers/gpio/gpio_stm32.c",
+          "zephyr/drivers/hwinfo/hwinfo_stm32.c",
+          "zephyr/drivers/interrupt_controller/intc_exti_stm32.c",
+          "zephyr/drivers/mdio/mdio_stm32_hal.c",
+          "zephyr/drivers/pinctrl/pinctrl_stm32.c",
+          "zephyr/drivers/serial/uart_stm32.c",
+          "zephyr/drivers/timer/cortex_m_systick.c",
+          "zephyr/kernel/device.c",
+          "zephyr/kernel/init.c",
+          "zephyr/kernel/kheap.c",
+          "zephyr/kernel/mem_slab.c",
+          "zephyr/kernel/mempool.c",
+          "zephyr/kernel/pipe.c",
+          "zephyr/kernel/poll.c",
+          "zephyr/kernel/sched.c",
+          "zephyr/kernel/system_work_q.c",
+          "zephyr/kernel/thread_monitor.c",
+          "zephyr/kernel/timeout.c",
+          "zephyr/kernel/timer.c",
+          "zephyr/kernel/work.c",
+          "zephyr/kernel/xip.c",
+          "zephyr/lib/heap/heap.c",
+          "zephyr/lib/libc/picolibc/locks.c",
+          "zephyr/lib/net_buf/buf.c",
+          "zephyr/lib/os/cbprintf_complete.c",
+          "zephyr/lib/os/fdtable.c",
+          "zephyr/lib/os/printk.c",
+          "zephyr/lib/os/zvfs/zvfs_select.c",
+          "zephyr/lib/posix/options/fnmatch.c",
+          "zephyr/lib/utils/bitarray.c",
+          "zephyr/lib/utils/hex.c",
+          "zephyr/lib/utils/ring_buffer.c",
+          "zephyr/soc/st/stm32/common/soc_config.c",
+          "zephyr/soc/st/stm32/stm32h5x/soc.c",
+          "zephyr/subsys/fs/nvs/nvs.c",
+          "zephyr/subsys/logging/log_core.c",
+          "zephyr/subsys/logging/log_msg.c",
+          "zephyr/subsys/net/ip/connection.c",
+          "zephyr/subsys/net/ip/icmp.c",
+          "zephyr/subsys/net/ip/icmpv4.c",
+          "zephyr/subsys/net/ip/igmp.c",
+          "zephyr/subsys/net/ip/ipv4.c",
+          "zephyr/subsys/net/ip/net_context.c",
+          "zephyr/subsys/net/ip/net_core.c",
+          "zephyr/subsys/net/ip/net_if.c",
+          "zephyr/subsys/net/ip/net_mgmt.c",
+          "zephyr/subsys/net/ip/net_pkt.c",
+          "zephyr/subsys/net/ip/net_tc.c",
+          "zephyr/subsys/net/ip/udp.c",
+          "zephyr/subsys/net/ip/utils.c",
+          "zephyr/subsys/net/l2/ethernet/arp.c",
+          "zephyr/subsys/net/l2/ethernet/ethernet.c",
+          "zephyr/subsys/net/lib/coap/coap.c",
+          "zephyr/subsys/net/lib/coap/coap_link_format.c",
+          "zephyr/subsys/net/lib/dhcpv4/dhcpv4.c",
+          "zephyr/subsys/net/lib/dns/dispatcher.c",
+          "zephyr/subsys/net/lib/dns/dns_pack.c",
+          "zephyr/subsys/net/lib/dns/resolve.c",
+          "zephyr/subsys/net/lib/shell/conn.c",
+          "zephyr/subsys/net/lib/shell/dns.c",
+          "zephyr/subsys/net/lib/shell/events.c",
+          "zephyr/subsys/net/lib/shell/iface.c",
+          "zephyr/subsys/net/lib/shell/route.c",
+          "zephyr/subsys/net/lib/shell/stats.c",
+          "zephyr/subsys/net/lib/shell/udp.c",
+          "zephyr/subsys/net/lib/sockets/getaddrinfo.c",
+          "zephyr/subsys/net/lib/sockets/sockets_inet.c",
+          "zephyr/subsys/net/lib/sockets/sockets_service.c",
+          "zephyr/subsys/net/lib/sockets/sockets_tls.c",
+          "zephyr/subsys/settings/src/settings_store.c",
+          "zephyr/subsys/shell/shell.c",
+          "zephyr/subsys/shell/shell_help.c",
+          "zephyr/subsys/storage/flash_map/flash_map.c",
+          "zephyr/subsys/storage/flash_map/flash_map_default.c",
+          "zephyr/subsys/tracing/tracing_none.c"
+        ],
+        "busiest": [
+          {
+            "file": "drivers/ethernet/eth_stm32_hal.c",
+            "commits": 24
+          },
+          {
+            "file": "subsys/net/ip/net_if.c",
+            "commits": 21
+          },
+          {
+            "file": "subsys/net/lib/dhcpv4/dhcpv4.c",
+            "commits": 16
+          },
+          {
+            "file": "drivers/ethernet/phy/phy_mii.c",
+            "commits": 16
+          },
+          {
+            "file": "subsys/net/ip/net_context.c",
+            "commits": 13
+          },
+          {
+            "file": "kernel/init.c",
+            "commits": 12
+          },
+          {
+            "file": "subsys/net/ip/connection.c",
+            "commits": 12
+          },
+          {
+            "file": "subsys/net/lib/shell/iface.c",
+            "commits": 12
+          },
+          {
+            "file": "subsys/net/ip/net_core.c",
+            "commits": 11
+          },
+          {
+            "file": "drivers/serial/uart_stm32.c",
+            "commits": 9
+          },
+          {
+            "file": "subsys/net/lib/dns/resolve.c",
+            "commits": 8
+          },
+          {
+            "file": "subsys/net/l2/ethernet/ethernet.c",
+            "commits": 8
+          },
+          {
+            "file": "kernel/sched.c",
+            "commits": 7
+          },
+          {
+            "file": "subsys/net/l2/ethernet/arp.c",
+            "commits": 6
+          },
+          {
+            "file": "drivers/mdio/mdio_stm32_hal.c",
+            "commits": 6
+          }
+        ]
+      },
+      "evidence": [],
+      "action": "The busiest files are listed first; review those against your app's behavior.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "STORAGE-BACKEND-OPTIONS-CHANGED-5c1b784f",
+      "category": "storage",
+      "kind": "backend-options-changed",
+      "subject": "settings",
+      "title": "Storage backend settings options changed: CONFIG_SETTINGS_ZMS_LOAD_SUBTREE_PATH unset \u2192 n, CONFIG_SETTINGS_ZMS_NO_LL_DELETE unset \u2192 n",
+      "severity": "info",
+      "confidence": "high",
+      "old": {
+        "SETTINGS_ZMS_LOAD_SUBTREE_PATH": null,
+        "SETTINGS_ZMS_NO_LL_DELETE": null
+      },
+      "new": {
+        "SETTINGS_ZMS_LOAD_SUBTREE_PATH": "n",
+        "SETTINGS_ZMS_NO_LL_DELETE": "n"
+      },
+      "evidence": [],
+      "action": "The backend stays enabled; review these options.",
+      "related": [],
+      "analyzer": "storage",
+      "heuristics": [],
+      "introduced_by_migration": true,
+      "provenance": {
+        "evidence_source": "app .config and Kconfig at v4.1.0 and v4.2.0; backend trees from zmig/data/hazard_seeds.yaml; compiled files from the app SBOM",
+        "role_source": "not applicable (no image role involved)",
+        "role_evidence": "strong"
+      }
+    },
+    {
+      "id": "GUIDE-ENTRY-MATCH-7613c10e",
+      "category": "guide",
+      "kind": "entry-match",
+      "subject": "MG-4.2-0046:kconfig:ETH_NATIVE_POSIX",
+      "title": "4.2 migration guide (Ethernet): ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecate (only in files this build doesn't use: socs/native.conf, socs/native_64.conf)",
+      "severity": "info",
+      "confidence": "medium",
+      "old": null,
+      "new": {
+        "entry": "MG-4.2-0046",
+        "doc": "doc/releases/migration-guide-4.2.rst",
+        "ref": "v4.2.0",
+        "item": {
+          "kind": "kconfig",
+          "value": "ETH_NATIVE_POSIX"
+        },
+        "headings": [
+          "Device Drivers and Devicetree",
+          "Ethernet"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc_entry",
+          "doc": "doc/releases/migration-guide-4.2.rst",
+          "line": 208,
+          "ref": "v4.2.0",
+          "entry_id": "MG-4.2-0046",
+          "text": "ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecated in favor of CONFIG_ETH_NATIVE_TAP ."
+        },
+        {
+          "type": "file_line",
+          "path": "socs/native.conf",
+          "line": 3,
+          "text": "CONFIG_ETH_NATIVE_POSIX=n"
+        },
+        {
+          "type": "file_line",
+          "path": "socs/native_64.conf",
+          "line": 3,
+          "text": "CONFIG_ETH_NATIVE_POSIX=n"
+        }
+      ],
+      "action": "Read MG-4.2-0046 and update the lines listed.",
+      "related": [
+        "KCONFIG-SYMBOL-DEPRECATED-ba6df930"
+      ],
+      "analyzer": "guide",
+      "heuristics": [
+        "guide.role-match",
+        "guide.severity-from-wording",
+        "outside-build"
+      ],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "GUIDE-ENTRY-MATCH-f0ba680d",
+      "category": "guide",
+      "kind": "entry-match",
+      "subject": "MG-4.2-0074:kconfig:MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE",
+      "title": "4.2 migration guide (Modem): Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU. (only in files this build doesn't use: boards/rak5010_nrf52840.conf)",
+      "severity": "info",
+      "confidence": "medium",
+      "old": null,
+      "new": {
+        "entry": "MG-4.2-0074",
+        "doc": "doc/releases/migration-guide-4.2.rst",
+        "ref": "v4.2.0",
+        "item": {
+          "kind": "kconfig",
+          "value": "MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE"
+        },
+        "headings": [
+          "Device Drivers and Devicetree",
+          "Modem"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc_entry",
+          "doc": "doc/releases/migration-guide-4.2.rst",
+          "line": 314,
+          "ref": "v4.2.0",
+          "entry_id": "MG-4.2-0074",
+          "text": "Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU."
+        },
+        {
+          "type": "file_line",
+          "path": "boards/rak5010_nrf52840.conf",
+          "line": 27,
+          "text": "CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE=160"
+        }
+      ],
+      "action": "Read MG-4.2-0074 and update the lines listed.",
+      "related": [
+        "KCONFIG-SYMBOL-REMOVED-f4c32f9b"
+      ],
+      "analyzer": "guide",
+      "heuristics": [
+        "guide.role-match",
+        "guide.severity-from-wording",
+        "outside-build"
+      ],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "STORAGE-IMPLEMENTATION-CHANGED-17e68292",
+      "category": "storage",
+      "kind": "implementation-changed",
+      "subject": "storage",
+      "title": "2 compiled storage backend files changed; their on-media definitions didn't",
+      "severity": "info",
+      "confidence": "medium",
+      "old": null,
+      "new": {
+        "files": [
+          "subsys/fs/nvs/nvs.c",
+          "subsys/settings/src/settings_store.c"
+        ]
+      },
+      "evidence": [],
+      "action": "Behavior can change without the declarations changing; named in the verdict basis.",
+      "related": [],
+      "analyzer": "storage",
+      "heuristics": [],
+      "introduced_by_migration": true,
+      "provenance": {
+        "evidence_source": "app .config and Kconfig at v4.1.0 and v4.2.0; backend trees from zmig/data/hazard_seeds.yaml; compiled files from the app SBOM",
+        "role_source": "not applicable (no image role involved)",
+        "role_evidence": "strong"
+      }
+    }
+  ],
+  "upgrade_path": {
+    "verdict": "direct-ok",
+    "unchecked": [],
+    "confidence": "medium",
+    "categories": {
+      "layout": {
+        "status": "clean",
+        "confidence": "high",
+        "checked": [
+          "partitions of image hello @ v4.1.0 (4) and hello @ v4.2.0 (4) from the final devicetree",
+          "partition roles from MCUboot's Zephyr port and the storage subsystems at both refs"
+        ]
+      },
+      "mcuboot": {
+        "status": "not-applicable",
+        "confidence": "high",
+        "checked": [
+          "no bootloader image, and the app isn't built for MCUboot, at either ref"
+        ]
+      },
+      "storage": {
+        "status": "clean",
+        "confidence": "medium",
+        "checked": [
+          "enabled backends: nvs v4.1.0=on v4.2.0=on; settings v4.1.0=on v4.2.0=on",
+          "value changes of backend symbols, with select/imply/depends causes at both refs",
+          "nvs uses (none resolved)",
+          "settings uses storage_partition",
+          "nvs: on-media definitions unchanged (3 seeds)",
+          "settings: on-media definitions unchanged (2 seeds)"
+        ],
+        "backends": {
+          "old": [
+            "nvs",
+            "settings"
+          ],
+          "new": [
+            "nvs",
+            "settings"
+          ]
+        },
+        "partitions": {
+          "nvs": [],
+          "settings": [
+            "storage_partition"
+          ]
+        },
+        "implementation_only": [
+          "subsys/fs/nvs/nvs.c",
+          "subsys/settings/src/settings_store.c"
+        ],
+        "linked_layout_findings": []
+      },
+      "ble": {
+        "status": "not-applicable",
+        "confidence": "high",
+        "checked": [
+          "no Bluetooth symbol that uses SETTINGS is enabled at v4.1.0"
+        ]
+      },
+      "wire": {
+        "status": "clean",
+        "confidence": "medium",
+        "checked": [
+          "allowlist v1: 12 of 12 entries checked in 1 image pairs; clean means only that none of them changed"
+        ],
+        "entries_checked": [
+          "WIRE-SMP-ORIGINAL",
+          "WIRE-SMP-NETBUF",
+          "WIRE-SMP-BT-REASSEMBLY",
+          "WIRE-BT-L2CAP-MTU",
+          "WIRE-BT-ACL-RX",
+          "WIRE-BT-NAME",
+          "WIRE-BT-APPEARANCE",
+          "WIRE-USB-VID",
+          "WIRE-USB-PID",
+          "WIRE-USB-PRODUCT",
+          "WIRE-USB-MANUFACTURER",
+          "WIRE-CONSOLE-BAUD"
+        ],
+        "entries_missing": [],
+        "changed_but_unused": []
+      },
+      "sysbuild": {
+        "status": "not-applicable",
+        "confidence": "high",
+        "checked": [
+          "not a sysbuild build"
+        ]
+      },
+      "images": {
+        "status": "clean",
+        "confidence": "high",
+        "checked": [
+          "images findings of the analyzer"
+        ]
+      },
+      "crossimage": {
+        "status": "clean",
+        "confidence": "high",
+        "checked": [
+          "crossimage findings of the analyzer"
+        ]
+      }
+    },
+    "remedies": {},
+    "assumptions": [
+      "deployed app == the source build's app image"
+    ],
+    "basis": [
+      "storage: clean on definitions; implementation-only changes in 2 files: subsys/fs/nvs/nvs.c, subsys/settings/src/settings_store.c",
+      "wire: clean means only that no allowlisted item changed"
+    ]
+  },
+  "not_checked": [
+    {
+      "area": "bootloader partition roles",
+      "reason": "no mcuboot module in the v4.1.0 workspace",
+      "analyzer": "layout"
+    },
+    {
+      "area": "bootloader partition roles",
+      "reason": "no mcuboot module in the v4.2.0 workspace",
+      "analyzer": "layout"
+    },
+    {
+      "area": "salvage of files the app doesn't own",
+      "reason": "salvage only disables lines in the app's own config and overlay files; a target configure failure caused by board, module or generated files can't be salvaged (no salvage was needed in this run)",
+      "analyzer": "scan"
+    },
+    {
+      "area": "sysbuild configuration",
+      "reason": "not a sysbuild build at both refs",
+      "analyzer": "sysbuild"
+    },
+    {
+      "area": "usable image size",
+      "reason": "no imgtool sign command in the app's build at both refs",
+      "analyzer": "layout"
+    },
+    {
+      "area": "wire formats outside the allowlist",
+      "reason": "only 12 allowlisted items are compared (zmig/data/wire_format.yaml); protocol payloads, custom GATT services and other peer-visible behavior aren't",
+      "analyzer": "wire"
+    }
+  ],
+  "checked": [
+    {
+      "area": "binary boundaries (abidiff)",
+      "result": "clean",
+      "detail": "no prebuilt static library from the project tree on the link line, and CONFIG_LLEXT isn't set: no binary ABI to compare",
+      "analyzer": "api"
+    },
+    {
+      "area": "declarations the project uses",
+      "result": "found",
+      "detail": "276 Zephyr/module declaration(s) the project's TUs use, compared at both refs",
+      "analyzer": "api"
+    },
+    {
+      "area": "libclang parse coverage",
+      "result": "clean",
+      "detail": "clang version 18.1.1: 31 project TU(s) with the source flags (0 with errors), 31 with the target flags (0 with errors); 62 parsed, 0 from the parse cache, 0 TU(s) skipped (no included file changed)",
+      "analyzer": "api"
+    },
+    {
+      "area": "struct layouts at the source (pahole)",
+      "result": "clean",
+      "detail": "18 of 20 field offset(s) clang modelled checked against the GCC-built ELF; 0 disagree",
+      "analyzer": "api"
+    },
+    {
+      "area": "struct layouts at the target (pahole)",
+      "result": "clean",
+      "detail": "18 of 20 field offset(s) clang modelled checked against the GCC-built ELF; 0 disagree",
+      "analyzer": "api"
+    },
+    {
+      "area": "the project's own system calls",
+      "result": "clean",
+      "detail": "0 __syscall declaration(s) in 0 project header(s) compared with both builds' syscalls.json",
+      "analyzer": "api"
+    },
+    {
+      "area": "device and SYS_INIT init order",
+      "result": "clean",
+      "detail": "2 project init call(s) present at both refs compared, among 34 init calls at the source and 34 at the target",
+      "analyzer": "initorder"
+    },
+    {
+      "area": "module set",
+      "result": "clean",
+      "detail": "5 module(s) the source build used compared in both Zephyr manifests (4 changed); the target build needed no other module",
+      "analyzer": "modules"
+    }
+  ]
+}
