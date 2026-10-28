@@ -19,7 +19,16 @@ from typing import Any, ClassVar, Literal
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact, project_path, project_roots
 from zmig.errors import ArtifactMissing
-from zmig.findings import JSON, Category, Confidence, Finding, NotChecked, Severity, file_line
+from zmig.findings import (
+    JSON,
+    Category,
+    Checked,
+    Confidence,
+    Finding,
+    NotChecked,
+    Severity,
+    file_line,
+)
 from zmig.scan import ScanContext
 from zmig.snapshots import init_levels
 
@@ -157,4 +166,17 @@ class InitOrderAnalyzer:
                     "counts": {"now_after": len(later), "now_before": len(earlier)},
                 },
             )
-        return AnalyzerResult(findings)
+        project = sum(
+            1
+            for k in old_keys
+            if k in by_new
+            and (site(nd, by_new[k]["fn"], new_proj) or site(od, by_old[k]["fn"], old_proj))
+        )
+        checked = Checked(
+            "device and SYS_INIT init order",
+            "found" if findings else "clean",
+            f"{project} project init call(s) present at both refs compared, among "
+            f"{len(old_keys)} init calls at the source and {len(new_keys)} at the target",
+            self.name,
+        )
+        return AnalyzerResult(findings, checked=[checked])

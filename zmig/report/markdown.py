@@ -229,6 +229,14 @@ def render_markdown(report: Report) -> str:
             out.append("")
     else:
         out += ["No findings.", ""]
+    if report.checked:
+        # What did run, so "found nothing" isn't confused with "didn't run" (Not checked).
+        out += ["## Checked", ""]
+        out += [
+            f"- **{c.area}** ({c.analyzer}): {c.result}: {c.detail}"
+            for c in sorted(report.checked, key=lambda c: (c.analyzer, c.area))
+        ]
+        out.append("")
     if report.not_checked:
         out += ["## Not checked", ""]
         out += [

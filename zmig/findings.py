@@ -13,7 +13,7 @@ from enum import StrEnum
 from typing import Any
 
 SCHEMA_URI = "https://zmig.dev/schema/report/1"
-SCHEMA_VERSION = "1.2"
+SCHEMA_VERSION = "1.3"
 
 
 class Severity(StrEnum):
@@ -206,15 +206,40 @@ class NotChecked:
 
 
 @dataclass(frozen=True)
+class Checked:
+    """Something an analyzer or tool did examine (report section "checked"), so a report
+    tells "ran, found nothing" apart from "did not run" (that's NotChecked)."""
+
+    area: str
+    result: str  # clean | found | partial
+    detail: str
+    analyzer: str
+
+    def to_json(self) -> JSON:
+        return {
+            "area": self.area,
+            "result": self.result,
+            "detail": self.detail,
+            "analyzer": self.analyzer,
+        }
+
+
+@dataclass(frozen=True)
 class AnalyzerStatus:
     name: str
     status: str  # ok | partial | skipped | error
     reason: str | None = None
+    # What it reported when it ran: all findings, and the breaking/risky ones.
+    findings: int | None = None
+    hazards: int | None = None
 
     def to_json(self) -> JSON:
         d: JSON = {"name": self.name, "status": self.status}
         if self.reason:
             d["reason"] = self.reason
+        if self.findings is not None:
+            d["findings"] = self.findings
+            d["hazards"] = self.hazards or 0
         return d
 
 
@@ -231,6 +256,7 @@ class Report:
     analyzers: list[AnalyzerStatus] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
     not_checked: list[NotChecked] = field(default_factory=list)
+    checked: list[Checked] = field(default_factory=list)
     upgrade_path: JSON | None = None
 
     def sorted_findings(self) -> list[Finding]:
@@ -268,5 +294,9 @@ class Report:
             "not_checked": [
                 n.to_json()
                 for n in sorted(set(self.not_checked), key=lambda n: (n.area, n.analyzer, n.reason))
+            ],
+            "checked": [
+                c.to_json()
+                for c in sorted(set(self.checked), key=lambda c: (c.analyzer, c.area, c.detail))
             ],
         }

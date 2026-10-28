@@ -40,6 +40,7 @@ from zmig.errors import ZmigError
 from zmig.findings import (
     JSON,
     Category,
+    Checked,
     Confidence,
     Finding,
     NotChecked,
@@ -101,6 +102,7 @@ class ApiAnalyzer:
     def analyze(self, ctx: ScanContext) -> AnalyzerResult:
         findings: list[Finding] = []
         not_checked: list[NotChecked] = []
+        checked: list[Checked] = []
         old, new = syscall_names(ctx.old_img), syscall_names(ctx.new_img)
         if old is None or new is None:
             side = "source" if old is None else "target"
@@ -112,10 +114,20 @@ class ApiAnalyzer:
                 )
             )
         else:
-            for header, decls in project_syscalls(ctx).items():
+            mine = project_syscalls(ctx)
+            for header, decls in mine.items():
                 lost = [d for d in decls if d[0] in old and d[0] not in new]
                 if lost:
                     findings.append(self._lost_syscalls(ctx, header, lost))
+            checked.append(
+                Checked(
+                    "the project's own system calls",
+                    "found" if findings else "clean",
+                    f"{sum(len(d) for d in mine.values())} __syscall declaration(s) in "
+                    f"{len(mine)} project header(s) compared with both builds' syscalls.json",
+                    self.name,
+                )
+            )
         version = libclang_version()
         if version is None:
             not_checked.append(
@@ -125,15 +137,50 @@ class ApiAnalyzer:
                     self.name,
                 )
             )
-            return AnalyzerResult(findings, status="partial", not_checked=not_checked)
+            return AnalyzerResult(
+                findings,
+                status="partial",
+                reason="libclang isn't installed",
+                not_checked=not_checked,
+                checked=checked,
+            )
         ctx.shared.setdefault("environment", {})["libclang"] = version
         src, tgt, gaps = self._parse_both(ctx, version)
         not_checked += gaps
-        findings += self._declaration_changes(ctx, src, tgt)
-        b_findings, b_gaps = self._binary_checks(ctx, src, tgt)
+        errs = [sum(1 for t in tus if t["errors"]) for tus in (src, tgt)]
+        checked.append(
+            Checked(
+                "libclang parse coverage",
+                "partial" if gaps else "clean",
+                f"{version}: {len(src)} project TU(s) parsed with the source flags "
+                f"({errs[0]} with errors), {len(tgt)} with the target flags ({errs[1]} with "
+                f"errors, {len(src) - len(tgt)} without a target compile command)",
+                self.name,
+            )
+        )
+        decl_findings = self._declaration_changes(ctx, src, tgt)
+        findings += decl_findings
+        used = {r["name"] for t in src for r in t["refs"]}
+        checked.append(
+            Checked(
+                "declarations the project uses",
+                "found" if decl_findings else "clean",
+                f"{len(used)} Zephyr/module declaration(s) the project's TUs use, compared at "
+                f"both refs",
+                self.name,
+            )
+        )
+        b_findings, b_gaps, b_checked = self._binary_checks(ctx, src, tgt)
         findings += b_findings
         not_checked += b_gaps
-        return AnalyzerResult(findings, status="partial" if gaps else "ok", not_checked=not_checked)
+        checked += b_checked
+        return AnalyzerResult(
+            findings,
+            status="partial" if gaps else "ok",
+            reason=f"{len(gaps)} input(s) not interpreted (see Not checked)" if gaps else None,
+            not_checked=not_checked,
+            checked=checked,
+        )
 
     def _parse_both(
         self, ctx: ScanContext, version: str
@@ -375,12 +422,13 @@ class ApiAnalyzer:
 
     def _binary_checks(
         self, ctx: ScanContext, src: list[dict[str, Any]], tgt: list[dict[str, Any]]
-    ) -> tuple[list[Finding], list[NotChecked]]:
+    ) -> tuple[list[Finding], list[NotChecked], list[Checked]]:
         """§6: pahole cross-checks clang's layout of the structs the project accesses
         against the GCC-built ELFs; abidiff compares what a binary boundary (a prebuilt
         static library the project links, LLEXT) sees. Missing tools are not-checked."""
         findings: list[Finding] = []
         gaps: list[NotChecked] = []
+        checked: list[Checked] = []
         for side, img, tus in (("source", ctx.old_img, src), ("target", ctx.new_img, tgt)):
             fields = {
                 k: v
@@ -388,7 +436,16 @@ class ApiAnalyzer:
                 for k, v in t["decls"].items()
                 if v["kind"] == "field" and k.count(".") == 1 and not k.startswith("<")
             }
-            if not fields or not img.has(Artifact.ELF):
+            if not fields:
+                continue
+            if not img.has(Artifact.ELF):
+                gaps.append(
+                    NotChecked(
+                        f"struct layouts at the {side} (pahole)",
+                        f"no ELF at the {side}: {img.missing_reason(Artifact.ELF)}",
+                        self.name,
+                    )
+                )
                 continue
             layouts = pahole_layouts(img.artifact(Artifact.ELF), [k.split(".")[0] for k in fields])
             if layouts is None:
@@ -406,6 +463,20 @@ class ApiAnalyzer:
                 elf_bit = layouts.get(struct, {}).get(member)
                 if elf_bit is not None and v.get("offset", -1) >= 0 and elf_bit != v["offset"]:
                     differ.append(f"{k} (clang bit {v['offset']}, ELF bit {elf_bit})")
+            compared = sum(
+                1
+                for k in fields
+                if layouts.get(k.split(".")[0], {}).get(k.split(".")[1]) is not None
+            )
+            checked.append(
+                Checked(
+                    f"struct layouts at the {side} (pahole)",
+                    "partial" if differ else "clean",
+                    f"{compared} of {len(fields)} field offset(s) clang modelled checked "
+                    f"against the GCC-built ELF; {len(differ)} disagree",
+                    self.name,
+                )
+            )
             if differ:
                 gaps.append(
                     NotChecked(
@@ -418,7 +489,18 @@ class ApiAnalyzer:
                     )
                 )
         roots = project_roots(ctx.old, ctx.old_img.dir)
-        for b in binary_boundaries(ctx.old_img.dir, list(roots)):
+        bounds = binary_boundaries(ctx.old_img.dir, list(roots))
+        if not bounds:
+            checked.append(
+                Checked(
+                    "binary boundaries (abidiff)",
+                    "clean",
+                    "no prebuilt static library from the project tree on the link line, and "
+                    "CONFIG_LLEXT isn't set: no binary ABI to compare",
+                    self.name,
+                )
+            )
+        for b in bounds:
             if b == "llext":
                 gaps.append(
                     NotChecked(
@@ -446,7 +528,16 @@ class ApiAnalyzer:
                         self.name,
                     )
                 )
-            elif changes:
+            elif not changes:
+                checked.append(
+                    Checked(f"ABI seen by {rel} (abidiff)", "clean",
+                            "abidiff reports no change to the symbols it imports", self.name)
+                )  # fmt: skip
+            else:
+                checked.append(
+                    Checked(f"ABI seen by {rel} (abidiff)", "found",
+                            f"{len(changes)} change(s) to symbols it imports", self.name)
+                )  # fmt: skip
                 findings.append(
                     Finding(
                         category=Category.API,
@@ -467,7 +558,7 @@ class ApiAnalyzer:
                         new=changes,
                     )
                 )
-        return findings, gaps
+        return findings, gaps, checked
 
     def _missing_device(self, ctx: ScanContext, ord_: int, sites: list[str]) -> Finding:
         """A devicetree device the project takes (DEVICE_DT_GET, DT_CHOSEN, ...) that the

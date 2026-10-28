@@ -15,7 +15,7 @@ from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol, runtime_checkable
 
 from zmig.errors import ZmigError
-from zmig.findings import AnalyzerStatus, Finding, NotChecked
+from zmig.findings import AnalyzerStatus, Checked, Finding, NotChecked
 
 if TYPE_CHECKING:
     from zmig.buildctx import Artifact
@@ -32,6 +32,8 @@ class AnalyzerResult:
     status: Status = "ok"
     reason: str | None = None
     not_checked: list[NotChecked] = field(default_factory=list)
+    # What it did examine (with the result), so "ran, found nothing" is visible.
+    checked: list[Checked] = field(default_factory=list)
 
     @classmethod
     def skipped(cls, reason: str) -> AnalyzerResult:
@@ -146,6 +148,7 @@ def run_build_analyzers(
     findings: list[Finding] = []
     statuses: list[AnalyzerStatus] = []
     not_checked: list[NotChecked] = []
+    checked: list[Checked] = []
     for cls in classes:
         per_image = getattr(cls, "per_image", True)
         ctxs = [_Ctx.for_pair(base, o, n) for o, n in pairs] if per_image else [base]
@@ -172,9 +175,24 @@ def run_build_analyzers(
             tag = None if (not per_image or ctx.is_app) else ctx.image
             findings += [replace(f, image=tag) if tag else f for f in res.findings]
             not_checked += res.not_checked
-            statuses.append(AnalyzerStatus(label, res.status, res.reason))
+            checked += res.checked
+            statuses.append(AnalyzerStatus(label, res.status, res.reason, 0, 0))
             ctx.shared.setdefault("findings", []).extend(res.findings)
-    return link_related(outside_build(findings, base)), statuses, not_checked
+    base.shared["checked"] = checked
+    final = outside_build(findings, base)
+    # Counts after outside_build's downgrades: what the report shows for each analyzer.
+    counted = []
+    for st in statuses:
+        if st.findings is None:
+            counted.append(st)
+            continue
+        name, _, image = st.name.partition("@")
+        if image == base.old_img.name:
+            image = ""  # the app image's findings carry no image tag
+        mine = [f for f in final if f.analyzer == name and (f.image or "") == image]
+        hazards = sum(1 for f in mine if f.severity.value != "info")
+        counted.append(replace(st, findings=len(mine), hazards=hazards))
+    return link_related(final), counted, not_checked
 
 
 # App input files that a build may or may not use, depending on board, shield and SoC.

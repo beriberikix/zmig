@@ -78,7 +78,7 @@ def test_analyzer_reports_missing_tools_as_not_checked(
         old=b, new=b, old_img=imgs[0], new_img=imgs[1], new_spec="new", scope=("s",)
     )
     tu = {"decls": {"s.b": {"kind": "field", "offset": 32}}}
-    findings, gaps = api.ApiAnalyzer()._binary_checks(ctx, [tu], [tu])  # type: ignore[arg-type]
+    findings, gaps, checked = api.ApiAnalyzer()._binary_checks(ctx, [tu], [tu])  # type: ignore[arg-type]
     assert findings == []
     areas = {g.area: g.reason for g in gaps}
     assert (
@@ -86,3 +86,5 @@ def test_analyzer_reports_missing_tools_as_not_checked(
     )
     assert areas["ABI seen by lib/libvendor.a"] == "abidiff isn't installed (abigail-tools)"
     assert Artifact.ELF.value == "zephyr/zephyr.elf"
+    # Nothing it couldn't run is reported as checked.
+    assert checked == []

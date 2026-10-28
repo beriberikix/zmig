@@ -432,3 +432,40 @@ def test_guide_entry_full_text_keeps_the_remedy() -> None:
     (entry,) = parse(text, "doc/releases/migration-guide-4.2.rst", "4.2", "MG-4.2")
     assert entry.lead == "CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE has been deprecated."
     assert "instantiate as many zephyr,native-pty-uart nodes" in entry.full
+
+
+def test_report_separates_checked_from_not_checked() -> None:
+    """'Ran, found nothing' vs 'didn't run' (review of P2, item 1)."""
+    import json as _json
+
+    import jsonschema
+
+    from zmig.findings import AnalyzerStatus, Checked, NotChecked, Report
+
+    ref = {"spec": "v1", "sha": "a" * 40, "kind": "tag", "dirty": False}
+    r = Report("scan", "0", {"from": ref, "to": ref}, {})
+    r.analyzers = [
+        AnalyzerStatus("initorder", "ok", None, 0, 0),
+        AnalyzerStatus("sbom", "skipped", "no SBOM"),
+    ]
+    r.checked = [Checked("device and SYS_INIT init order", "clean", "2 compared", "initorder")]
+    r.not_checked = [NotChecked("SBOM", "the build failed", "sbom")]
+    j = r.to_json()
+    schema = _json.loads((Path(__file__).parents[1] / "zmig/schema/report-1.json").read_text())
+    jsonschema.validate(j, schema)
+    assert j["checked"] == [
+        {
+            "area": "device and SYS_INIT init order",
+            "result": "clean",
+            "detail": "2 compared",
+            "analyzer": "initorder",
+        }
+    ]
+    statuses = {a["name"]: a for a in j["analyzers"]}
+    assert statuses["initorder"] == {
+        "name": "initorder",
+        "status": "ok",
+        "findings": 0,
+        "hazards": 0,
+    }
+    assert "findings" not in statuses["sbom"]  # didn't run: no count

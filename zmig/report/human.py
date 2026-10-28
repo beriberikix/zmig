@@ -52,8 +52,12 @@ def render_human(report: Report) -> str:
     info = sum(1 for f in report.findings if f.severity is Severity.INFO)
     if info:
         lines.append(f"(+{info} info findings in MIGRATION.md / report.json)")
-    if report.not_checked:
-        lines.append(f"({len(report.not_checked)} areas not checked: see MIGRATION.md)")
+    if report.checked or report.not_checked:
+        clean = sum(1 for c in report.checked if c.result == "clean")
+        lines.append(
+            f"(checked: {clean} clean, {len(report.checked) - clean} with findings or gaps; "
+            f"{len(report.not_checked)} not checked: see MIGRATION.md)"
+        )
     bad = [a for a in report.analyzers if a.status != "ok"]
     for a in bad:
         lines.append(f"! analyzer {a.name} {a.status}: {a.reason}")

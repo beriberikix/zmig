@@ -110,6 +110,14 @@
           },
           "reason": {
             "type": "string"
+          },
+          "findings": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hazards": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }
@@ -229,6 +237,37 @@
             "type": "string"
           },
           "reason": {
+            "type": "string"
+          },
+          "analyzer": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "checked": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "area",
+          "result",
+          "detail",
+          "analyzer"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "clean",
+              "found",
+              "partial"
+            ]
+          },
+          "detail": {
             "type": "string"
           },
           "analyzer": {

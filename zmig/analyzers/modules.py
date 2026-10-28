@@ -8,7 +8,7 @@ from typing import ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact
-from zmig.findings import JSON, Category, Confidence, Finding, Severity, tool_output
+from zmig.findings import JSON, Category, Checked, Confidence, Finding, Severity, tool_output
 from zmig.manifest import load_manifest
 from zmig.modulecheck import manifest_changes
 from zmig.scan import ScanContext
@@ -118,4 +118,16 @@ class ModulesAnalyzer:
                     old=c.old,
                     new=c.new,
                 )
-        return AnalyzerResult(findings)
+        needs = ", ".join(n.module for n in ctx.module_needs)
+        removed = [c.module for c in changes if c.kind == "removed"]
+        detail = (
+            f"{len(used)} module(s) the source build used compared in both Zephyr manifests "
+            f"({len(changes)} changed); "
+            + (
+                f"the target build needed {needs}"
+                if needs
+                else "the target build needed no other module"
+            )
+        )
+        checked = Checked("module set", "found" if needs or removed else "clean", detail, self.name)
+        return AnalyzerResult(findings, checked=[checked])

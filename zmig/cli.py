@@ -349,6 +349,7 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     )
     # Tool versions analyzers recorded (the libclang the API diff used).
     report.environment.update(ctx.shared.get("environment", {}))
+    report.checked = list(ctx.shared.get("checked", []))
     report.not_checked.append(
         NotChecked(
             "salvage of files the app doesn't own",
