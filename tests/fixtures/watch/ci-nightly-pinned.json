@@ -1,0 +1,1082 @@
+{
+  "schema": "https://zmig.dev/schema/report/1",
+  "schema_version": "1.3",
+  "zmig_version": "0.1.0",
+  "command": "scan",
+  "inputs": {
+    "from": {
+      "spec": "v4.1-branch",
+      "sha": "7081d7c5f19306fda5766835052f2b69badfbb41",
+      "kind": "branch",
+      "url": "https://github.com/zephyrproject-rtos/zephyr",
+      "dirty": false
+    },
+    "to": {
+      "spec": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+      "sha": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+      "kind": "sha",
+      "url": "https://github.com/zephyrproject-rtos/zephyr",
+      "dirty": false
+    },
+    "app": "app",
+    "app_tree_hash": "ee7d2b9afe1f889cfd29ad4c3552cbc368f74e0a0cc22e522c574a4f1ddc578c",
+    "board": {
+      "from": "usb2canfdv1",
+      "to": "usb2canfdv1",
+      "mapping": "same"
+    },
+    "build_mode": "full",
+    "sysbuild": false
+  },
+  "environment": {
+    "python": "3.12.15",
+    "west": "West version: v1.5.0",
+    "cmake": "cmake version 3.31.6",
+    "ninja": "1.13.2",
+    "dtc": "Version: DTC 1.7.0",
+    "git": "git version 2.56.0",
+    "sdk": {
+      "path": "/home/runner/work/zmig-ci-cannectivity/zephyr-sdk-0.16.8",
+      "version": "0.16.8"
+    },
+    "libclang": "clang version 18.1.1"
+  },
+  "contexts": [
+    {
+      "ref": "v4.1-branch",
+      "board": "usb2canfdv1",
+      "mode": "full",
+      "sysbuild": false,
+      "status": "ok",
+      "key": "9f1baaa3623494b5",
+      "images": [
+        {
+          "name": "app",
+          "role": "app",
+          "role_source": "the default image (domains.yaml), or the only image",
+          "status": "ok",
+          "board": "usb2canfdv1/stm32g0b1xx"
+        }
+      ],
+      "sdk": {
+        "path": "/home/runner/work/zmig-ci-cannectivity/zephyr-sdk-0.16.8",
+        "version": "0.16.8"
+      }
+    },
+    {
+      "ref": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+      "board": "usb2canfdv1",
+      "mode": "full",
+      "sysbuild": false,
+      "status": "build-failed",
+      "key": "21572a11c0cdbdb8",
+      "images": [
+        {
+          "name": "app",
+          "role": "app",
+          "role_source": "the default image (domains.yaml), or the only image",
+          "status": "build-failed",
+          "board": "usb2canfdv1/stm32g0b1xx"
+        }
+      ],
+      "sdk": {
+        "path": "/home/runner/work/zmig-ci-cannectivity/zephyr-sdk-0.16.8",
+        "version": "0.16.8"
+      },
+      "superseded_by_module_recovery": [
+        "cmsis_6"
+      ]
+    },
+    {
+      "ref": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+      "board": "usb2canfdv1",
+      "mode": "full",
+      "sysbuild": false,
+      "status": "build-failed",
+      "key": "c9fe528354295c88",
+      "images": [
+        {
+          "name": "app",
+          "role": "app",
+          "role_source": "the default image (domains.yaml), or the only image",
+          "status": "build-failed",
+          "board": "usb2canfdv1/stm32g0b1xx"
+        }
+      ],
+      "sdk": {
+        "path": "/home/runner/work/zmig-ci-cannectivity/zephyr-sdk-0.16.8",
+        "version": "0.16.8"
+      },
+      "modules_added": [
+        "cmsis_6"
+      ]
+    }
+  ],
+  "analyzers": [
+    {
+      "name": "api",
+      "status": "ok",
+      "findings": 2,
+      "hazards": 2
+    },
+    {
+      "name": "ble",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "board",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "buildlog",
+      "status": "ok",
+      "findings": 3,
+      "hazards": 3
+    },
+    {
+      "name": "crossimage",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "devicetree",
+      "status": "ok",
+      "findings": 3,
+      "hazards": 1
+    },
+    {
+      "name": "guide",
+      "status": "ok",
+      "findings": 2,
+      "hazards": 1
+    },
+    {
+      "name": "images",
+      "status": "ok",
+      "findings": 1,
+      "hazards": 0
+    },
+    {
+      "name": "initorder",
+      "status": "skipped",
+      "reason": "target (30de5e8a2ceef99177c6c96785a8888b978154f0): zephyr/zephyr.elf missing: the build failed"
+    },
+    {
+      "name": "kconfig",
+      "status": "ok",
+      "findings": 3,
+      "hazards": 0
+    },
+    {
+      "name": "layout",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "mcuboot",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "modules",
+      "status": "ok",
+      "findings": 3,
+      "hazards": 1
+    },
+    {
+      "name": "sbom",
+      "status": "skipped",
+      "reason": "target (30de5e8a2ceef99177c6c96785a8888b978154f0): the build failed; west spdx needs a full build"
+    },
+    {
+      "name": "storage",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "sysbuild",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "wire",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    }
+  ],
+  "summary": {
+    "counts": {
+      "breaking": 5,
+      "risky": 3,
+      "info": 9
+    },
+    "top": [
+      "API-CALLBACK-TYPE-CHANGED-796c0709",
+      "API-FUNCTION-REMOVED-aeea2c6e",
+      "BUILD-TARGET-BUILD-FAILED-cd4b7f37",
+      "GUIDE-ENTRY-MATCH-aa58e19a",
+      "MANIFEST-MODULE-REQUIRED-83c6b99c"
+    ]
+  },
+  "findings": [
+    {
+      "id": "API-CALLBACK-TYPE-CHANGED-796c0709",
+      "category": "api",
+      "kind": "callback-type-changed",
+      "subject": "const state_execution",
+      "title": "Callbacks your code provides no longer match the type Zephyr expects at 30de5e8a2ceef99177c6c96785a8888b978154f0: const state_execution",
+      "severity": "breaking",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "expected": "const state_execution",
+        "message": "incompatible function pointer types initializing 'const state_execution' (aka 'enum smf_state_result (*const)(void *)') with an expression of type 'void (void *)'"
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 348,
+          "text": "const state_execution"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 353,
+          "text": "const state_execution"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 358,
+          "text": "const state_execution"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 363,
+          "text": "const state_execution"
+        }
+      ],
+      "action": "Change their signatures to match (incompatible function pointer types initializing 'const state_execution' (aka 'enum smf_state_result (*const)(void *)') with an expression of type 'void (void *)').",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "API-FUNCTION-REMOVED-aeea2c6e",
+      "category": "api",
+      "kind": "function-removed",
+      "subject": "smf_set_handled",
+      "title": "Function smf_set_handled, which your code uses, no longer exists in 30de5e8a2ceef99177c6c96785a8888b978154f0",
+      "severity": "breaking",
+      "confidence": "high",
+      "old": "void (struct smf_ctx *)",
+      "new": null,
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 225,
+          "text": "smf_set_handled"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 263,
+          "text": "smf_set_handled"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 271,
+          "text": "smf_set_handled"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 275,
+          "text": "smf_set_handled"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/smf.h:157: void (struct smf_ctx *)"
+        }
+      ],
+      "action": "Find its replacement in the migration guides.",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "BUILD-TARGET-BUILD-FAILED-cd4b7f37",
+      "category": "build",
+      "kind": "target-build-failed",
+      "subject": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+      "title": "The target build fails: 2 errors (linker)",
+      "severity": "breaking",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "errors": [
+          {
+            "kind": "linker",
+            "image": "",
+            "file": "<app>/src/led.c",
+            "line": 225,
+            "message": "undefined reference to `smf_set_handled'"
+          },
+          {
+            "kind": "linker",
+            "image": "",
+            "file": "<app>/src/led.c",
+            "line": 275,
+            "message": "undefined reference to `smf_set_handled'"
+          }
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 225,
+          "text": "undefined reference to `smf_set_handled'"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 275,
+          "text": "undefined reference to `smf_set_handled'"
+        }
+      ],
+      "action": "The Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
+      "related": [],
+      "analyzer": "buildlog",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "MANIFEST-MODULE-REQUIRED-83c6b99c",
+      "category": "manifest",
+      "kind": "module-required",
+      "subject": "cmsis_6",
+      "title": "The target build needs module cmsis_6, which the build's module set doesn't include",
+      "severity": "breaking",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "module": "cmsis_6",
+        "why": "`cmsis_core.h` is missing; the target's zephyr/modules/cmsis_6/ provides it",
+        "site": "zephyr/include/zephyr/arch/arm/asm_inline_gcc.h:24",
+        "declared": "west.yml:130",
+        "alternatives": [
+          "cmsis"
+        ],
+        "added_by_zmig": true
+      },
+      "evidence": [
+        {
+          "type": "tool_output",
+          "invocation": "target build",
+          "excerpt": "zephyr/include/zephyr/arch/arm/asm_inline_gcc.h:24: `cmsis_core.h` is missing; the target's zephyr/modules/cmsis_6/ provides it"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "target manifest",
+          "excerpt": "zephyr/west.yml:130 declares cmsis_6"
+        }
+      ],
+      "action": "Add cmsis_6 to your workspace (the name-allowlist or project list that imports Zephyr) and run `west update`. zmig added it to analyze the target; the rest of this report compares against that build.",
+      "related": [],
+      "analyzer": "modules",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "GUIDE-ENTRY-MATCH-aa58e19a",
+      "category": "guide",
+      "kind": "entry-match",
+      "subject": "MG-4.2-0137:ident:smf_set_handled",
+      "title": "4.2 migration guide (State Machine Framework): smf_set_handled has been removed. [smf_set_handled]",
+      "severity": "breaking",
+      "confidence": "medium",
+      "old": null,
+      "new": {
+        "entry": "MG-4.2-0137",
+        "doc": "doc/releases/migration-guide-4.2.rst",
+        "ref": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+        "item": {
+          "kind": "ident",
+          "value": "smf_set_handled"
+        },
+        "headings": [
+          "Other subsystems",
+          "State Machine Framework"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc_entry",
+          "doc": "doc/releases/migration-guide-4.2.rst",
+          "line": 770,
+          "ref": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+          "entry_id": "MG-4.2-0137",
+          "text": "smf_set_handled has been removed."
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 225,
+          "text": "smf_set_handled(SMF_CTX(lctx));"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 263,
+          "text": "smf_set_handled(SMF_CTX(lctx));"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 271,
+          "text": "smf_set_handled(SMF_CTX(lctx));"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 275,
+          "text": "smf_set_handled(SMF_CTX(lctx));"
+        }
+      ],
+      "action": "Read MG-4.2-0137 and update the lines listed.",
+      "related": [],
+      "analyzer": "guide",
+      "heuristics": [
+        "guide.role-match",
+        "guide.severity-from-wording"
+      ],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "BUILD-NEW-WARNING-3d9db422",
+      "category": "build",
+      "kind": "new-warning",
+      "subject": "compiler:<app>/src/led.c:implicit declaration of function 'smf_set_handled'",
+      "title": "New compiler warning at 30de5e8a2ceef99177c6c96785a8888b978154f0: implicit declaration of function 'smf_set_handled'",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "file": "<app>/src/led.c",
+        "flag": "-Wimplicit-function-declaration",
+        "sites": [
+          "src/led.c:225"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 225,
+          "text": "implicit declaration of function 'smf_set_handled'"
+        }
+      ],
+      "action": "Check whether it points at a real problem.",
+      "related": [],
+      "analyzer": "buildlog",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "BUILD-NEW-WARNING-865575d8",
+      "category": "build",
+      "kind": "new-warning",
+      "subject": "compiler:<app>/src/led.c:initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'",
+      "title": "New compiler warning at 30de5e8a2ceef99177c6c96785a8888b978154f0: initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "file": "<app>/src/led.c",
+        "flag": "-Wincompatible-pointer-types",
+        "sites": [
+          "src/led.c:349",
+          "src/led.c:354",
+          "src/led.c:359",
+          "src/led.c:364"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 349,
+          "text": "initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 354,
+          "text": "initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 359,
+          "text": "initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'"
+        },
+        {
+          "type": "file_line",
+          "path": "src/led.c",
+          "line": 364,
+          "text": "initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'"
+        }
+      ],
+      "action": "Check whether it points at a real problem.",
+      "related": [],
+      "analyzer": "buildlog",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-CHANGED-a6954bb0",
+      "category": "devicetree",
+      "kind": "node-changed",
+      "subject": "&zephyr_udc0:/soc/usb@40005c00",
+      "title": "&zephyr_udc0 (/soc/usb@40005c00) changed: clocks, maximum-speed",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "clocks": [
+          "< &rcc 0x3c 0x2000 >, < &rcc 0x5 0xcc0058 >",
+          "< &rcc 0x3c 0x2000 >,\n         < &rcc 0x5 0xcc0058 >"
+        ],
+        "maximum-speed": [
+          null,
+          "\"full-speed\""
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "src/usb.c",
+          "line": 126,
+          "text": "USBD_DEVICE_DEFINE(usbd, DEVICE_DT_GET(DT_NODELABEL(zephyr_udc0)), CONFIG_CANNECTIVITY_USB_VID,"
+        }
+      ],
+      "action": "Check these property changes against how your code uses the node.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-CHANGED-ffa8ebef",
+      "category": "devicetree",
+      "kind": "node-changed",
+      "subject": "&fdcan1:/soc/can@40006400",
+      "title": "&fdcan1 (/soc/can@40006400) changed: clocks, interrupt-names, interrupts, reg, reg-names (only in files this build doesn't use: boards/nucleo_h723zg_stm32h723xx.overlay)",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "clocks": [
+          "< &rcc 0x3c 0x1000 >, < &rcc 0xa 0x8c80058 >",
+          "< &rcc 0x3c 0x1000 >,\n         < &rcc 0xa 0x8c80058 >"
+        ],
+        "interrupt-names": [
+          "\"int0\", \"int1\"",
+          "\"int0\",\n                  \"int1\""
+        ],
+        "interrupts": [
+          "< 0x15 0x0 >, < 0x16 0x0 >",
+          "< 0x15 0x0 >,\n             < 0x16 0x0 >"
+        ],
+        "reg": [
+          "< 0x40006400 0x400 >, < 0x4000b400 0x350 >",
+          "< 0x40006400 0x400 >,\n      < 0x4000b400 0x350 >"
+        ],
+        "reg-names": [
+          "\"m_can\", \"message_ram\"",
+          "\"m_can\",\n            \"message_ram\""
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/nucleo_h723zg_stm32h723xx.overlay",
+          "line": 24,
+          "text": "&fdcan1 {"
+        }
+      ],
+      "action": "Check these property changes against how your code uses the node.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [
+        "outside-build"
+      ],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-OTHER-NODES-95dd4731",
+      "category": "devicetree",
+      "kind": "other-nodes",
+      "subject": "unreferenced",
+      "title": "27 nodes your app doesn't reference changed, disappeared or appeared; 1 more node only changed binding",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "changed": [
+          "/soc",
+          "/soc/can@40006800",
+          "/soc/flash-controller@40022000",
+          "/soc/flash-controller@40022000/flash@8000000",
+          "/soc/interrupt-controller@40021800",
+          "/soc/serial@40004400",
+          "/soc/serial@40004800",
+          "/soc/serial@40004c00",
+          "/soc/serial@40005000",
+          "/soc/serial@40008000",
+          "/soc/serial@40008400",
+          "/soc/serial@40013800",
+          "/soc/serial@40013c00",
+          "/soc/spi@40003800",
+          "/soc/spi@40003c00",
+          "/soc/spi@40013000",
+          "/soc/timers@40012c00"
+        ],
+        "removed": [],
+        "added": [
+          "/mcos",
+          "/mcos/mco1",
+          "/mcos/mco2",
+          "/soc/power@40007000",
+          "/soc/power@40007000/wkup-pin@1",
+          "/soc/power@40007000/wkup-pin@2",
+          "/soc/power@40007000/wkup-pin@3",
+          "/soc/power@40007000/wkup-pin@4",
+          "/soc/power@40007000/wkup-pin@5",
+          "/soc/power@40007000/wkup-pin@6"
+        ],
+        "binding_changed": [
+          "/cpus"
+        ]
+      },
+      "evidence": [],
+      "action": "None needed unless you start using them.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "GUIDE-COVERAGE-2b29cd11",
+      "category": "guide",
+      "kind": "coverage",
+      "subject": "documents",
+      "title": "Read 160 entries from 2 documents; 1 touch your app",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "documents": [
+          {
+            "doc": "doc/releases/migration-guide-4.2.rst",
+            "ref": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+            "version": "4.2"
+          },
+          {
+            "doc": "doc/releases/release-notes-4.2.rst",
+            "ref": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+            "version": "4.2"
+          }
+        ],
+        "entries": 160,
+        "matched": [
+          "MG-4.2-0137"
+        ]
+      },
+      "evidence": [],
+      "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+      "related": [],
+      "analyzer": "guide",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "IMAGES-IMAGES-SUMMARY-dc5e889f",
+      "category": "images",
+      "kind": "images-summary",
+      "subject": "images",
+      "title": "1 image at 30de5e8a2ceef99177c6c96785a8888b978154f0: app (app)",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": [
+        {
+          "image": "app",
+          "role": "app",
+          "status": [
+            "ok",
+            "build-failed"
+          ],
+          "compiled_files": null
+        }
+      ],
+      "evidence": [],
+      "action": "Per-image findings follow, grouped by image.",
+      "related": [],
+      "analyzer": "images",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-DEFAULT-CHANGED-5427105d",
+      "category": "kconfig",
+      "kind": "default-changed",
+      "subject": "CONFIG_5 symbols",
+      "title": "5 Kconfig symbols: other symbols resolve to a different value in 30de5e8a2ceef99177c6c96785a8888b978154f0",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "REBOOT": [
+          "y",
+          "n"
+        ],
+        "RUNTIME_NMI": [
+          "y",
+          "n"
+        ],
+        "SCHED_DUMB": [
+          "y",
+          "n"
+        ],
+        "TIMESLICE_SIZE": [
+          "0",
+          "20"
+        ],
+        "WAITQ_DUMB": [
+          "y",
+          "n"
+        ]
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-NEWLY-SET-1abf43d9",
+      "category": "kconfig",
+      "kind": "newly-set",
+      "subject": "CONFIG_29 symbols",
+      "title": "29 Kconfig symbols: symbols are newly enabled or set in 30de5e8a2ceef99177c6c96785a8888b978154f0",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "ARCH_DEVICE_STATE_ALIGN": "4",
+        "ARCH_HAS_VECTOR_TABLE_RELOCATION": "y",
+        "ARCH_SUPPORTS_COREDUMP_STACK_PTR": "y",
+        "ARMV8_1_M_PMU_EVENTCNT": "8",
+        "COMMON_LIBC_TIME": "y",
+        "CORTEX_M_SYSTICK_LPM_TIMER_NONE": "y",
+        "COUNTER_NATIVE_POSIX_NBR_CHANNELS": "4",
+        "CPU_LOAD_LOG_LEVEL": "3",
+        "CPU_LOAD_LOG_LEVEL_DEFAULT": "y",
+        "CPU_LOAD_LOG_PERIODICALLY": "0",
+        "DEVICE_DEINIT_SUPPORT": "y",
+        "HAS_POWEROFF": "y",
+        "LOG_FLUSH_SLEEP_US": "10000",
+        "SCHED_SIMPLE": "y",
+        "STM32_BACKUP_PROTECTION": "y",
+        "SYSTEM_WORKQUEUE_WORK_TIMEOUT_MS": "0",
+        "TOOLCHAIN_SUPPORTS_VLA_IN_STATEMENTS": "y",
+        "USBD_BOS_SUPPORT": "y",
+        "USBD_HWINFO_DEVID_LENGTH": "16",
+        "USBD_MAX_SPEED": "0",
+        "USBD_MAX_SPEED_FULL": "y",
+        "USBD_MSG_DEFERRED_MODE": "y",
+        "USBD_VREQ_SUPPORT": "y",
+        "VIRTIO_LOG_LEVEL": "3",
+        "VIRTIO_LOG_LEVEL_DEFAULT": "y",
+        "WAITQ_SIMPLE": "y",
+        "XSI_SINGLE_PROCESS_LOG_LEVEL": "3",
+        "XSI_SINGLE_PROCESS_LOG_LEVEL_DEFAULT": "y",
+        "ZEPHYR_CMSIS_6_MODULE": "y"
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-NO-LONGER-SET-5a3acb9c",
+      "category": "kconfig",
+      "kind": "no-longer-set",
+      "subject": "CONFIG_16 symbols",
+      "title": "16 Kconfig symbols: symbols set before are absent in 30de5e8a2ceef99177c6c96785a8888b978154f0",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "EVENTFD_MAX": "0",
+        "KOBJECT_DATA_AREA_RESERVE_EXTRA_PERCENT": "100",
+        "KOBJECT_RODATA_AREA_EXTRA_BYTES": "16",
+        "KOBJECT_TEXT_AREA": "256",
+        "MAX_PTHREAD_COUNT": "0",
+        "MAX_PTHREAD_KEY_COUNT": "0",
+        "MAX_TIMER_COUNT": "0",
+        "MSG_COUNT_MAX": "0",
+        "POSIX_LIMITS_RTSIG_MAX": "0",
+        "POSIX_MAX_FDS": "4",
+        "POSIX_MAX_OPEN_FILES": "4",
+        "PRIVILEGED_STACK_SIZE": "1024",
+        "SEM_NAMELEN_MAX": "0",
+        "SEM_VALUE_MAX": "0",
+        "TIMER_DELAYTIMER_MAX": "0",
+        "UDC_AMBIQ_MAX_QMESSAGES": "8"
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "MANIFEST-MODULE-REPINNED-0901b553",
+      "category": "manifest",
+      "kind": "module-repinned",
+      "subject": "hal_stm32",
+      "title": "Module hal_stm32, which the build uses, moves from 55043bcc35ff to 1e753266ddfb",
+      "severity": "info",
+      "confidence": "high",
+      "old": "55043bcc35fffa3b4a8c75a696d932b5020aad09",
+      "new": "1e753266ddfb4b07a8a0b1ec566e9637ea45d5ef",
+      "evidence": [
+        {
+          "type": "tool_output",
+          "invocation": "manifest",
+          "excerpt": "zephyr/west.yml:247"
+        }
+      ],
+      "action": "The SBOM findings list what changed in the files the build compiles.",
+      "related": [],
+      "analyzer": "modules",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "MANIFEST-MODULE-REPINNED-fa90a493",
+      "category": "manifest",
+      "kind": "module-repinned",
+      "subject": "cmsis",
+      "title": "Module cmsis, which the build uses, moves from d1b8b20b6278 to 512cc7e895e8",
+      "severity": "info",
+      "confidence": "high",
+      "old": "d1b8b20b6278615b00e136374540eb1c00dcabe7",
+      "new": "512cc7e895e8491696b61f7ba8066b4a182569b8",
+      "evidence": [
+        {
+          "type": "tool_output",
+          "invocation": "manifest",
+          "excerpt": "zephyr/west.yml:119"
+        }
+      ],
+      "action": "The SBOM findings list what changed in the files the build compiles.",
+      "related": [],
+      "analyzer": "modules",
+      "heuristics": [],
+      "introduced_by_migration": true
+    }
+  ],
+  "upgrade_path": {
+    "verdict": "direct-ok",
+    "unchecked": [],
+    "confidence": "low",
+    "categories": {
+      "layout": {
+        "status": "clean",
+        "confidence": "high",
+        "checked": [
+          "partitions of image app @ v4.1-branch (2) and app @ 30de5e8a2ceef99177c6c96785a8888b978154f0 (2) from the final devicetree",
+          "partition roles from MCUboot's Zephyr port and the storage subsystems at both refs"
+        ]
+      },
+      "mcuboot": {
+        "status": "not-applicable",
+        "confidence": "high",
+        "checked": [
+          "no bootloader image, and the app isn't built for MCUboot, at either ref"
+        ]
+      },
+      "storage": {
+        "status": "not-applicable",
+        "confidence": "high",
+        "checked": [
+          "no storage backend symbol is enabled in the app at either ref"
+        ]
+      },
+      "ble": {
+        "status": "not-applicable",
+        "confidence": "high",
+        "checked": [
+          "no Bluetooth symbol that uses SETTINGS is enabled at v4.1-branch"
+        ]
+      },
+      "wire": {
+        "status": "clean",
+        "confidence": "medium",
+        "checked": [
+          "allowlist v1: 12 of 12 entries checked in 1 image pairs; clean means only that none of them changed"
+        ],
+        "entries_checked": [
+          "WIRE-SMP-ORIGINAL",
+          "WIRE-SMP-NETBUF",
+          "WIRE-SMP-BT-REASSEMBLY",
+          "WIRE-BT-L2CAP-MTU",
+          "WIRE-BT-ACL-RX",
+          "WIRE-BT-NAME",
+          "WIRE-BT-APPEARANCE",
+          "WIRE-USB-VID",
+          "WIRE-USB-PID",
+          "WIRE-USB-PRODUCT",
+          "WIRE-USB-MANUFACTURER",
+          "WIRE-CONSOLE-BAUD"
+        ],
+        "entries_missing": [],
+        "changed_but_unused": []
+      },
+      "sysbuild": {
+        "status": "not-applicable",
+        "confidence": "high",
+        "checked": [
+          "not a sysbuild build"
+        ]
+      },
+      "images": {
+        "status": "clean",
+        "confidence": "high",
+        "checked": [
+          "images findings of the analyzer"
+        ]
+      },
+      "crossimage": {
+        "status": "clean",
+        "confidence": "high",
+        "checked": [
+          "crossimage findings of the analyzer"
+        ]
+      }
+    },
+    "remedies": {},
+    "assumptions": [
+      "deployed app == the source build's app image"
+    ],
+    "basis": [
+      "wire: clean means only that no allowlisted item changed",
+      "the target build failed: the categories come from its configuration and whatever the failed build produced; confidence capped at low"
+    ]
+  },
+  "not_checked": [
+    {
+      "area": "bootloader partition roles",
+      "reason": "no mcuboot module in the 30de5e8a2ceef99177c6c96785a8888b978154f0 workspace",
+      "analyzer": "layout"
+    },
+    {
+      "area": "bootloader partition roles",
+      "reason": "no mcuboot module in the v4.1-branch workspace",
+      "analyzer": "layout"
+    },
+    {
+      "area": "fork triage of modules",
+      "reason": "module history is unavailable (shallow clones: cmsis, cmsis_6, hal_stm32), so commits a project carries on top of upstream modules can't be classified; run `zmig plan` on a full workspace for that",
+      "analyzer": "scan"
+    },
+    {
+      "area": "salvage of files the app doesn't own",
+      "reason": "salvage only disables lines in the app's own config and overlay files; a target configure failure caused by board, module or generated files can't be salvaged (no salvage was needed in this run)",
+      "analyzer": "scan"
+    },
+    {
+      "area": "struct layouts at the target (pahole)",
+      "reason": "no ELF at the target: zephyr/zephyr.elf missing: the build failed",
+      "analyzer": "api"
+    },
+    {
+      "area": "sysbuild configuration",
+      "reason": "not a sysbuild build at both refs",
+      "analyzer": "sysbuild"
+    },
+    {
+      "area": "usable image size",
+      "reason": "no imgtool sign command in the app's build at both refs",
+      "analyzer": "layout"
+    },
+    {
+      "area": "wire formats outside the allowlist",
+      "reason": "only 12 allowlisted items are compared (zmig/data/wire_format.yaml); protocol payloads, custom GATT services and other peer-visible behavior aren't",
+      "analyzer": "wire"
+    }
+  ],
+  "checked": [
+    {
+      "area": "binary boundaries (abidiff)",
+      "result": "clean",
+      "detail": "no prebuilt static library from the project tree on the link line, and CONFIG_LLEXT isn't set: no binary ABI to compare",
+      "analyzer": "api"
+    },
+    {
+      "area": "declarations the project uses",
+      "result": "found",
+      "detail": "189 Zephyr/module declaration(s) the project's TUs use, compared at both refs",
+      "analyzer": "api"
+    },
+    {
+      "area": "libclang parse coverage",
+      "result": "clean",
+      "detail": "clang version 18.1.1: 5 project TU(s) with the source flags (0 with errors), 5 with the target flags (0 with errors); 5 parsed, 5 from the parse cache, 0 TU(s) skipped (no included file changed)",
+      "analyzer": "api"
+    },
+    {
+      "area": "struct layouts at the source (pahole)",
+      "result": "clean",
+      "detail": "13 of 22 field offset(s) clang modelled checked against the GCC-built ELF; 0 disagree",
+      "analyzer": "api"
+    },
+    {
+      "area": "the project's own system calls",
+      "result": "clean",
+      "detail": "0 __syscall declaration(s) in 0 project header(s) compared with both builds' syscalls.json",
+      "analyzer": "api"
+    },
+    {
+      "area": "module set",
+      "result": "found",
+      "detail": "2 module(s) the source build used compared in both Zephyr manifests (2 changed); the target build needed cmsis_6",
+      "analyzer": "modules"
+    }
+  ]
+}

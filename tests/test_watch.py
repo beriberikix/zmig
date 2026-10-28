@@ -465,3 +465,26 @@ def test_from_manifest_branch_is_warned(tmp_path: Path, monkeypatch: pytest.Monk
     kind = "tag"
     _, _, _, rec = watchcmd._resolve_from(args, None, None)  # type: ignore[arg-type]
     assert rec and "warning" not in rec
+
+
+def test_unseen_is_not_fixed_when_a_gap_blocks() -> None:
+    """The first CI nightly of the CANnectivity test repo (run 40764423331): at v4.4.2
+    the target configure failed, and the 7 accepted findings the run couldn't look for
+    were reported as fixed (and as SARIF `absent`, which would close their alerts)."""
+    report = load("ci-nightly-v4.4.2")
+    pinned = load("ci-nightly-pinned")
+    b = Baseline(Path("b.json"), load("ci-baseline"))
+    states = gap_states(report, b)
+    assert {s.gap.id: s.state for s in states}["target-build"] == "worse"
+    cmp = compare(report, b, TODAY, pinned, blind=any(s.blocking for s in states))
+    assert len(cmp.of("unseen")) == 7 and not cmp.of("fixed")
+    assert {i.cause for i in cmp.of("new")} == {"target-movement"}
+    out = decide(cmp, states, Policy())
+    assert out.code == EXIT_NEW_FINDING
+    sarif = json.loads(render_watch_sarif(report, cmp, "0", "app"))
+    assert "absent" not in {r["baselineState"] for r in sarif["runs"][0]["results"]}
+    text = render_comment(report, b, cmp, out, "usb2canfdv1", TODAY)
+    assert "Accepted, not seen in this run (analysis incomplete: not counted as fixed) (7)" in text
+    assert "#### Fixed" not in text
+    # Without a blocking gap, the same absences are "fixed".
+    assert len(compare(report, b, TODAY, pinned).of("fixed")) == 7

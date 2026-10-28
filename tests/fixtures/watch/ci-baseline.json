@@ -1,0 +1,182 @@
+{
+  "schema": "https://zmig.dev/schema/baseline/1",
+  "zmig_version": "0.1.0",
+  "zmig_build": "866807487e4d46b9",
+  "fingerprint_version": 1,
+  "config": {
+    "app": "app",
+    "board": "usb2canfdv1",
+    "to_board": null,
+    "sysbuild": false,
+    "fast": false,
+    "modules": [
+      "cmsis",
+      "hal_stm32"
+    ],
+    "cmake_args": [
+      "-DZEPHYR_EXTRA_MODULES=<repo>",
+      "-DFILE_SUFFIX=usbd_next"
+    ],
+    "analyzers": "all"
+  },
+  "from": {
+    "spec": "v4.1-branch",
+    "sha": "7081d7c5f19306fda5766835052f2b69badfbb41"
+  },
+  "to": {
+    "spec": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+    "resolved": "30de5e8a2ceef99177c6c96785a8888b978154f0",
+    "sha": "30de5e8a2ceef99177c6c96785a8888b978154f0"
+  },
+  "verdict": {
+    "verdict": "direct-ok",
+    "confidence": "low"
+  },
+  "accepted_gaps": [
+    {
+      "id": "analyzer:initorder",
+      "level": "skipped",
+      "rank": 2,
+      "detail": "analyzer initorder skipped: target (<ref>): zephyr/zephyr.elf missing: the build failed",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    },
+    {
+      "id": "analyzer:sbom",
+      "level": "skipped",
+      "rank": 2,
+      "detail": "analyzer sbom skipped: target (<ref>): the build failed; west spdx needs a full build",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    },
+    {
+      "id": "target-build",
+      "level": "build-failed",
+      "rank": 1,
+      "detail": "the target build is build-failed: later build stages and the analyzers that need them saw nothing",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    }
+  ],
+  "accepted": [
+    {
+      "fingerprint": "25fc97c8f0fe5a79",
+      "severity": "breaking",
+      "category": "guide",
+      "kind": "entry-match",
+      "subject": "MG-4.2-0137:ident:smf_set_handled",
+      "title": "4.2 migration guide (State Machine Framework): smf_set_handled has been removed. [smf_set_handled]",
+      "path": "src/led.c",
+      "value": "eb32d11c5068158b",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    },
+    {
+      "fingerprint": "80481a899b039a94",
+      "severity": "breaking",
+      "category": "api",
+      "kind": "callback-type-changed",
+      "subject": "const state_execution",
+      "title": "Callbacks your code provides no longer match the type Zephyr expects at <ref>: const state_execution",
+      "path": "src/led.c",
+      "value": "9f3a7b43a6c47342",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    },
+    {
+      "fingerprint": "8ec5292b30029d23",
+      "severity": "breaking",
+      "category": "api",
+      "kind": "function-removed",
+      "subject": "smf_set_handled",
+      "title": "Function smf_set_handled, which your code uses, no longer exists in <ref>",
+      "path": "src/led.c",
+      "value": "74234e98afe7498f",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    },
+    {
+      "fingerprint": "9d637bacb15d5214",
+      "severity": "breaking",
+      "category": "manifest",
+      "kind": "module-required",
+      "subject": "cmsis_6",
+      "title": "The target build needs module cmsis_6, which the build's module set doesn't include",
+      "path": "",
+      "value": "fbbe111ae6d9dddd",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    },
+    {
+      "fingerprint": "f69d1ed046162e90",
+      "severity": "breaking",
+      "category": "build",
+      "kind": "target-build-failed",
+      "subject": "<ref>",
+      "title": "The target build fails: 2 errors (linker)",
+      "path": "src/led.c",
+      "value": "09cc5f29b640ce1d",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    },
+    {
+      "fingerprint": "9f24b6dc6098aa4b",
+      "severity": "risky",
+      "category": "build",
+      "kind": "new-warning",
+      "subject": "compiler:<app>/src/led.c:initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'",
+      "title": "New compiler warning at <ref>: initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'",
+      "path": "src/led.c",
+      "value": "5705e96c7ac9cd8c",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    },
+    {
+      "fingerprint": "c2f8a10a012918f0",
+      "severity": "risky",
+      "category": "build",
+      "kind": "new-warning",
+      "subject": "compiler:<app>/src/led.c:implicit declaration of function 'smf_set_handled'",
+      "title": "New compiler warning at <ref>: implicit declaration of function 'smf_set_handled'",
+      "path": "src/led.c",
+      "value": "a056b68634d036ed",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    },
+    {
+      "fingerprint": "e804a620413aaa9d",
+      "severity": "risky",
+      "category": "devicetree",
+      "kind": "node-changed",
+      "subject": "&zephyr_udc0:/soc/usb@40005c00",
+      "title": "&zephyr_udc0 (/soc/usb@40005c00) changed: clocks, maximum-speed",
+      "path": "src/usb.c",
+      "value": "12cd7935864a2fe6",
+      "reason": "v4.2 port not started; CI test baseline",
+      "accepted_by": "tester",
+      "accepted_at": "2026-10-28T15:52:07Z",
+      "accepted_commit": "f88ddbce9e73e87f558ed8d748ebe5effc410681"
+    }
+  ],
+  "rebases": []
+}

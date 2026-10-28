@@ -350,13 +350,13 @@ def cmd_watch(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         )
 
     today = dt.date.fromisoformat(args.today) if args.today else dt.datetime.now(dt.UTC).date()
-    cmp = compare(report, baseline, today, pinned)
+    gap_states = classify_gaps(gaps(report, baseline.data), baseline, today)
+    cmp = compare(report, baseline, today, pinned, blind=any(g.blocking for g in gap_states))
     policy = Policy(
         fail_on=("breaking", "risky") if args.fail_on == "risky" else ("breaking",),
         allow_inconclusive=args.allow_inconclusive,
         on_target_movement=args.on_target_movement,
     )
-    gap_states = classify_gaps(gaps(report, baseline.data), baseline, today)
     outcome = decide(cmp, gap_states, policy)
     comment = render_comment(report, baseline, cmp, outcome, args.board, today, warnings)
     base = str(config["app"])

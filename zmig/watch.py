@@ -350,7 +350,7 @@ def rebase_baseline(
 
 @dataclass
 class Item:
-    state: str  # new | escalated | updated | unchanged | fixed
+    state: str  # new | escalated | updated | unchanged | fixed | unseen
     fingerprint: str
     severity: str
     title: str
@@ -385,9 +385,15 @@ def compare(
     baseline: Baseline,
     today: dt.date,
     pinned: JSON | None = None,
+    blind: bool = False,
 ) -> Comparison:
     """Match the report's breaking and risky findings against the baseline's accepted
     entries as multisets per fingerprint.
+
+    `blind`: the run has a gap the baseline didn't accept (e.g. the target configure now
+    fails), so an accepted finding that wasn't found may simply not have been looked for.
+    It's "unseen", not "fixed" (regression: the first CI nightly of the CANnectivity test
+    repo reported 7 accepted findings as fixed when the v4.4.2 configure failed).
 
     `pinned` is the same project scanned against the baseline's target, given when this
     run's target moved: a new finding also present there is due to this change, one
@@ -427,7 +433,8 @@ def compare(
                 news.append((f, was is not None))
                 items.append(_item("new", fp, f, ctx, was, expired=was is not None))
         for e in [*act, *exp]:
-            items.append(Item("fixed", fp, e["severity"], e["title"], e.get("path", ""), entry=e))
+            gone = "unseen" if blind else "fixed"
+            items.append(Item(gone, fp, e["severity"], e["title"], e.get("path", ""), entry=e))
         # Attribute the new ones: the first k are explained by this change.
         gating = [i for i in items if i.fingerprint == fp and i.gating]
         if not moved:
@@ -443,7 +450,7 @@ def compare(
 
     counts: dict[str, Counter[str]] = defaultdict(Counter)
     for i in items:
-        if i.state != "fixed" and i.path:
+        if i.state not in ("fixed", "unseen") and i.path:
             counts[i.path][i.fingerprint] += 1
     return Comparison(items, moved, pinned is not None, dict(counts))
 
@@ -741,6 +748,11 @@ def render_comment(
             "(--on-target-movement warn)."
         )
     section("Fixed (accepted, no longer found)", cmp.of("fixed"), False)
+    section(
+        "Accepted, not seen in this run (analysis incomplete: not counted as fixed)",
+        cmp.of("unseen"),
+        False,
+    )
     section("Accepted, value changed", cmp.of("updated"), False)
     unchanged = Counter(i.severity for i in cmp.of("unchanged", "updated"))
     lines.extend(
@@ -787,6 +799,8 @@ def render_watch_sarif(report: JSON, cmp: Comparison, zmig_version: str, base: s
         "updated": "updated",
         "unchanged": "unchanged",
         "fixed": "absent",
+        # Not found because the run couldn't look: keep the alert open.
+        "unseen": "unchanged",
     }
     for i in cmp.items:
         src = i.finding or i.entry or {}
