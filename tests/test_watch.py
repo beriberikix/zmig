@@ -500,3 +500,66 @@ def test_update_baseline_keeps_rebase_provenance() -> None:
     data = make_baseline(load("cannectivity-c1"), {}, to, acc, "0.1.0", rebased, "newbuild")
     assert all(e.get("rebased_from") for e in data["accepted"])
     assert {e["reason"] for e in data["accepted"]} == {"test"}
+
+
+def _add_site(report: JSON, kind: str, path: str, line: int) -> JSON:
+    r = copy.deepcopy(report)
+    f = next(x for x in r["findings"] if x["kind"] == kind)
+    f["evidence"].append({"type": "file_line", "path": path, "line": line, "text": f["subject"]})
+    return r
+
+
+def test_new_use_site_of_an_accepted_finding_fails() -> None:
+    """Watch design bug (not analyzer tuning): a second smf_set_handled call in main.c
+    folded into the accepted function-removed finding fingerprinted by led.c, so it wasn't
+    reported (CI test repo PR #3, run 40787484968)."""
+    r = load("cannectivity-c1")
+    b = baseline_of(r)
+    assert all(e["evidence"] for e in b.accepted if e["path"])
+    two = _add_site(r, "function-removed", "src/main.c", 46)
+    cmp = compare(two, b, TODAY)
+    hit = cmp.of("new-use-site")
+    assert [(i.severity, i.finding["kind"], i.new_sites) for i in hit] == [  # type: ignore[index]
+        ("breaking", "function-removed", ["src/main.c"])
+    ]
+    assert hit[0].fingerprint in {e["fingerprint"] for e in b.accepted}  # same finding
+    out = decide(cmp, [], Policy())
+    assert out.code == EXIT_NEW_FINDING
+    text = render_comment(two, b, cmp, out, "usb2canfdv1", TODAY)
+    assert "#### Accepted finding has a new use site (1)" in text
+    assert "new use site(s) `src/main.c` line 46 (accepted for `src/led.c`" in text
+    sarif = json.loads(render_watch_sarif(two, cmp, "0", "app"))
+    new = [x for x in sarif["runs"][0]["results"] if x["baselineState"] == "new"]
+    assert [x["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] for x in new] == [
+        "src/main.c"
+    ]
+    # Accepting it (update-baseline) records main.c, and it's unchanged afterwards.
+    b2 = Baseline(Path("b.json"), make_baseline(two, {}, {"sha": "x"}, ACC, "t", b))
+    assert {i.state for i in compare(two, b2, TODAY).items} == {"unchanged"}
+
+
+def test_moves_within_a_file_and_line_shifts_are_not_new_use_sites() -> None:
+    r = load("cannectivity-c1")
+    b = baseline_of(r)
+    moved = shift_lines(_add_site(r, "function-removed", "src/led.c", 300), "src/led.c", 9)
+    assert {i.state for i in compare(moved, b, TODAY).items} == {"unchanged"}
+
+
+def test_entries_without_an_evidence_set_are_not_checked() -> None:
+    r = load("cannectivity-c1")
+    b = baseline_of(r)
+    for e in b.data["accepted"]:
+        e.pop("evidence")
+    two = _add_site(r, "function-removed", "src/main.c", 46)
+    assert {i.state for i in compare(two, b, TODAY).items} == {"unchanged"}
+
+
+def test_rebase_lists_evidence_files_a_new_build_adds() -> None:
+    old = baseline_of(load("cannectivity-c1"))
+    rb = rebase_baseline(
+        old, _add_site(load("cannectivity-c1"), "function-removed", "src/main.c", 46), ACC,
+        "0.1.0", "newbuild",
+    )  # fmt: skip
+    assert [(n["kind"], files) for n, files in rb.new_files] == [
+        ("function-removed", ["src/main.c"])
+    ]

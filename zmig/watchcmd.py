@@ -311,6 +311,11 @@ def cmd_watch(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
                 f"  {old['fingerprint']}  {old['severity']} {old['category']}/{old['kind']} "
                 f"{old['subject'][:60]}: {why}"
             )
+        print(
+            f"Evidence files added by this build, accepted with the rebase ({len(rb.new_files)}):"
+        )
+        for new, files in rb.new_files:
+            print(f"  {new['fingerprint']}  {new['category']}/{new['kind']}: {', '.join(files)}")
         print(f"Found by this build, not accepted (will be new) ({len(rb.not_accepted)}):")
         for f in rb.not_accepted:
             print(f"  {f['severity']} {f['category']}/{f['kind']}: {f['title'][:90]}")

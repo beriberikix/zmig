@@ -91,6 +91,21 @@ def primary_location(finding: JSON) -> str:
     return ""
 
 
+def evidence_set(finding: JSON, ctx: FingerprintContext) -> list[list[str]]:
+    """The finding's project evidence as sorted [file, symbol] pairs (no lines: lines move
+    with unrelated edits). Stored per accepted entry, so a new file in it shows up."""
+    out = {
+        (ctx.normalize(str(e["path"])), str(e.get("text") or ""))
+        for e in finding.get("evidence", ())
+        if e.get("type") == "file_line"
+    }
+    return [list(x) for x in sorted(out)]
+
+
+def evidence_files(pairs: list[list[str]]) -> set[str]:
+    return {p for p, _ in pairs}
+
+
 def first_line(finding: JSON) -> int | None:
     for e in finding.get("evidence", ()):
         if e.get("type") == "file_line":
@@ -207,6 +222,7 @@ def _entry(finding: JSON, ctx: FingerprintContext, acc: Acceptance) -> JSON:
         "title": ctx.normalize(finding["title"]),
         "path": ctx.normalize(primary_location(finding)),
         "value": value_digest(finding, ctx),
+        "evidence": evidence_set(finding, ctx),
         "reason": acc.reason,
         "accepted_by": acc.by,
         "accepted_at": acc.at,
@@ -288,6 +304,9 @@ class Rebase:
     remapped: list[tuple[JSON, JSON]]  # (old entry, new entry)
     unmapped: list[tuple[JSON, str]]  # (old entry, why)
     not_accepted: list[JSON]  # current findings with no old entry: not accepted by a rebase
+    # Re-mapped entries whose evidence now names files the old entry's didn't (shown for
+    # review: a rebase takes this build's evidence set).
+    new_files: list[tuple[JSON, list[str]]] = field(default_factory=list)
 
 
 def rebase_baseline(
@@ -306,6 +325,7 @@ def rebase_baseline(
     for f in sorted(_gated(report), key=lambda f: _SEV_RANK[f["severity"]]):
         pool[(f["category"], f["kind"], ctx.normalize(f["subject"]))].append(f)
     remapped, unmapped, accepted = [], [], []
+    new_files: list[tuple[JSON, list[str]]] = []
     keep = ("reason", "accepted_by", "accepted_at", "accepted_commit", "until")
     for e in previous.accepted:
         cands = pool[(e["category"], e["kind"], e["subject"])]
@@ -326,6 +346,10 @@ def rebase_baseline(
             if k in e:
                 new[k] = e[k]
         new["rebased_from"] = e["fingerprint"]
+        if "evidence" in e:
+            extra = sorted(evidence_files(new["evidence"]) - evidence_files(e["evidence"]))
+            if extra:
+                new_files.append((new, extra))
         remapped.append((e, new))
         accepted.append(new)
     not_accepted = [f for fs in pool.values() for f in fs]
@@ -354,7 +378,7 @@ def rebase_baseline(
             ],
         }
     )
-    return Rebase(data, remapped, unmapped, not_accepted)
+    return Rebase(data, remapped, unmapped, not_accepted, new_files)
 
 
 # --- Comparison (§2, §4) -----------------------------------------------------------------
@@ -362,7 +386,8 @@ def rebase_baseline(
 
 @dataclass
 class Item:
-    state: str  # new | escalated | updated | unchanged | fixed | unseen
+    # new | escalated | new-use-site | updated | unchanged | fixed | unseen
+    state: str
     fingerprint: str
     severity: str
     title: str
@@ -371,10 +396,12 @@ class Item:
     entry: JSON | None = None  # the baseline entry it matched (or, for "fixed", the entry)
     cause: str | None = None  # new/escalated: change | target-movement | unattributed
     expired: bool = False  # new because its acceptance expired
+    # new-use-site: files in the finding's evidence that the accepted entry didn't have.
+    new_sites: list[str] = field(default_factory=list)
 
     @property
     def gating(self) -> bool:
-        return self.state in ("new", "escalated")
+        return self.state in ("new", "escalated", "new-use-site")
 
 
 @dataclass
@@ -422,9 +449,13 @@ def compare(
         live = until is None or dt.date.fromisoformat(until) >= today
         (active if live else expired)[e["fingerprint"]].append(e)
     pinned_counts: Counter[str] = Counter()
+    pinned_sites: dict[str, set[str]] = defaultdict(set)
     if pinned is not None:
         pctx = FingerprintContext.of(pinned)
-        pinned_counts.update(fingerprint(f, pctx) for f in _gated(pinned))
+        for f in _gated(pinned):
+            pfp = fingerprint(f, pctx)
+            pinned_counts[pfp] += 1
+            pinned_sites[pfp] |= evidence_files(evidence_set(f, pctx))
     moved = report["inputs"]["to"]["sha"] != baseline.to_sha
 
     items: list[Item] = []
@@ -438,6 +469,20 @@ def compare(
                     news.append((f, False))
                     items.append(_item("escalated", fp, f, ctx, e))
                     continue
+                # A file the accepted entry's evidence didn't have: a new use site of an
+                # accepted finding (regression: a second smf_set_handled call in main.c
+                # folded into the finding fingerprinted by led.c, CI test repo PR #3).
+                # Entries from before evidence sets were recorded aren't checked.
+                added = (
+                    sorted(evidence_files(evidence_set(f, ctx)) - evidence_files(e["evidence"]))
+                    if "evidence" in e
+                    else []
+                )
+                if added:
+                    it = _item("new-use-site", fp, f, ctx, e)
+                    it.new_sites = added
+                    items.append(it)
+                    continue
                 same = e.get("value") == value_digest(f, ctx)
                 items.append(_item("unchanged" if same else "updated", fp, f, ctx, e))
             else:
@@ -447,8 +492,21 @@ def compare(
         for e in [*act, *exp]:
             gone = "unseen" if blind else "fixed"
             items.append(Item(gone, fp, e["severity"], e["title"], e.get("path", ""), entry=e))
+        # A new use site is due to this change if the pinned scan (the baseline's target)
+        # has it too.
+        for i in items:
+            if i.fingerprint == fp and i.state == "new-use-site":
+                if not moved:
+                    i.cause = "change"
+                elif pinned is None:
+                    i.cause = "unattributed"
+                else:
+                    seen = pinned_sites.get(fp, set())
+                    i.cause = "change" if set(i.new_sites) <= seen else "target-movement"
         # Attribute the new ones: the first k are explained by this change.
-        gating = [i for i in items if i.fingerprint == fp and i.gating]
+        gating = [
+            i for i in items if i.fingerprint == fp and i.gating and i.state != "new-use-site"
+        ]
         if not moved:
             causes = ["change"] * len(gating)
         elif pinned is None:
@@ -754,6 +812,23 @@ def render_comment(
                 )
 
     section("New", cmp.of("new", "escalated"), True)
+    sites = cmp.of("new-use-site")
+    if sites:
+        lines.extend(["", f"#### Accepted finding has a new use site ({len(sites)})"])
+        for i in sorted(sites, key=lambda i: (_SEV_RANK[i.severity], i.title)):
+            where = []
+            for p in i.new_sites:
+                ln = [
+                    e["line"]
+                    for e in (i.finding or {}).get("evidence", ())
+                    if e.get("type") == "file_line" and ctx.normalize(str(e["path"])) == p
+                ]
+                where.append(f"`{p}`" + (f" line {', '.join(map(str, sorted(ln)))}" if ln else ""))
+            cause = f"; due to {_CAUSE[i.cause]}" if i.cause else ""
+            lines.append(
+                f"- {i.severity}: {ctx.normalize(i.title)}: new use site(s) {'; '.join(where)} "
+                f"(accepted for `{i.path}`{cause}) `{i.fingerprint}`"
+            )
     if out.warned:
         lines.append(
             f"\n{len(out.warned)} new finding(s) due to target movement don't fail this run "
@@ -808,6 +883,7 @@ def render_watch_sarif(report: JSON, cmp: Comparison, zmig_version: str, base: s
     state = {
         "new": "new",
         "escalated": "new",
+        "new-use-site": "unchanged",  # the accepted alert; each new site is its own result
         "updated": "updated",
         "unchanged": "unchanged",
         "fixed": "absent",
@@ -843,6 +919,32 @@ def render_watch_sarif(report: JSON, cmp: Comparison, zmig_version: str, base: s
                 "properties": {"zmigState": i.state, **({"zmigCause": i.cause} if i.cause else {})},
             }
         )
+        for site in i.new_sites:
+            if site.startswith(("<", "/", "(", "doc:", "$", "~")):
+                continue
+            ln = [
+                e["line"]
+                for e in (i.finding or {}).get("evidence", ())
+                if e.get("type") == "file_line" and str(e["path"]) == site
+            ]
+            sloc: JSON = {"artifactLocation": {"uri": site, "uriBaseId": "APPROOT"}}
+            if ln:
+                sloc["region"] = {"startLine": min(ln)}
+            results.append(
+                {
+                    "ruleId": rule,
+                    "level": level[i.severity],
+                    "message": {"text": f"Accepted finding has a new use site: {i.title}"},
+                    "locations": [{"physicalLocation": sloc}],
+                    "partialFingerprints": {
+                        SARIF_FINGERPRINT_KEY: i.fingerprint
+                        + "/"
+                        + hashlib.sha256(site.encode()).hexdigest()[:8]
+                    },
+                    "baselineState": "new",
+                    "properties": {"zmigState": "new-use-site", "zmigAcceptedFor": i.path},
+                }
+            )
     doc = {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
         "version": "2.1.0",
@@ -888,6 +990,7 @@ def watch_json(report: JSON, baseline: Baseline, cmp: Comparison, out: Outcome) 
                 **({"id": i.finding["id"]} if i.finding else {}),
                 **({"cause": i.cause} if i.cause else {}),
                 **({"expired": True} if i.expired else {}),
+                **({"new_sites": i.new_sites} if i.new_sites else {}),
             }
             for i in cmp.items
         ],
