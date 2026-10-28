@@ -18,6 +18,7 @@ import pytest
 
 from tests.manual_diff import config_diff, dts_diff
 from zmig.cli import main
+from zmig.verdict import invariant_violations
 
 ROOT = Path(__file__).parents[1]
 SCHEMA = json.loads((ROOT / "zmig/schema/report-1.json").read_text())
@@ -50,6 +51,7 @@ def scan(fixture: str, out: Path) -> dict[str, Any]:
         args += ["--module", m]
     assert main(args) == 0
     r: dict[str, Any] = json.loads((out / "report.json").read_text())
+    assert invariant_violations(r) == []
     jsonschema.validate(r, SCHEMA)
     return r
 

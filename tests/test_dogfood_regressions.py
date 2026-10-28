@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 
 from zmig.cli import main
+from zmig.verdict import invariant_violations
 
 ROOT = Path(__file__).parents[1]
 CACHE = Path(os.environ.get("ZMIG_CACHE", Path.home() / ".cache" / "zmig"))
@@ -37,6 +38,7 @@ def test_app_that_finds_zephyr_by_west_layout(tmp_path: Path) -> None:
     args += ["--format", "json", "--out", str(tmp_path)]
     assert main(args) == 0
     r: dict[str, Any] = json.loads((tmp_path / "report.json").read_text())
+    assert invariant_violations(r) == []
     assert [c["status"] for c in r["contexts"]] == ["ok", "ok"]
 
 
@@ -73,6 +75,7 @@ def test_smp_svr_p1_verdict(tmp_path: Path) -> None:
     args += ["--out", str(tmp_path / "out")]
     assert main(args) == 0
     r: dict[str, Any] = json.loads((tmp_path / "out" / "report.json").read_text())
+    assert invariant_violations(r) == []
     mism = [f for f in r["findings"] if f["kind"] == "app-bootloader-mismatch"]
     assert [f["subject"] for f in mism] == ["SB_CONFIG_MCUBOOT_MODE_SWAP_USING_OFFSET"]
     assert mism[0]["remedy"] == "config-pin"
@@ -99,6 +102,7 @@ def test_target_needs_a_module_the_scan_lacks(tmp_path: Path) -> None:
     args += ["--analyzers", "modules", "--format", "json", "--out", str(tmp_path)]
     assert main(args) == 0
     r: dict[str, Any] = json.loads((tmp_path / "report.json").read_text())
+    assert invariant_violations(r) == []
     assert [c["status"] for c in r["contexts"]] == ["ok", "configure-failed", "ok"]
     assert r["contexts"][1]["superseded_by_module_recovery"] == ["cmsis_6"]
     assert r["contexts"][2]["modules_added"] == ["cmsis_6"]

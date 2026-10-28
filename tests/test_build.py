@@ -13,6 +13,7 @@ import jsonschema
 import pytest
 
 from zmig.cli import main
+from zmig.verdict import invariant_violations
 
 ROOT = Path(__file__).parents[1]
 APP = ROOT / "tests" / "fixtures" / "hello"
@@ -43,6 +44,7 @@ def scan(out: Path, *extra: str) -> dict[str, object]:
     )
     assert rc == 0
     report: dict[str, object] = json.loads((out / "report.json").read_text())
+    assert invariant_violations(report) == []
     jsonschema.validate(report, SCHEMA)
     return report
 

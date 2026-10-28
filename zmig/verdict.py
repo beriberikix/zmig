@@ -163,7 +163,25 @@ def upgrade_path(
             r = Remedy.REFLASH
         remedies.setdefault(r.value, []).append(f.id)
 
-    if hazards:
+    # A breaking/risky finding in a hazard category without a remedy, or a category an
+    # analyzer recorded as a hazard, still rules out direct-ok; its remedy is unknown
+    # (regression: B-rak's layout category said "hazard" while the verdict said direct-ok,
+    # docs/DOGFOOD-3-baseline.md M8).
+    hazard_categories = {Category(n) for n in CATEGORIES}
+    for f in findings:
+        if (
+            f.category in hazard_categories
+            and f.severity is not Severity.INFO
+            and f.introduced_by_migration
+            and f.remedy is None
+        ):
+            remedies.setdefault(Remedy.UNKNOWN.value, []).append(f.id)
+    for name, c in cats.items():
+        if c["status"] == "hazard" and not any(
+            fid in ids for fid in c.get("findings", []) for ids in remedies.values()
+        ):
+            remedies.setdefault(Remedy.UNKNOWN.value, []).append(f"category:{name}")
+    if hazards or remedies:
         verdict = (
             "blocked" if any(Remedy(r) in NOT_BY_APP_OTA for r in remedies) else "needs-changes"
         )
@@ -224,3 +242,62 @@ def upgrade_path(
         "assumptions": assumptions,
         "basis": basis,
     }
+
+
+def invariant_violations(report: JSON) -> list[str]:
+    """Properties every scan report's verdict must have (empty when they all hold):
+
+    1. direct-ok is impossible if any breaking or risky finding is in a hazard category
+       (pre-existing ones included);
+    2. direct-ok is impossible if any category is a hazard or unknown, and a hazard
+       category means needs-changes or blocked;
+    3. a category that didn't run (or recorded nothing) is unknown, listed in `unchecked`,
+       and the verdict isn't direct-ok (a hazard elsewhere still decides needs-changes or
+       blocked: §8 precedence);
+    4. a pre-existing breaking finding in a deployment category caps confidence at low.
+    """
+    up = report.get("upgrade_path")
+    if not up:
+        return []
+    out: list[str] = []
+    verdict, cats = up["verdict"], up["categories"]
+    hazard_cats = {c.value for c in (Category(n) for n in CATEGORIES)}
+    sev = [
+        f["id"]
+        for f in report.get("findings", [])
+        if f["category"] in hazard_cats and f["severity"] in ("breaking", "risky")
+    ]
+    if verdict == "direct-ok" and sev:
+        out.append(f"direct-ok with breaking/risky hazard-category findings: {sev}")
+    bad = sorted(n for n, c in cats.items() if c["status"] in ("hazard", "unknown"))
+    if verdict == "direct-ok" and bad:
+        out.append(f"direct-ok with categories {bad} not clean")
+    if any(c["status"] == "hazard" for c in cats.values()) and verdict not in (
+        "needs-changes",
+        "blocked",
+    ):
+        out.append(f"a hazard category but verdict {verdict}")
+    for n, c in cats.items():
+        if c["status"] == "unknown" and n not in up.get("unchecked", []):
+            out.append(f"category {n} is unknown but not listed as unchecked")
+    statuses = report.get("analyzers", [])
+    for n, analyzer in CATEGORIES.items():
+        runs = [
+            s for s in statuses if s["name"] == analyzer or s["name"].startswith(analyzer + "@")
+        ]
+        if (not runs or any(s["status"] != "ok" for s in runs)) and cats[n]["status"] != "unknown":
+            out.append(f"category {n}'s analyzer didn't run cleanly, but it's {cats[n]['status']}")
+    deploy = {c.value for c in DEPLOYMENT.values()}
+    pre = [
+        f["id"]
+        for f in report.get("findings", [])
+        if f["severity"] == "breaking"
+        and not f.get("introduced_by_migration", True)
+        and (
+            f["category"] in deploy
+            or any((n, Category(f["category"]), f["kind"]) in TOUCHES for n in DEPLOYMENT)
+        )
+    ]
+    if pre and up["confidence"] != "low":
+        out.append(f"pre-existing breaking {pre} but confidence {up['confidence']}")
+    return out

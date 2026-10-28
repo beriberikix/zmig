@@ -19,6 +19,7 @@ import jsonschema
 import pytest
 
 from zmig.cli import main
+from zmig.verdict import invariant_violations
 
 ROOT = Path(__file__).parents[1]
 SCHEMA = json.loads((ROOT / "zmig/schema/report-1.json").read_text())
@@ -59,6 +60,7 @@ def _scan(name: str, out: Path) -> dict[str, Any]:
     args += ["--format", "json", "--out", str(out)]
     assert main(args) == 0
     r: dict[str, Any] = json.loads((out / "report.json").read_text())
+    assert invariant_violations(r) == []
     jsonschema.validate(r, SCHEMA)
     assert r["inputs"]["from"]["sha"] == SHAS[frm]
     assert r["inputs"]["to"]["sha"] == SHAS[to]
@@ -275,6 +277,7 @@ def test_c_storage_remedy_builds(tmp_path: Path) -> None:
     args += ["--format", "json", "--out", str(tmp_path / "out")]
     assert main(args) == 0
     r = json.loads((tmp_path / "out" / "report.json").read_text())
+    assert invariant_violations(r) == []
     assert [c["status"] for c in r["contexts"]] == ["ok", "ok"]
     assert {f["severity"] for f in of(r, "storage")} <= {"info"}
 
@@ -357,6 +360,7 @@ def test_wire_user_allowlist(tmp_path: Path) -> None:
     args += ["--format", "json", "--out", str(tmp_path)]
     assert main(args) == 0
     r = json.loads((tmp_path / "report.json").read_text())
+    assert invariant_violations(r) == []
     (ch,) = of(r, "wire", "wire-value-changed")
     assert ch["subject"] == "CONFIG_BT_AUTO_PHY_UPDATE"
     assert (ch["old"], ch["new"]) == ("y", "n")
@@ -444,6 +448,7 @@ def test_deployed_image_signed_with_another_key(
     args += ["--format", "json", "--out", str(tmp_path / "out")]
     assert main(args) == 0
     out = json.loads((tmp_path / "out" / "report.json").read_text())
+    assert invariant_violations(out) == []
     (d,) = of(out, "mcuboot", "signed-image-diff")
     assert d["old"]["path"] == str(deployed)
     kinds = {f["kind"] for f in of(out, "mcuboot") if f.get("remedy")}

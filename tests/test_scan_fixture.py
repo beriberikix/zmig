@@ -15,6 +15,7 @@ import pytest
 
 from tests.manual_diff import config_diff, dts_diff
 from zmig.cli import main
+from zmig.verdict import invariant_violations
 
 ROOT = Path(__file__).parents[1]
 APP = ROOT / "tests" / "fixtures" / "app"
@@ -51,6 +52,7 @@ def report(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
         == 0
     )
     r: dict[str, Any] = json.loads((out / "report.json").read_text())
+    assert invariant_violations(r) == []
     jsonschema.validate(r, SCHEMA)
     r["_out"] = str(out)
     return r
@@ -209,6 +211,7 @@ def test_large_gap_v442(tmp_path: Path) -> None:
         == 0
     )
     r = json.loads((tmp_path / "report.json").read_text())
+    assert invariant_violations(r) == []
     jsonschema.validate(r, SCHEMA)
     assert {a["name"]: a["status"] for a in r["analyzers"]} == {
         "board": "ok",
@@ -306,6 +309,7 @@ def test_guide_gating_large_gap(tmp_path: Path) -> None:
         == 0
     )
     r = json.loads((tmp_path / "report.json").read_text())
+    assert invariant_violations(r) == []
     # hawkBit entry mentions CONFIG_BOARD (which main.c reads), gated on a hawkBit option.
     f = find(r, "entry-match", "MG-4.2-0140:kconfig:BOARD")
     assert (f["severity"], f["confidence"]) == ("info", "low")
