@@ -1,0 +1,132 @@
+# zmig watch: example GitHub Actions workflow (docs/DESIGN-WATCH.md §6).
+#
+# UNTESTED: this file has never run in GitHub Actions. Every `uses:` is pinned to the commit
+# its tag pointed to on 2026-10-28 (`git ls-remote`); every action input below is from
+# memory and is UNVERIFIED until checked against that action's README at the pinned commit.
+# The test procedure is in docs/DESIGN-WATCH.md §8.
+#
+# Copy to .github/workflows/zmig-watch.yml and edit the ZMIG_* values for your app.
+
+name: zmig watch
+
+on:
+  # `pull_request`, never `pull_request_target`: the scan builds the PR's code, and
+  # `pull_request_target` would run that code with a write token and the base repo's
+  # secrets. With `pull_request`, fork PRs get a read-only token and no secrets, so the
+  # comment step below can't post for them; the job summary carries the comment instead.
+  pull_request:
+  schedule:
+    - cron: "0 3 * * *"   # nightly: track the next release
+    - cron: "0 4 * * 1"   # weekly (Mondays): track main (optional; delete if unwanted)
+  workflow_dispatch:
+
+env:
+  ZMIG_VERSION: "0.1.0"
+  # The zmig package to install. zmig isn't on PyPI; point this at where you host it,
+  # pinned to a commit.
+  ZMIG_PIP: "zmig[zephyr,api] @ git+https://github.com/OWNER/zmig@COMMIT_SHA"
+  ZMIG_ARGS: >-
+    --app app --board usb2canfdv1
+    --module cmsis --module hal_stm32
+    --cmake-arg=-DZEPHYR_EXTRA_MODULES=${{ github.workspace }}
+    --cmake-arg=-DFILE_SUFFIX=usbd_next
+    --sdk ${{ github.workspace }}/../zephyr-sdk-0.16.8
+  ZEPHYR_SDK: "0.16.8"
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      security-events: write   # SARIF upload (same-repo PRs and scheduled runs only)
+      pull-requests: write     # the PR comment (same-repo PRs only)
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4; inputs UNVERIFIED
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5; inputs UNVERIFIED
+        with:
+          python-version: "3.12"
+
+      - name: Host tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build device-tree-compiler dwarves abigail-tools
+
+      # Cache key: west.yml and the zmig version only, never the baseline (a baseline
+      # edit doesn't change what's cached). The scheduled run on the default branch
+      # populates it; PR runs restore it. Whether a PR can restore a cache saved by the
+      # default branch, and the per-repository cache size limit, are UNVERIFIED: check
+      # them against the current GitHub Actions cache documentation.
+      - name: Restore zmig cache (mirror, workspaces, parse cache)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4; inputs UNVERIFIED
+        with:
+          path: |
+            ~/.cache/zmig/mirrors
+            ~/.cache/zmig/workspaces
+            ~/.cache/zmig/api
+          key: zmig-${{ env.ZMIG_VERSION }}-${{ hashFiles('west.yml') }}
+          restore-keys: zmig-${{ env.ZMIG_VERSION }}-
+
+      - name: Zephyr SDK ${{ env.ZEPHYR_SDK }} (ARM toolchain only)
+        # Release asset names are UNVERIFIED.
+        run: |
+          cd ..
+          base=https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v$ZEPHYR_SDK
+          curl -sSfL $base/zephyr-sdk-${ZEPHYR_SDK}_linux-x86_64_minimal.tar.xz | tar -xJ
+          cd zephyr-sdk-$ZEPHYR_SDK
+          curl -sSfL $base/toolchain_linux-x86_64_arm-zephyr-eabi.tar.xz | tar -xJ
+
+      - run: pip install "$ZMIG_PIP"
+
+      - name: zmig watch
+        id: zmig
+        shell: bash
+        run: |
+          case "${{ github.event_name }}/${{ github.event.schedule }}" in
+            "schedule/0 4 * * 1") to="--to track:main" ;;
+            schedule/*|workflow_dispatch/*) to="--to track:next-release" ;;
+            *) to="" ;;   # pull_request: pinned to the baseline's target SHA
+          esac
+          set +e
+          zmig watch $ZMIG_ARGS $to --baseline .zmig/baseline.json \
+            --sarif zmig.sarif --pr-comment zmig-comment.md --out zmig-out
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          # 4 = inconclusive. On a PR it's a warning (the job passes; see §6 on "neutral");
+          # on a scheduled run it fails the job.
+          if [ $code -eq 4 ] && [ "${{ github.event_name }}" = pull_request ]; then
+            echo "::warning title=zmig watch::inconclusive: no new finding, but the run couldn't check everything (see the job summary)"
+            exit 0
+          fi
+          exit $code
+
+      - name: Upload SARIF
+        if: always() && hashFiles('zmig.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@4bfa242aa49c5f7c6770b98670d354a7dfac05f8  # v3; inputs UNVERIFIED
+        with:
+          sarif_file: zmig.sarif
+          category: zmig
+
+      - name: PR comment (one comment, edited in place)
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && hashFiles('zmig-comment.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+                 --jq '.[] | select(.body | startswith("<!-- zmig-watch -->")) | .id' | head -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@zmig-comment.md
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@zmig-comment.md
+          fi
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4; inputs UNVERIFIED
+        with:
+          name: zmig-watch
+          path: zmig-out
