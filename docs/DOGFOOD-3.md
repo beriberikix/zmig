@@ -217,3 +217,119 @@ when the change was an allowed misleading-output fix or one you asked for.
 The clean numbers are the DOGFOOD-2 baseline for B and A1, and the DOGFOOD-3 baseline for
 the five configurations added there. Every later number is on projects whose output has
 informed zmig changes.
+
+---
+
+## 8. Round 3: checked records, verdict invariants, value-use severity, P2 cost
+
+All runs use the same commands as §2–3 (nine configurations), with builds cached.
+
+### 8.1 Checked and clean (`fbaddec`)
+
+Report schema 1.3 adds two things:
+
+- a `checked` list: area, result (`clean`/`found`/`partial`), detail, analyzer;
+- per-analyzer `findings`/`hazards` counts once an analyzer ran. A skipped analyzer has no
+  counts.
+
+Shown on real builds:
+
+- **Golioth B:** 7 areas clean, 1 with findings.
+  - libclang: 31 TUs at each side, 0 errors.
+  - pahole: 18 of 20 field offsets checked against the ELF, 0 disagree, at both refs.
+  - binary boundaries: none.
+  - init order: 2 project init calls compared.
+  - module set: clean.
+- **bms A1-native:** the parse gap is `partial` with its TU listed under Not checked, and
+  the missing target ELF is not-checked for pahole.
+
+### 8.2 Verdict invariants (`8b19cea`)
+
+`zmig.verdict.invariant_violations` encodes four rules:
+
+1. direct-ok is impossible with breaking/risky hazard-category findings or a non-clean
+   category;
+2. a hazard category means needs-changes or blocked;
+3. a category whose analyzer didn't run is unknown and listed as unchecked;
+4. a pre-existing breaking finding caps confidence at low.
+
+The verdict now also treats remedy-less hazard-category findings and recorded hazard
+categories as hazards (remedy `unknown`). Tests:
+
+- 3000 random cases;
+- the B-rak layout-hazard-plus-direct-ok regression;
+- negative cases for the checker itself;
+- an assertion on every report the fixture and dogfood build tests produce.
+
+Swept over the 80 dogfood reports on disk:
+
+| Reports | Result |
+|---|---|
+| DOGFOOD-3 baseline B-rak and B-esp | violate (the M8 bug) |
+| 9 DOGFOOD-1-era reports | violate (they predate the `unchecked` field) |
+| all others | pass |
+| all nine current runs | pass |
+
+**How rule 3 is encoded:** a category that didn't run never yields direct-ok and is always
+in `unchecked`. With a confirmed hazard elsewhere, the verdict is still needs-changes or
+blocked, per P1's approved precedence, with "remedies are a lower bound".
+
+### 8.3 Value-change severity (`2668e77`)
+
+Every use of an enum constant or object-like macro is classified as stored, passed,
+compared, narrowed, other (discarded or `sizeof`) or unknown. A value change is info only
+when every use is "other".
+
+Re-run on all nine configurations: the breaking/risky findings are **identical** before
+and after, so recall and precision are unchanged. G1b stays breaking. Nothing was demoted:
+
+- ZMK `SENSOR_CHAN_*`: compared and passed;
+- B-esp event codes: compared (`case` labels);
+- `NET_REQUEST_WIFI_*`: unknown (an argument of the `net_mgmt()` macro), so they stay risky.
+
+### 8.4 P2 cost (`fdfdb77`)
+
+Profiling (6 ZMK TUs) showed libclang's parsing was **0.56 s of 8.8 s**. The rest was Python
+walking every header declaration and resolving file names per node.
+
+The fix: walk only the project's own declarations, and record a Zephyr declaration only
+when the project references it. Those 6 TUs drop to 1.7 s, with the same findings.
+
+Added as you asked, with what they bought:
+
+- **Skip TUs whose included files didn't change between refs.** This skipped **0 TUs in
+  every configuration.** Across a Zephyr release, every TU includes some changed file
+  (`toolchain.h`, `kernel_structs.h`, `autoconf.h`). Excluding `autoconf.h` would skip 3
+  of 31 on Golioth B and 0 of 56 on ZMK, and still be unsafe, because Kconfig changes alter
+  declarations. So it's kept as exact but ineffective here.
+- **A parse cache keyed by content** (parser version, TU text, flags with build and
+  workspace paths normalized, and the hash of every included file), shared across build
+  directories.
+
+Scan wall-clock, builds cached:
+
+| Config | Before (cold, `2668e77`) | After, cold parse cache | After, warm parse cache |
+|---|---|---|---|
+| Golioth B | 209 s | 48 s | 7 s |
+| B-rak | 143 s | 41 s | 8 s |
+| B-esp | 161 s | 48 s | 7 s |
+| B-native | 104 s | 31 s | 6 s |
+| bms A1 | 114 s | 41 s | 8 s |
+| A1-native | 91 s | 43 s | 6 s |
+| A1-oled | 120 s | 46 s | 6 s |
+| ZMK corne | 185 s | 75 s | 35 s |
+| ZMK niceview | 200 s | 80 s | 44 s |
+
+What the warm runs show:
+
+- Findings are identical to before in all nine configurations, cold and warm.
+- They're served from the cache (e.g. "0 parsed, 62 from the parse cache" on Golioth B).
+- ZMK still re-parses 24 TUs warm. Those are the TUs whose target compile failed: ninja has
+  no dependency record for them, so their inputs aren't known and they aren't cached. The
+  same holds for 1 TU each in A1-native and A1-oled.
+
+Two bugs were found while measuring and fixed in `fdfdb77`:
+
+- a function at the source that's a macro at the target crashed the diff with `KeyError`;
+- the absolute `output` in compile_commands never matched ninja's object keys, so the cache
+  never hit.
