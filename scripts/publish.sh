@@ -188,7 +188,11 @@ echo "Commits to push:"
 git log --format='  %h %s' "${remote_sha:+$remote_sha..}$local_sha"
 [ $scan_only = 1 ] && { echo; echo "--scan-only: not pushing"; exit 0; }
 echo
-read -r -p "Push $branch to $remote? Type yes to push: " answer
+if [ ! -t 0 ]; then
+  echo "Not pushed: the confirmation must be typed in a terminal (stdin is not one)." >&2
+  exit 1
+fi
+read -r -p "Push $branch to $remote? Type yes to push: " answer || answer=
 if [ "$answer" != yes ]; then
   echo "Not pushed."
   exit 1
