@@ -51,68 +51,37 @@ class Collected:
     outside: list[str]  # user fragments outside the project: never edited
 
 
-def _fragments(
-    ctx: ScanContext, app: Path, root: Path, cache: Cache
-) -> tuple[list[Path], list[str]]:
-    """The user-owned fragments this image's builds merged, as real files: copies of the
-    app map back to the app; Zephyr's, modules' and generated files are skipped."""
-    seen: dict[Path, None] = {}
-    outside: list[str] = []
-    copies = [b.src.resolve() for b in (ctx.old, ctx.new_raw, ctx.new) if b is not None]
-    # The base configuration (the board's defconfig, user-owned for a board the project
-    # ships) and the fragments merged after it.
-    for paths in (
-        (ctx.old_facts.base_config, *ctx.old_facts.configs),
-        (ctx.new_raw_facts.base_config, *ctx.new_raw_facts.configs),
-    ):
-        for raw in paths:
-            if not raw:
-                continue
-            p = Path(raw).resolve()
-            real = None
-            for c in copies:
-                if p.is_relative_to(c):
-                    real = app / p.relative_to(c)
-                    break
-            if real is None:
-                if p.is_relative_to(cache.root.resolve()):
-                    continue  # Zephyr, modules, generated files
-                real = p
-            if not real.is_file():
-                continue
-            if real.resolve().is_relative_to(root):
-                seen[real.resolve()] = None
-            elif str(real) not in outside:
-                outside.append(str(real))
-    return list(seen), outside
+def _split_project(files: list[Path], root: Path) -> tuple[list[Path], list[str]]:
+    """(files inside the project, paths outside it: never edited)."""
+    inside = [f for f in files if f.is_relative_to(root)]
+    return inside, [str(f) for f in files if not f.is_relative_to(root)]
 
 
-def collect(ctx: ScanContext, app: Path, root: Path, cache: Cache, sysbuild: bool) -> Collected:
+def collect(ctx: ScanContext, app: Path, root: Path, sysbuild: bool) -> Collected:
+    """Assignments in the fragments each image's build read (ScanContext.config_files;
+    sysbuild.conf and SB_CONF_FILE from the sysbuild log)."""
     out: list[tuple[Assignment, ScanContext | None]] = []
     outside: list[str] = []
+
+    def add(f: Path, prefix: str, image: str, pc: ScanContext | None) -> None:
+        lines = f.read_text().splitlines()
+        rel = f.relative_to(root).as_posix()
+        for line, pre, sym, value in parse_conf("\n".join(lines)):
+            if pre == prefix:
+                a = Assignment(rel, f, line, lines[line - 1].strip(), pre, sym, value, image)
+                out.append((a, pc))
+
     for o, n in pair_images(ctx.old, ctx.new):
         pc = ScanContext.for_pair(ctx, o, n)
-        files, out_files = _fragments(pc, app, root, cache)
+        files, out_files = _split_project(pc.config_files or [], root)
         outside += [f for f in out_files if f not in outside]
         for f in files:
-            for line, prefix, sym, value in parse_conf(f.read_text()):
-                if prefix != "CONFIG_":
-                    continue
-                text = f.read_text().splitlines()[line - 1].strip()
-                rel = f.relative_to(root).as_posix()
-                out.append((Assignment(rel, f, line, text, prefix, sym, value, pc.image), pc))
-    sb = app / "sysbuild.conf"
-    if sysbuild and sb.is_file() and sb.resolve().is_relative_to(root):
-        for line, prefix, sym, value in parse_conf(sb.read_text()):
-            if prefix == "SB_CONFIG_":
-                text = sb.read_text().splitlines()[line - 1].strip()
-                rel = sb.resolve().relative_to(root).as_posix()
-                out.append(
-                    (
-                        Assignment(rel, sb.resolve(), line, text, prefix, sym, value, "sysbuild"),
-                        None,
-                    )
-                )
+            add(f, "CONFIG_", pc.image, pc)
+    if sysbuild:
+        files, out_files = _split_project(ctx.sysbuild_config_files or [], root)
+        outside += [f for f in out_files if f not in outside]
+        for f in files:
+            add(f, "SB_CONFIG_", "sysbuild", None)
     return Collected(out, outside)
 
 
@@ -290,7 +259,7 @@ def cmd_fix(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     keep: list[ScanContext] = []
     before = scan_report(args, cache, runner, keep)
     ctx = keep[0]
-    col = collect(ctx, app, root, cache, args.sysbuild)
+    col = collect(ctx, app, root, args.sysbuild)
     props = propose(ctx, col)
     mode = "apply" if args.apply else "dry run; --apply commits these on a new branch"
     print(format_plan(props, col, f"zmig fix kconfig: {ctx.old_spec} -> {ctx.new_spec} ({mode})"))

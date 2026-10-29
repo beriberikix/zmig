@@ -9,6 +9,7 @@ present on both sides (app, MCUboot, ...). Analyzers that look at the build as a
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from pathlib import Path
@@ -97,19 +98,53 @@ class ScanContext:
     # --- what the user's app contributes to this image --------------------------------
 
     @cached_property
+    def config_files(self) -> list[Path] | None:
+        """The user's own Kconfig fragments this image's builds read, as the user's real
+        files: every `Loaded`/`Merged configuration` the configure logs name (board
+        defconfigs, .conf files, EXTRA_CONF_FILE and OVERLAY_CONFIG fragments, per-image
+        sysbuild files), from the source build and the unmodified target build. Zephyr's
+        and modules' files and generated ones are left out. None when the logs name no
+        fragment (the configure didn't reach Kconfig)."""
+        builds = [b for b in (self.old, self.new_raw, self.new) if b is not None]
+        logs = [self.old_img.log, *([self.new_raw_img.log] if self.new_raw_img else [])]
+        named = [m for log in logs if log.is_file() for m in fragments_named(log.read_text())]
+        if not named:
+            return None
+        return user_files(named, self.old.spec.app.resolve(), builds)
+
+    @cached_property
+    def sysbuild_config_files(self) -> list[Path] | None:
+        """The same for the sysbuild level (sysbuild.conf, SB_CONF_FILE): from the
+        sysbuild segment of each build's log."""
+        builds = [b for b in (self.old, self.new_raw) if b is not None]
+        named = [
+            m
+            for b in builds
+            if (log := b.dir / "zmig-logs" / "sysbuild.log").is_file()
+            for m in fragments_named(log.read_text())
+        ]
+        if not named:
+            return None
+        return user_files(named, self.old.spec.app.resolve(), [*builds, self.new])
+
+    @cached_property
     def usage(self) -> ProjectUsage:
-        """References from the app's files that apply to this image. For the app image:
-        everything except per-image sysbuild configuration (sysbuild/, sysbuild.conf).
-        For other images: the app files that image's build applied (from its log)."""
+        """References from the app's files that apply to this image. Kconfig assignments
+        come from the fragments this image's build read (`config_files`; regression:
+        ZMK's `CONFIG_PINMUX=y` in a board `_defconfig` was never indexed when only
+        `*.conf` names were). Other references: for the app image, every app file except
+        per-image sysbuild configuration (sysbuild/, sysbuild.conf); for other images,
+        the app files that image's build applied (from its log)."""
         app = self.old.spec.app.resolve()
+        conf = self.config_files
         if self.is_app:
 
             def keep(rel: str) -> bool:
                 return not (rel.startswith(SYSBUILD_DIR + "/") or rel == "sysbuild.conf")
 
-            return usage_scan(app, include=keep)
+            return usage_scan(app, include=keep, conf_files=conf)
         applied = set(app_relative(self.old_facts.overlays + self.old_facts.configs, self.old.src))
-        return usage_scan(app, include=lambda rel: rel in applied)
+        return usage_scan(app, include=lambda rel: rel in applied, conf_files=conf)
 
     @cached_property
     def build_files(self) -> set[str] | None:
@@ -201,3 +236,32 @@ class ScanContext:
             self.shared["guide_entries"] = out
         entries: list[tuple[Document, Entry]] = self.shared["guide_entries"]
         return entries
+
+
+_FRAGMENT = re.compile(r"^(?:Loaded|Merged) configuration '(.+)'$", re.M)
+
+
+def fragments_named(log: str) -> list[str]:
+    """Every Kconfig fragment a configure log says Kconfig loaded or merged, in order."""
+    return _FRAGMENT.findall(log)
+
+
+def user_files(named: list[str], app: Path, builds: list[BuildContext]) -> list[Path]:
+    """The user's real files among fragment paths from build logs. A path inside the copy
+    of the app that was built maps back to the app; paths inside zmig's workspaces (Zephyr,
+    modules) or build directories (generated files) are dropped; anything else is a user
+    file passed by path (e.g. EXTRA_CONF_FILE outside the app). Missing files are dropped;
+    order and duplicates are kept once, first seen."""
+    copies = [b.src.resolve() for b in builds]
+    skip = [r for b in builds for r in (b.workspace.root.resolve(), b.dir.resolve())]
+    out: dict[Path, None] = {}
+    for raw in named:
+        p = Path(raw).resolve()
+        real = next((app / p.relative_to(c) for c in copies if p.is_relative_to(c)), None)
+        if real is None:
+            if any(p.is_relative_to(r) for r in skip):
+                continue
+            real = p
+        if real.is_file():
+            out.setdefault(real.resolve(), None)
+    return list(out)

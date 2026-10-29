@@ -159,3 +159,38 @@ exists):
   lines, the rule would comment them out, and the implemented fixer didn't edit at all.
 
 ZMK is a **tuned** project (the development project). This tests the fixer, not recall.
+
+## Scan usage index from the build's own fragment list (generic post-baseline fix)
+
+**The problem.** The scan's Kconfig usage index (`ScanContext.usage`) read assignments
+only from files named `*.conf`, so ZMK's `CONFIG_PINMUX=y` in `planck_rev6_defconfig:10`
+was never reported. Commit `16403a6` fixed this only for `zmig fix kconfig` (its own
+fragment list), not for the scan.
+
+**The fix.** The index now reads assignments from the fragments each image's configure
+log says Kconfig loaded or merged (`ScanContext.config_files`):
+
+- board defconfigs, board and shield `.conf` files;
+- `EXTRA_CONF_FILE` and `OVERLAY_CONFIG` fragments, also outside the app;
+- per-image sysbuild files.
+
+App copies map back to the app. Zephyr's, modules' and generated files are dropped. The
+sysbuild level (`sysbuild.conf`, `SB_CONF_FILE`) comes from the sysbuild segment's log
+(`sysbuild_config_files`, used by the sysbuild analyzer).
+
+`*.conf` names are only the fallback, when a configure never reached Kconfig. As a side
+effect, an app `.conf` the build didn't read is no longer indexed. `zmig fix kconfig` now
+uses the same lists. That also fixes its old rule, which dropped every path under zmig's
+cache root, including a project that lives there.
+
+**Regression test.** `tests/test_config_index.py`, with ZMK's real `planck_rev6_defconfig`
+from `b8846cf6` (`tests/fixtures/zmk-defconfig`).
+
+**Re-run on the cached ZMK planck configuration** (tuned project). The run used
+`GIT_ALLOW_PROTOCOL=file`, so git could not use the network, and took 32 s with exit 0.
+Comparing reports by finding id, 59 → 59 findings, one changed:
+
+| Before | After |
+|---|---|
+| breaking `read-symbol-removed` CONFIG_PINMUX, citing `boards/arm/{mikoto,nrfmicro,puchi_ble}/CMakeLists.txt:2` (other boards, not in this build) | breaking `symbol-removed` "CONFIG_PINMUX, set in boards/arm/planck/planck_rev6_defconfig, no longer exists", at `planck_rev6_defconfig:10`, the line the maintainers deleted |
+

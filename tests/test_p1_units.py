@@ -106,7 +106,7 @@ def test_sysbuild_user_settings_and_replacement(tmp_path: Path) -> None:
         "# comment\nSB_CONFIG_BOOTLOADER_MCUBOOT=y\nSB_CONFIG_MCUBOOT_MODE_SWAP_WITHOUT_SCRATCH=y\n"
     )
     u = user_settings(tmp_path)
-    assert u["MCUBOOT_MODE_SWAP_WITHOUT_SCRATCH"][:2] == (3, "y")
+    assert u["MCUBOOT_MODE_SWAP_WITHOUT_SCRATCH"][:3] == ("sysbuild.conf", 3, "y")
     # Shape of v4.1.0 share/sysbuild/images/bootloader/Kconfig:61-65.
     nk = {
         "MCUBOOT_MODE_SWAP_WITHOUT_SCRATCH": {

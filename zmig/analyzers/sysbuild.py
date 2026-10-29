@@ -17,6 +17,7 @@ placeholders, so per-ref cache paths (e.g. the default signing key) don't show a
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,14 +63,20 @@ def _same(a: str | None, b: str | None) -> bool:
     return (_off(a) and _off(b)) or a == b
 
 
-def user_settings(app: Path) -> dict[str, tuple[int, str, str]]:
-    """SB_CONFIG_X -> (line, value, text) from the app's sysbuild.conf."""
-    out: dict[str, tuple[int, str, str]] = {}
-    f = app / "sysbuild.conf"
-    if f.is_file():
+def user_settings(
+    app: Path, files: list[Path] | None = None
+) -> dict[str, tuple[str, int, str, str]]:
+    """SB_CONFIG_X -> (path, line, value, text) from the sysbuild-level fragments the build
+    read (`ScanContext.sysbuild_config_files`: sysbuild.conf, SB_CONF_FILE), shown relative
+    to the app; the app's sysbuild.conf when the log names none."""
+    out: dict[str, tuple[str, int, str, str]] = {}
+    for f in files if files is not None else [app / "sysbuild.conf"]:
+        if not f.is_file():
+            continue
+        rel = os.path.relpath(f.resolve(), app).replace(os.sep, "/")
         for i, line in enumerate(f.read_text().splitlines(), 1):
             if m := re.match(r"^\s*SB_CONFIG_(\w+)\s*=\s*(.*?)\s*$", line):
-                out[m[1]] = (i, m[2], line.strip())
+                out[m[1]] = (rel, i, m[2], line.strip())
     return out
 
 
@@ -116,7 +123,7 @@ class SysbuildAnalyzer:
             )
         ok = sysbuild_kconfig(ctx.old.dir, ctx.old.workspace, ctx.runner)
         nk = sysbuild_kconfig(ctx.new.dir, ctx.new.workspace, ctx.runner)
-        user = user_settings(ctx.old.spec.app.resolve())
+        user = user_settings(ctx.old.spec.app.resolve(), ctx.sysbuild_config_files)
         rules = {side: self._rules(b) for side, b in (("old", ctx.old), ("new", ctx.new))}
         imgs = {side: self._images(b) for side, b in (("old", ctx.old), ("new", ctx.new))}
         findings: list[Finding] = []
@@ -255,7 +262,7 @@ class SysbuildAnalyzer:
             )
 
         # 2. Symbols the user sets that are deprecated or gone at the target.
-        for sym, (line, _value, text) in sorted(user.items()):
+        for sym, (path, line, _value, text) in sorted(user.items()):
             if sym in handled:
                 continue
             if sym in nk and not nk[sym].get("deprecated"):
@@ -287,7 +294,7 @@ class SysbuildAnalyzer:
                     f"{ctx.new_spec}, and the image options it propagates to changed"
                 )
                 sev, remedy = Severity.RISKY, Remedy.APP_CHANGE
-            ev: list[JSON] = [file_line("sysbuild.conf", line, text)]
+            ev: list[JSON] = [file_line(path, line, text)]
             ev += self._kconfig_ev(ctx, sym, ok, nk)
             findings.append(
                 Finding(
@@ -378,7 +385,7 @@ class SysbuildAnalyzer:
         changed: list[JSON],
         ok: Symbols,
         nk: Symbols,
-        user: dict[str, tuple[int, str, str]],
+        user: dict[str, tuple[str, int, str, str]],
     ) -> Finding:
         same = not changed
         # config-pin: the old member still exists at the target and isn't deprecated.
@@ -388,8 +395,8 @@ class SysbuildAnalyzer:
             if sym:
                 ev += self._kconfig_ev(ctx, sym, ok, nk)
         if a in user:
-            line, _, text = user[a]
-            ev.insert(0, file_line("sysbuild.conf", line, text))
+            path, line, _, text = user[a]
+            ev.insert(0, file_line(path, line, text))
         return Finding(
             category=Category.SYSBUILD,
             kind=kind,

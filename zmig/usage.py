@@ -11,8 +11,9 @@ can't place is ignored rather than guessed.
 
 from __future__ import annotations
 
+import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -187,15 +188,31 @@ def _scan_overlay(rel: str, text: str, u: ProjectUsage) -> None:
             break
 
 
-def scan(app: Path, include: Callable[[str], bool] | None = None) -> ProjectUsage:
+def scan(
+    app: Path,
+    include: Callable[[str], bool] | None = None,
+    conf_files: Sequence[Path] | None = None,
+) -> ProjectUsage:
     """Index the app's references; `include` (on app-relative paths) limits which files
-    count, e.g. to the files one sysbuild image applies."""
+    count, e.g. to the files one sysbuild image applies. `conf_files`, when given, are the
+    Kconfig fragments the build itself read (whatever their names: defconfigs, board
+    .conf files, EXTRA_CONF_FILE fragments, also outside the app); then only those are
+    indexed for assignments, not every `*.conf` under the app."""
     app = app.resolve()
     u = ProjectUsage(app)
+    if conf_files is not None:
+        for f in conf_files:
+            try:
+                text = f.read_text()
+            except (OSError, UnicodeDecodeError):
+                continue
+            _scan_conf(os.path.relpath(f.resolve(), app).replace(os.sep, "/"), text, u)
     for p in _files(app):
         rel = p.relative_to(app).as_posix()
         if include is not None and not include(rel):
             continue
+        if p.suffix == ".conf" and conf_files is not None:
+            continue  # assignments come from the build's own list above
         try:
             text = p.read_text()
         except UnicodeDecodeError:
