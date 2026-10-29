@@ -63,6 +63,8 @@ packages = ["zmig"]
 artifacts = ["zmig/data/*.json", "zmig/data/*.yaml", "zmig/schema/*.json"]
 
 [tool.ruff]
+# Verbatim third-party sources used as test inputs (patches must apply to them as-is).
+extend-exclude = ["tests/fixtures/patch-methods"]
 line-length = 100
 target-version = "py312"
 

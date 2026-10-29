@@ -162,7 +162,9 @@ class ForksAnalyzer:
         head = mirror.fetch_path(up.path)
         tgt_sha = mirror.resolve(target)[0] if target else base_sha
         try:
-            res: ForkResult = classify(mirror, head, base_sha, tgt_sha, up.unpushed)
+            res: ForkResult = classify(
+                mirror, head, base_sha, tgt_sha, up.unpushed, ctx.patch_methods
+            )
         except ZmigError as e:
             out.append(
                 _finding(
@@ -225,22 +227,62 @@ class ForksAnalyzer:
         if not target:
             return out
         for c in res.commits:
-            out.append(self._commit_finding(c, label, scope))
+            out.append(self._commit_finding(c, label, scope, ctx.patch_file(c.subject)))
         return out
 
     @staticmethod
-    def _commit_finding(c: CommitResult, label: str, scope: tuple[str, ...]) -> Finding:
+    def _commit_finding(
+        c: CommitResult, label: str, scope: tuple[str, ...], patch_file: str | None = None
+    ) -> Finding:
         ev: list[JSON] = [git_commit(label, c.sha, c.subject, c.patch_id or None)]
         new: dict[str, object] = {
             "state": c.state,
             "files": list(c.files),
             "provenance": "local-unpushed" if c.unpushed else "remote",
+            "methods": {
+                m.method: {"state": m.state, "files": list(m.files), "hunks": list(m.hunks)}
+                for m in c.methods
+            },
+            **({"patch_file": patch_file} if patch_file else {}),
         }
+        # Which method says what, when they disagree ("applies under 3way, fails under
+        # git-apply"); the state is the stricter one.
+        by = {m.method: m.state for m in c.methods}
+        fails = [m for m, st in by.items() if st == "conflicts"]
+        applies = [m for m, st in by.items() if st == "applies"]
+        split = (
+            f" (fails under {', '.join(fails)}; applies under {', '.join(applies)})"
+            if fails and applies
+            else ""
+        )
+        what = f"the project's patch {patch_file}" if patch_file else "the local commit"
+        where = (
+            f"; failing hunk(s): {', '.join(c.failed_hunks)}"
+            if c.failed_hunks
+            else (
+                f"; conflicting files: {_files_note(c.conflict_files)}" if c.conflict_files else ""
+            )
+        )
         if c.overlap:
             new["overlap"] = list(c.overlap)
             new["overlap_commits"] = [list(x) for x in c.overlap_commits]
         subject = f"{label}:{c.sha}"
         short = f'{c.sha[:12]} "{c.subject}"'
+        if c.state == "upstreamed" and c.match == "absorbed":
+            new["match"] = "absorbed"
+            return _finding(
+                scope,
+                "upstreamed",
+                subject,
+                f"{label} {short} is already in the target, but it no longer applies{split}",
+                Severity.RISKY,
+                Confidence.MEDIUM,
+                f"Drop {what}: upstream already absorbed the change (its added lines are "
+                f"present and its removed lines are gone at the target{where}).",
+                tuple(ev),
+                new,
+                ("fork.absorbed",),
+            )
         if c.state == "upstreamed" and c.upstream is not None:
             up_sha, up_subj = c.upstream
             ev.append(git_commit("upstream", up_sha, up_subj))
@@ -307,11 +349,10 @@ class ForksAnalyzer:
                 scope,
                 "conflicts",
                 subject,
-                f"{label} {short} conflicts with the target",
+                f"{label} {short} conflicts with the target{split}",
                 Severity.BREAKING,
                 Confidence.HIGH,
-                f"Resolve by hand when rebasing; conflicting files: "
-                f"{_files_note(c.conflict_files)}.",
+                f"Refresh {what} against the target{where}.",
                 tuple(ev),
                 new,
             )

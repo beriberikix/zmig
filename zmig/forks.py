@@ -15,7 +15,18 @@ Classification of each local, non-merge commit, first match wins:
   applies     merges cleanly onto target plus the previously applied local commits
   conflicts   merge-tree reports conflicted paths
 Independently, `overlap` lists files the commit touches that upstream also changed.
-The sequential replay mirrors what `git rebase --onto <target>` would do.
+
+How a commit "applies" depends on how the project applies its patches (`methods`):
+  3way       `git merge-tree` with the commit's parent as base, i.e. a cherry-pick /
+             `git rebase --onto <target>`: hunks whose context moved still merge
+  git-apply  `git apply` of the commit's diff, as patch-file workflows do (zenv's patch.sh,
+             `git am` without -3): context must match, line offsets are allowed, no fuzz
+  git-am     the same check as git-apply
+Each method replays the commits in order on its own chain. With several methods the state
+is the stricter one, and `methods` records every method's result, so a disagreement
+("applies under 3way, fails under git-apply") is visible. `absorbed` means upstream
+already contains the change: its added lines are present and its removed lines are gone at
+the target, even though no upstream commit matches it.
 """
 
 from __future__ import annotations
@@ -23,6 +34,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import tempfile
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
@@ -33,6 +45,20 @@ from zmig.errors import ToolFailed, ZmigError
 from zmig.refs import Mirror
 
 CommitState = Literal["upstreamed", "applies", "conflicts"]
+PatchMethod = Literal["git-apply", "git-am", "3way"]
+PATCH_METHODS: tuple[PatchMethod, ...] = ("git-apply", "git-am", "3way")
+DEFAULT_METHODS: tuple[PatchMethod, ...] = ("git-apply", "3way")
+
+
+@dataclass(frozen=True)
+class MethodResult:
+    """One patch-application method's result for a commit."""
+
+    method: PatchMethod
+    state: Literal["applies", "conflicts"]
+    files: tuple[str, ...] = ()  # conflicting files
+    hunks: tuple[str, ...] = ()  # git-apply: "path:line" of each hunk that failed
+
 
 # Fixed identity and dates for trial commits in the mirror, so replay is deterministic.
 _TRIAL_ENV = {
@@ -63,7 +89,7 @@ class CommitResult:
     files: tuple[str, ...]
     patch_id: str
     state: CommitState
-    match: Literal["patch-id", "subject", "content"] | None = None
+    match: Literal["patch-id", "subject", "content", "absorbed"] | None = None
     upstream: tuple[str, str] | None = None  # (sha, subject) when upstreamed
     conflict_files: tuple[str, ...] = ()
     overlap: tuple[str, ...] = ()
@@ -73,6 +99,16 @@ class CommitResult:
     # that aren't patch-id identical; and whether subject and content agree.
     similarity: float | None = None
     signals: Literal["agree", "disagree"] | None = None
+    methods: tuple[MethodResult, ...] = ()
+    absorbed: bool = False
+
+    @property
+    def disagreement(self) -> bool:
+        return len({m.state for m in self.methods}) > 1
+
+    @property
+    def failed_hunks(self) -> tuple[str, ...]:
+        return tuple(h for m in self.methods for h in m.hunks)
 
 
 @dataclass(frozen=True)
@@ -104,8 +140,8 @@ class _Git:
         )
         return proc.returncode, proc.stdout
 
-    def out(self, *args: str, input: str | None = None) -> str:
-        return self(*args, input=input)[1]
+    def out(self, *args: str, input: str | None = None, env: dict[str, str] | None = None) -> str:
+        return self(*args, input=input, env=env)[1]
 
 
 def _patch_ids(git: _Git, log_args: Iterable[str]) -> dict[str, str]:
@@ -121,9 +157,15 @@ def _patch_ids(git: _Git, log_args: Iterable[str]) -> dict[str, str]:
 
 
 def classify(
-    mirror: Mirror, head: str, base: str, target: str, unpushed: frozenset[str] = frozenset()
+    mirror: Mirror,
+    head: str,
+    base: str,
+    target: str,
+    unpushed: frozenset[str] = frozenset(),
+    methods: tuple[PatchMethod, ...] = DEFAULT_METHODS,
 ) -> ForkResult:
-    """Classify the commits on `head` that upstream doesn't have, against `target`."""
+    """Classify the commits on `head` that upstream doesn't have, against `target`, under
+    each patch-application method in `methods` (see the module docstring)."""
     git = _Git(mirror)
     rc, mb = git("merge-base", head, base, check=False)
     if rc != 0:
@@ -143,7 +185,7 @@ def classify(
             subjects.setdefault(norm, (sha, subj))
 
     results: list[CommitResult] = []
-    cur = target
+    chains = {m: target for m in methods}  # each method's replay chain
     for c in local:
         subject = git.out("log", "-1", "--format=%s", c).strip()
         files = tuple(
@@ -183,11 +225,26 @@ def classify(
                 replace(res, state="upstreamed", match="patch-id", upstream=(up, up_subject))
             )
             continue
-        # Replay like `git rebase`: patch-id matches are dropped above; everything else,
-        # including subject-only matches (whose content differs), is applied in order.
-        tree, conflicted = _trial_apply(git, cur, c)
-        if tree is not None:
-            cur = _commit_tree(git, tree, cur, c)
+        # Replay in order on each method's chain: patch-id matches are dropped above;
+        # everything else, including subject-only matches (whose content differs), is
+        # applied. A commit that fails isn't added to that chain.
+        per: list[MethodResult] = []
+        for m in methods:
+            if m == "3way":
+                tree, conflicted_m = _trial_apply(git, chains[m], c)
+                hunks: tuple[str, ...] = ()
+            else:
+                tree, conflicted_m, hunks = _apply_trial(git, chains[m], c)
+            if tree is not None:
+                chains[m] = _commit_tree(git, tree, chains[m], c)
+            per.append(
+                MethodResult(m, "applies" if tree is not None else "conflicts", conflicted_m, hunks)
+            )
+        failed = [r for r in per if r.state == "conflicts"]
+        tree = None if failed else "ok"
+        conflicted = tuple(sorted({f for r in failed for f in r.files}))
+        absorbed = bool(failed) and _absorbed(git, target, c)
+        res = replace(res, methods=tuple(per), absorbed=absorbed)
         mine = changed_lines(git, c)
         if (norm := normalize_subject(subject)) in subjects:
             by_subject = subjects[norm]
@@ -220,9 +277,66 @@ def classify(
             )
         elif tree is not None:
             results.append(res)
+        elif absorbed:
+            # Upstream made the same change without a matching commit (e.g. under another
+            # subject, with surrounding edits): keeping the patch fails, dropping it is right.
+            results.append(
+                replace(res, state="upstreamed", match="absorbed", conflict_files=conflicted)
+            )
         else:
             results.append(replace(res, state="conflicts", conflict_files=conflicted))
     return ForkResult(head, base, target, mb, tuple(results), merges)
+
+
+def _telling(text: str) -> bool:
+    return len(text) >= 12 and any(ch.isalnum() for ch in text)
+
+
+_PATCH_FAILED = re.compile(r"error: patch failed: (\S+):(\d+)")
+_DOES_NOT_APPLY = re.compile(r"error: (\S+): (?:patch does not apply|does not exist in index)")
+
+
+def _apply_trial(
+    git: _Git, onto: str, c: str
+) -> tuple[str | None, tuple[str, ...], tuple[str, ...]]:
+    """`git apply` `c`'s diff onto `onto`'s tree in a scratch index (nothing is checked
+    out): (result tree, (), ()) or (None, failing files, failing hunks as "path:line")."""
+    with tempfile.TemporaryDirectory(prefix="zmig-apply-") as d:
+        env = {"GIT_INDEX_FILE": os.path.join(d, "index")}
+        git("read-tree", onto, env=env)
+        diff = git.out("diff", "--binary", "--no-color", "--no-renames", f"{c}^", c)
+        proc = git.mirror.runner.run(
+            [git.mirror.git, "--git-dir", git.mirror.path, "apply", "--cached", "-"],
+            env=env,
+            input=diff,
+            check=False,
+            merge_output=True,
+        )
+        if proc.returncode == 0:
+            return git.out("write-tree", env=env).strip(), (), ()
+        out = proc.stdout
+        hunks = tuple(f"{p}:{ln}" for p, ln in _PATCH_FAILED.findall(out))
+        files = tuple(
+            sorted({p for p, _ in _PATCH_FAILED.findall(out)} | set(_DOES_NOT_APPLY.findall(out)))
+        )
+        return None, files, hunks
+
+
+def _absorbed(git: _Git, target: str, c: str) -> bool:
+    """Upstream already has `c`'s change: every line it adds is present, and every line it
+    removes is absent, in the target's version of each file (whitespace-normalized)."""
+    # Lines that are only punctuation or very short ("}", "return 0;") prove nothing.
+    lines = {k: v for k, v in changed_lines(git, c).items() if _telling(k[2])}
+    if not any(sign == "+" for sign, _, _ in lines):
+        return False
+    content: dict[str, set[str]] = {}
+    for (sign, path, text), _ in lines.items():
+        if path not in content:
+            rc, blob = git("show", f"{target}:{path}", check=False)
+            content[path] = {" ".join(ln.split()) for ln in blob.splitlines()} if rc == 0 else set()
+        if (sign == "+") != (text in content[path]):
+            return False
+    return True
 
 
 # A subject match is corroborated when at least half of the changed lines agree; a

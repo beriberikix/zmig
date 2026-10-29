@@ -25,7 +25,7 @@ from zmig.buildctx import (
 from zmig.cache import Cache, default_cache_root
 from zmig.errors import UsageError, ZmigError
 from zmig.findings import Category, Confidence, Finding, NotChecked, Report, Severity, plural
-from zmig.forks import compare_tree, guess_version_tag
+from zmig.forks import DEFAULT_METHODS, compare_tree, guess_version_tag
 from zmig.manifest import load_manifest, scan_user_workspace
 from zmig.modulecheck import ModuleNeed, diagnose
 from zmig.plan import PlanContext
@@ -104,6 +104,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=_csv,
         default=None,
         help="comma-separated analyzers to run (default: all)",
+    )
+    plan.add_argument(
+        "--patch-method",
+        choices=["git-apply", "git-am", "3way"],
+        default=None,
+        help="how the project applies its local patches: git-apply (patch files, e.g. "
+        "zenv), git-am, or 3way (git rebase / cherry-pick). Default: both git-apply and "
+        "3way, reporting disagreements; the stricter result is the verdict",
+    )
+    plan.add_argument(
+        "--patch-dir",
+        type=Path,
+        default=None,
+        help="the project's patch-file directory, to name the patch file in findings "
+        "(matched to commits by file name)",
     )
 
     scan = sub.add_parser(
@@ -569,6 +584,8 @@ def cmd_plan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
         user=user,
         upstream_overrides=overrides,
         release_data_path=args.release_data,
+        patch_methods=(args.patch_method,) if args.patch_method else DEFAULT_METHODS,
+        patch_dir=args.patch_dir,
     )
     report = Report(
         command="plan",
