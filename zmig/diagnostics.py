@@ -66,6 +66,11 @@ _CHOICE_DEFAULT = re.compile(
 _LOOP = re.compile(r"Dependency loop\n=+\n(?P<body>.*?)(?:\nCMake Error|\Z)", re.S)
 _LOOP_SYM = re.compile(r"^(?:\.\.\.[a-z ]+? )?(?P<sym>\w+) \(defined at (?P<locs>[^)]*)\)", re.M)
 _DT_ERROR = re.compile(r"^devicetree error: (?P<msg>.*)$", re.M)
+# edtlib, v3.6 through v4.4: a property the binding now requires is missing from a node.
+_DT_REQUIRED = re.compile(
+    r"'(?P<prop>[^']+)' is marked as required in 'properties:' in (?P<binding>\S+), but "
+    r"does not appear in <Node (?P<node>\S+) in"
+)
 _BOARD_INVALID = re.compile(r"No board named '(?P<board>[^']+)' found")
 _OVERLAY = re.compile(r"^-- Found devicetree overlay: (?P<path>.+)$", re.M)
 _MERGED = re.compile(r"^Merged configuration '(?P<path>[^']+)'", re.M)
@@ -206,7 +211,18 @@ def parse_log(text: str) -> LogFacts:
         )
     for m in _DT_ERROR.finditer(text):
         if m.start() not in undeclared:
-            diags.append(Diagnostic("dt-error", message=m[0].strip()))
+            # Still a dt-error (finding IDs depend on the kind), with its subject when
+            # edtlib named one (AUDIT.md §6 item 6).
+            r = _DT_REQUIRED.search(m["msg"])
+            diags.append(
+                Diagnostic(
+                    "dt-error",
+                    symbol=r["prop"] if r else "",
+                    node=r["node"] if r else "",
+                    binding=r["binding"] if r else "",
+                    message=m[0].strip(),
+                )
+            )
     for m in _BOARD_INVALID.finditer(text):
         diags.append(Diagnostic("board-invalid", symbol=m["board"], message=m[0]))
     loaded = _LOADED.search(text)

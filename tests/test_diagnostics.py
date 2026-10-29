@@ -135,3 +135,21 @@ def test_preexisting_dt_error_ignores_build_paths() -> None:
     assert preexisting(tgt, [src])
     (other,) = parse_log("devicetree error: something else entirely").diagnostics
     assert not preexisting(tgt, [other])
+
+
+# edtlib's wording at v3.6.0 and v4.2.0 (paths shortened); the node is dtlib's repr.
+REQUIRED_LOG = (
+    "devicetree error: 'phy-handle' is marked as required in 'properties:' in "
+    "/z/dts/bindings/ethernet/st,stm32-ethernet.yaml, but does not appear in "
+    "<Node /soc/ethernet@40028000 in '/b/zephyr/zephyr.dts.pre'>\n"
+)
+
+
+def test_required_property_missing_names_property_node_and_binding() -> None:
+    """Guide 4.2 "st,stm32-ethernet now requires phy-handle" (AUDIT.md §3 #11): the target
+    configure fails, so there is no target edt.pickle to compare; the error is the only
+    evidence. Kind stays dt-error so finding IDs don't change."""
+    (d,) = parse_log(REQUIRED_LOG).diagnostics
+    assert d.kind == "dt-error"
+    assert (d.symbol, d.node) == ("phy-handle", "/soc/ethernet@40028000")
+    assert d.binding == "/z/dts/bindings/ethernet/st,stm32-ethernet.yaml"

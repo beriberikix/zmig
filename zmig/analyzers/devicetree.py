@@ -54,6 +54,21 @@ def _prop_by_token(node: dict[str, Any], token: str) -> str | None:
     return next((p for p in node["props"] if dt_token(p) == token), None)
 
 
+def spec_changes(old: dict[str, Any], new: dict[str, Any], prop: str) -> list[tuple[str, Any, Any]]:
+    """How the binding's spec of a property the app uses changed: ("type", old, new) and
+    ("deprecated", False, True). A newly required property that's used is already present,
+    and a gone one is reported by the analyzer's other checks."""
+    o, n = old.get(prop), new.get(prop)
+    if not o or not n:
+        return []
+    out: list[tuple[str, Any, Any]] = []
+    if o["type"] != n["type"]:
+        out.append(("type", o["type"], n["type"]))
+    if n["deprecated"] and not o["deprecated"]:
+        out.append(("deprecated", False, True))
+    return out
+
+
 class DevicetreeAnalyzer:
     name: ClassVar[str] = "devicetree"
     kind: ClassVar[Literal["build"]] = "build"
@@ -119,6 +134,28 @@ class DevicetreeAnalyzer:
                     f"aborts the target configure on it.",
                     ev,
                     heuristics=() if hit else ("devicetree.diag-unlocated",),
+                    introduced=not pre,
+                )
+            elif d.kind == "dt-error" and d.symbol:
+                # A property the binding now requires (guide 4.2: st,stm32-ethernet needs
+                # phy-handle). The target configure stops on it, so this error is the only
+                # evidence; same kind and subject as any dt-error, so IDs don't change.
+                add(
+                    "dt-error",
+                    d.message[:80],
+                    f"{d.node} lacks '{d.symbol}', which its binding requires in "
+                    f"{ctx.new_spec}" + also,
+                    Severity.BREAKING,
+                    Confidence.HIGH,
+                    f"Add '{d.symbol}' to {d.node} in an overlay (binding: "
+                    f"{ctx.runner.redact(d.binding)}); the migration guide names its value.",
+                    (tool_output("target configure", ctx.runner.redact(d.message)),),
+                    new_v={
+                        "cause": "required-property-missing",
+                        "property": d.symbol,
+                        "node": d.node,
+                        "binding": ctx.runner.redact(d.binding),
+                    },
                     introduced=not pre,
                 )
             elif d.kind == "dt-error":
@@ -269,6 +306,28 @@ class DevicetreeAnalyzer:
         undeclared = {
             d.symbol for d in ctx.new_raw_facts.diagnostics if d.kind == "dt-undeclared-property"
         }
+        # Binding spec changes of properties the app uses, one finding per (kind, property)
+        # whether the overlay sets it, the C code reads it, or both (AUDIT.md §6 item 6).
+        spec_seen: set[tuple[str, str]] = set()
+
+        def type_changed(pn: str, prop: str, was: str, now: str, locs: list[Loc]) -> None:
+            if ("type", f"{pn}:{prop}") in spec_seen:
+                return
+            spec_seen.add(("type", f"{pn}:{prop}"))
+            add(
+                "property-type-changed",
+                f"{pn}:{prop}",
+                f"The binding of {pn} changed the type of '{prop}', which your app uses, "
+                f"from {was} to {now} in {ctx.new_spec}",
+                Severity.RISKY,
+                Confidence.HIGH,
+                f"Check how the value is written and read: DT_PROP() of a {now} expands "
+                f"differently from a {was}.",
+                _ev(locs),
+                old_v=was,
+                new_v=now,
+            )
+
         for ref, prop, loc in ctx.usage.dt_props_set:
             pn = resolve(ref, new)
             po = resolve(ref, old)
@@ -276,7 +335,11 @@ class DevicetreeAnalyzer:
                 continue
             ns, os_ = nn[pn]["specs"], on[po]["specs"] if po else {}
             spec = ns.get(prop)
+            for what, was, now in spec_changes(os_, ns, prop):
+                if what == "type":
+                    type_changed(pn, prop, was, now, [loc])
             if spec and spec["deprecated"] and not os_.get(prop, {}).get("deprecated"):
+                spec_seen.add(("deprecated", f"{pn}:{prop}"))
                 add(
                     "property-deprecated",
                     f"{pn}:{prop}",
@@ -301,7 +364,27 @@ class DevicetreeAnalyzer:
             if not (po and pn):
                 continue
             pold = _prop_by_token(on[po], token)
-            if pold and not _prop_by_token(nn[pn], token):
+            pnew = _prop_by_token(nn[pn], token)
+            if pold and pnew:
+                for what, was, now in spec_changes(on[po]["specs"], nn[pn]["specs"], pnew):
+                    if what == "type":
+                        type_changed(pn, pnew, was, now, [loc])
+                    elif ("deprecated", f"{pn}:{pnew}") not in spec_seen:
+                        spec_seen.add(("deprecated", f"{pn}:{pnew}"))
+                        add(
+                            "property-deprecated",
+                            f"{pn}:{pnew}",
+                            f"Your code reads '{pnew}' of {describe(ref)}, deprecated in "
+                            f"{ctx.new_spec}",
+                            Severity.RISKY,
+                            Confidence.HIGH,
+                            "Move to the replacement property named in the binding or "
+                            "migration guide before it is removed.",
+                            _ev([loc]),
+                            old_v=on[po]["specs"].get(pnew),
+                            new_v=nn[pn]["specs"].get(pnew),
+                        )
+            if pold and not pnew:
                 add(
                     "read-property-gone",
                     f"{pn}:{pold}",

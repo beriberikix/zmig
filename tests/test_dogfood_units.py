@@ -695,3 +695,88 @@ def test_module_required_at_both_refs_is_preexisting(
     assert new.severity is Severity.BREAKING and new.introduced_by_migration
     assert new.new["required_at_source"] is False
     assert new.id == pre.id
+
+
+def test_binding_spec_changes() -> None:
+    from zmig.analyzers.devicetree import spec_changes
+
+    old = {"a": {"type": "int", "required": False, "deprecated": False}}
+    assert spec_changes(old, old, "a") == []
+    assert spec_changes(old, {}, "a") == []  # gone: other findings say so
+    assert spec_changes(old, {"a": {**old["a"], "type": "array"}}, "a") == [
+        ("type", "int", "array")
+    ]
+    assert spec_changes(old, {"a": {**old["a"], "deprecated": True}}, "a") == [
+        ("deprecated", False, True)
+    ]
+    # Still deprecated is not news; newly required doesn't matter to a property that's set.
+    dep = {"a": {**old["a"], "deprecated": True}}
+    assert spec_changes(dep, dep, "a") == []
+    assert spec_changes(old, {"a": {**old["a"], "required": True}}, "a") == []
+
+
+def test_devicetree_binding_checks_for_read_properties_and_required_errors(
+    tmp_path: Path,
+) -> None:
+    """AUDIT.md §6 item 6: binding changes to properties the app's C code reads (type,
+    deprecation), and the cause of a "marked as required" configure error."""
+    from tests.test_diagnostics import REQUIRED_LOG
+    from zmig.analyzers.devicetree import DevicetreeAnalyzer
+    from zmig.diagnostics import parse_log
+    from zmig.findings import Severity
+    from zmig.usage import Loc, NodeRef
+
+    def node(specs: dict[str, Any]) -> dict[str, Any]:
+        return {"name": "can", "labels": ["can0"], "aliases": [], "compats": ["x,can"],
+                "matching_compat": "x,can", "status": "okay", "ord": 5,
+                "binding": "dts/bindings/can/x,can.yaml",
+                "props": {"bitrate": 125000, "sjw": 1}, "raw_props": ["bitrate", "sjw"],
+                "raw_values": {"bitrate": "<0x1e848>", "sjw": "<0x1>"}, "specs": specs}  # fmt: skip
+
+    spec = {"type": "int", "required": False, "deprecated": False}
+    old = {"nodes": {"/can": node({"bitrate": spec, "sjw": spec})}, "chosen": {}}
+    new = {"nodes": {"/can": node({"bitrate": {**spec, "deprecated": True},
+                                   "sjw": {**spec, "type": "array"}})}, "chosen": {}}  # fmt: skip
+    ref = NodeRef("label", "can0")
+    src = Loc("src/main.c", 9, "DT_PROP(DT_NODELABEL(can0), bitrate)")
+    ctx = SimpleNamespace(
+        old_edt=old,
+        new_edt=new,
+        old_facts=parse_log(""),
+        new_raw_facts=parse_log(REQUIRED_LOG),
+        new_raw=SimpleNamespace(src=tmp_path),
+        usage=SimpleNamespace(
+            app=tmp_path,
+            dt_nodes=[(ref, src)],
+            # The overlay sets bitrate too: one finding for it, not two with one ID.
+            dt_props_set=[(ref, "bitrate", Loc("app.overlay", 3, "bitrate = <125000>;"))],
+            dt_props_read=[
+                (ref, "bitrate", src, "DT_PROP"),
+                (ref, "sjw", Loc("src/main.c", 10, "DT_PROP(...)"), "DT_PROP"),
+            ],
+            dt_compats={},
+        ),
+        build_files={"src/main.c"},
+        old_spec="v4.1.0",
+        new_spec="v4.2.0",
+        scope=("s",),
+        runner=SimpleNamespace(redact=lambda s: s),
+    )
+    found = DevicetreeAnalyzer().analyze(ctx).findings  # type: ignore[arg-type]
+    by_kind: dict[str, list[Any]] = {}
+    for f in found:
+        by_kind.setdefault(f.kind, []).append(f)
+    assert len({f.id for f in found}) == len(found)
+
+    (dep,) = by_kind["property-deprecated"]
+    assert dep.subject == "/can:bitrate" and dep.severity is Severity.RISKY
+    (typ,) = by_kind["property-type-changed"]
+    assert typ.subject == "/can:sjw" and typ.severity is Severity.RISKY
+    assert typ.old == "int" and typ.new == "array"
+    assert any(e.get("path") == "src/main.c" for e in typ.evidence)
+
+    (err,) = by_kind["dt-error"]
+    assert err.subject == parse_log(REQUIRED_LOG).diagnostics[0].message[:80]  # ID unchanged
+    assert "phy-handle" in err.title and "/soc/ethernet@40028000" in err.title
+    assert "Add 'phy-handle'" in err.action
+    assert err.new["property"] == "phy-handle"
