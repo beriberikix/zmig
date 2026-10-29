@@ -1,0 +1,32 @@
+patch	result	detail
+adafruit_grand_central_m4_bossac_reset_once.patch	clean	
+adc_rp2xx0_01_polled_read.patch	clean	
+adc_rp2xx0_02_configurable_clkdiv.patch	clean	
+adc_stm32_polled_read.patch	offset	offset 18 lines 
+arduino_nano_33_ble_bossac_reset_once.patch	offset	offset 7 lines 
+arduino_nano_33_ble_drop_led4_board_init.patch	offset	offset 1 line 
+blackpill411_dfu_util_with_sysbuild.patch	clean	
+bossac_reset_cap.patch	offset	offset -5 lines 
+bossac_runner_handle_no_flash_load_offset.patch	offset	offset 3 lines 
+dfu_util_reset_cap.patch	clean	
+esp32_eth_enable_rmii_output_clock.patch	offset	offset 2 lines offset 4 lines 
+esp32_eth_pass_multicast_frames.patch	offset	offset 6 lines 
+esp32_ethernet_kit_esp32_reset_once.patch	clean	
+esp32_ethernet_kit_guard_phy_reset.patch	offset	offset -3 lines offset -4 lines 
+esp32_mcuboot_rodata_region_start.patch	clean	
+esp32_runner_handle_code_partition_offset.patch	offset	offset 6 lines 
+esp32s3_devkitc_esp32s3_reset_once.patch	clean	
+esp32s3_devkitc_use_wroom_n16r8.patch	clean	
+esp32s3_mcuboot_rodata_region_start.patch	clean	
+esp32s3_reset_with_watchdog_after_flash.patch	clean	
+host_tools_bossac_from_sysbuild.patch	offset	offset 1 line 
+kconfig_dt_node_prop_len.patch	offset	offset 3 lines 
+nucleo_f767zi_openocd_default_runner.patch	offset	offset -1 lines 
+nucleo_h563zi_openocd_default_runner.patch	offset	offset -2 lines 
+nucleo_h753zi_openocd_default_runner.patch	offset	offset -1 lines 
+rpi_pico_rom_bootloader_prompt.patch	clean	
+stm32f4_disco_openocd_default_runner.patch	offset	offset -1 lines 
+teensy_loader_reset_cap.patch	clean	
+udc_rpi_pico_disconnect_on_disable.patch	offset	offset 2 lines 
+usb_midi2_01_configurable_buffer_size.patch	clean	
+usb_midi2_02_ump_burst.patch	clean	
