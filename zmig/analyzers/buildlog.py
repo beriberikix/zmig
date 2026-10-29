@@ -66,6 +66,31 @@ _FAILED = re.compile(r"^FAILED: (?:\[code=\d+\] )?(?P<target>\S+)", re.M)
 _IMAGE = re.compile(r"/builds/[0-9a-f]+/(?P<image>[\w.-]+)/zephyr/")
 
 
+# The first real configure error, not sysbuild's "CMake configure failed for Zephyr
+# project: app" wrapper (regression: OpenDeck's target hid "devicetree error: ... undefined
+# node label 'eth_rxd0_pc4'" behind it, DOGFOOD-5 M18).
+_CONFIGURE_ERROR = re.compile(
+    r"^(?:devicetree error: |.*kconfig(?:\.py)?: .*error: |error: |CMake Error at (?!.*sysbuild))"
+)
+_SYSBUILD_IMAGE = re.compile(r"CMake configure failed for Zephyr project: (\S+)")
+
+
+def configure_error(log: str) -> tuple[str | None, list[str]] | None:
+    """(image, the first error's lines) of a failed configure; image from sysbuild's
+    wrapper message when there is one."""
+    lines = log.splitlines()
+    image = next((m[1] for ln in lines if (m := _SYSBUILD_IMAGE.search(ln))), None)
+    for i, ln in enumerate(lines):
+        if _CONFIGURE_ERROR.match(ln):
+            block = [ln.strip()]
+            for nxt in lines[i + 1 : i + 6]:
+                if not nxt.strip() or nxt.startswith(("--", "CMake Error", "Call Stack")):
+                    break
+                block.append(nxt.strip())
+            return image, block
+    return None
+
+
 def build_errors(log: str) -> list[BuildError]:
     """Compiler and linker errors in a build log; ninja's FAILED steps if neither."""
     out: list[BuildError] = []
@@ -161,14 +186,24 @@ class BuildlogAnalyzer:
                 for ln in log.splitlines()
                 if ln.strip() and not ln.startswith(("$ ", "--", "FATAL ERROR"))
             ][-12:]
+            first = configure_error(log)
+            cause = ""
+            ev_first: tuple[JSON, ...] = ()
+            if first is not None:
+                image, lines = first
+                where = f"{image} image: " if image else ""
+                cause = f": {where}{ctx.runner.redact(lines[0])[:160]}"
+                ev_first = (
+                    tool_output("first configure error", ctx.runner.redact("\n".join(lines))),
+                )
             add(
                 "target-configure-failed",
                 ctx.new_spec,
-                f"The target configure fails{salvaged} and zmig can't compare builds",
+                f"The target configure fails{salvaged}{cause}",
                 Severity.BREAKING,
                 "Fix the error in the evidence (often a board or toolchain change), then "
                 "rerun; Kconfig and devicetree analysis need a configured target.",
-                (tool_output("target configure", ctx.runner.redact("\n".join(tail))),),
+                (*ev_first, tool_output("target configure", ctx.runner.redact("\n".join(tail)))),
             )
             return AnalyzerResult(findings)
 

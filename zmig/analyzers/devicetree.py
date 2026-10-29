@@ -8,6 +8,7 @@ C sources (zmig.usage), and devicetree errors from the target configure.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
@@ -224,15 +225,24 @@ class DevicetreeAnalyzer:
                 )
                 changed = {}
             if changed:
+                # A node this image has no device for at either ref (its subsystem is off
+                # here: OpenDeck's MCUboot has no Ethernet, its bootloader no ADC) can't
+                # affect this image (DOGFOOD-5 M19). Unknown when either ELF is missing.
+                unused = _no_device(ctx, o, n)
                 add(
                     "node-changed",
                     f"{describe(ref)}:{pn}",
-                    f"{describe(ref)} ({pn}) changed: {', '.join(sorted(changed))}",
-                    Severity.RISKY,
+                    f"{describe(ref)} ({pn}) changed: {', '.join(sorted(changed))}"
+                    + (f" (no device for it in {ctx.image or 'this'} image)" if unused else ""),
+                    Severity.INFO if unused else Severity.RISKY,
                     Confidence.HIGH,
-                    "Check these property changes against how your code uses the node.",
+                    "Check these property changes against how your code uses the node."
+                    if not unused
+                    else "Nothing in this image instantiates the node; it matters only where "
+                    "a driver for it is built.",
                     _ev(locs),
                     new_v={**changed, **({"binding_defaults": defaults} if defaults else {})},
+                    heuristics=("devicetree.no-device-in-image",) if unused else (),
                 )
             elif defaults:
                 add(
@@ -362,6 +372,44 @@ class DevicetreeAnalyzer:
 
 
 _APP_COPY = re.compile(r"^(?:.*/)?apps/[0-9a-f]+/[^/]+/")
+
+
+_DEVICE_SYM = re.compile(r"^__device_dts_ord_(\d+)$")
+_device_ords: dict[str, frozenset[int]] = {}
+
+
+def device_ords(elf: Path) -> frozenset[int]:
+    """Devicetree ordinals that have a device object (`__device_dts_ord_<N>`) in an ELF."""
+    key = str(elf)
+    if key not in _device_ords:
+        from elftools.elf.elffile import ELFFile
+        from elftools.elf.sections import SymbolTableSection
+
+        found: set[int] = set()
+        with elf.open("rb") as f:
+            for sec in ELFFile(f).iter_sections():
+                if isinstance(sec, SymbolTableSection):
+                    for sym in sec.iter_symbols():
+                        if m := _DEVICE_SYM.match(sym.name):
+                            found.add(int(m[1]))
+        _device_ords[key] = frozenset(found)
+    return _device_ords[key]
+
+
+def _no_device(ctx: ScanContext, o: dict[str, Any], n: dict[str, Any]) -> bool:
+    """Both images built, both define devices, the node has a compatible, and neither
+    image has a device for it."""
+    if not (ctx.old_img.has(Artifact.ELF) and ctx.new_img.has(Artifact.ELF)):
+        return False
+    if not (o.get("compats") or n.get("compats")) or o.get("ord") is None:
+        return False
+    old_d, new_d = (
+        device_ords(ctx.old_img.artifact(Artifact.ELF)),
+        device_ords(ctx.new_img.artifact(Artifact.ELF)),
+    )
+    if not old_d or not new_d:
+        return False
+    return o["ord"] not in old_d and n.get("ord") not in new_d
 
 
 def _binding(path: str | None) -> str | None:

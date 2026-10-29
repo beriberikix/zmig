@@ -1,0 +1,3504 @@
+{
+  "schema": "https://zmig.dev/schema/report/1",
+  "schema_version": "1.3",
+  "zmig_version": "0.1.0",
+  "command": "scan",
+  "inputs": {
+    "from": {
+      "spec": "/home/user/.cache/zmig/dogfood/d6/z/src",
+      "sha": "b51212cbfb596f09dacaa544a680912f69953673",
+      "kind": "path",
+      "url": "https://github.com/zephyrproject-rtos/zephyr",
+      "dirty": false
+    },
+    "to": {
+      "spec": "/home/user/.cache/zmig/dogfood/d6/z/tgt",
+      "sha": "ace4550095c1f4a6e135cd20c320392dd8468292",
+      "kind": "path",
+      "url": "https://github.com/zephyrproject-rtos/zephyr",
+      "dirty": false
+    },
+    "app": "/home/user/.cache/zmig/dogfood/d6/x/pre/OpenDeck/app",
+    "app_tree_hash": "c7a11154f9afed3c7715f318854e1eb43d3e1d508b76be7de30e594490f66f36",
+    "board": {
+      "from": "nucleo_h563zi/stm32h563xx",
+      "to": "nucleo_h563zi/stm32h563xx",
+      "mapping": "same"
+    },
+    "build_mode": "full",
+    "sysbuild": true
+  },
+  "environment": {
+    "python": "3.14.4",
+    "west": "West version: v1.5.0",
+    "cmake": "cmake version 4.2.3",
+    "ninja": "1.13.2",
+    "dtc": "Version: DTC 1.7.2",
+    "git": "git version 2.53.0",
+    "sdk": {
+      "path": "/home/user/.cache/zmig/sdks/zephyr-sdk-1.0.1",
+      "version": "1.0.1"
+    },
+    "libclang": "clang version 18.1.1"
+  },
+  "contexts": [
+    {
+      "ref": "src@b51212cbfb59",
+      "board": "nucleo_h563zi/stm32h563xx",
+      "mode": "full",
+      "sysbuild": true,
+      "status": "ok",
+      "key": "695256308365fdb9",
+      "images": [
+        {
+          "name": "mcuboot",
+          "role": "bootloader",
+          "role_source": "CONFIG_MCUBOOT=y in the image's .config",
+          "status": "ok",
+          "board": "nucleo_h563zi/stm32h563xx"
+        },
+        {
+          "name": "opendeck_bootloader",
+          "role": "other",
+          "role_source": "neither the default image nor MCUboot",
+          "status": "ok",
+          "board": "nucleo_h563zi/stm32h563xx"
+        },
+        {
+          "name": "app",
+          "role": "app",
+          "role_source": "the default image (domains.yaml), or the only image",
+          "status": "ok",
+          "board": "nucleo_h563zi/stm32h563xx"
+        }
+      ],
+      "sdk": {
+        "path": "/home/user/.cache/zmig/sdks/zephyr-sdk-1.0.1",
+        "version": "1.0.1"
+      }
+    },
+    {
+      "ref": "tgt@ace4550095c1",
+      "board": "nucleo_h563zi/stm32h563xx",
+      "mode": "full",
+      "sysbuild": true,
+      "status": "configure-failed",
+      "key": "c8080986dc225627",
+      "images": [
+        {
+          "name": "app",
+          "role": "app",
+          "role_source": "the default image (domains.yaml), or the only image",
+          "status": "configure-failed",
+          "board": "nucleo_h563zi/stm32h563xx"
+        },
+        {
+          "name": "mcuboot",
+          "role": "bootloader",
+          "role_source": "CONFIG_MCUBOOT=y in the image's .config",
+          "status": "ok",
+          "board": "nucleo_h563zi/stm32h563xx"
+        },
+        {
+          "name": "opendeck_bootloader",
+          "role": "other",
+          "role_source": "neither the default image nor MCUboot",
+          "status": "ok",
+          "board": "nucleo_h563zi/stm32h563xx"
+        }
+      ],
+      "sdk": {
+        "path": "/home/user/.cache/zmig/sdks/zephyr-sdk-1.0.1",
+        "version": "1.0.1"
+      }
+    }
+  ],
+  "analyzers": [
+    {
+      "name": "api@app",
+      "status": "partial",
+      "reason": "100 input(s) not interpreted (see Not checked)",
+      "findings": 7,
+      "hazards": 7
+    },
+    {
+      "name": "api@mcuboot",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "api@opendeck_bootloader",
+      "status": "partial",
+      "reason": "2 input(s) not interpreted (see Not checked)",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "ble",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "board@app",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "board@mcuboot",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "board@opendeck_bootloader",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "buildlog@app",
+      "status": "ok",
+      "findings": 1,
+      "hazards": 1
+    },
+    {
+      "name": "buildlog@mcuboot",
+      "status": "ok",
+      "findings": 1,
+      "hazards": 0
+    },
+    {
+      "name": "buildlog@opendeck_bootloader",
+      "status": "ok",
+      "findings": 1,
+      "hazards": 0
+    },
+    {
+      "name": "crossimage",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "devicetree@app",
+      "status": "skipped",
+      "reason": "target (tgt@ace4550095c1): zephyr/edt.pickle missing"
+    },
+    {
+      "name": "devicetree@mcuboot",
+      "status": "ok",
+      "findings": 5,
+      "hazards": 2
+    },
+    {
+      "name": "devicetree@opendeck_bootloader",
+      "status": "ok",
+      "findings": 9,
+      "hazards": 4
+    },
+    {
+      "name": "guide",
+      "status": "ok",
+      "findings": 1,
+      "hazards": 0
+    },
+    {
+      "name": "images",
+      "status": "ok",
+      "findings": 2,
+      "hazards": 1
+    },
+    {
+      "name": "initorder@app",
+      "status": "skipped",
+      "reason": "target (tgt@ace4550095c1): zephyr/edt.pickle missing; target (tgt@ace4550095c1): zephyr/zephyr.elf missing: the configure failed"
+    },
+    {
+      "name": "initorder@mcuboot",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "initorder@opendeck_bootloader",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "kconfig@app",
+      "status": "skipped",
+      "reason": "target (tgt@ace4550095c1): zephyr/.config missing"
+    },
+    {
+      "name": "kconfig@mcuboot",
+      "status": "ok",
+      "findings": 3,
+      "hazards": 0
+    },
+    {
+      "name": "kconfig@opendeck_bootloader",
+      "status": "ok",
+      "findings": 3,
+      "hazards": 0
+    },
+    {
+      "name": "layout",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "mcuboot",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "modules",
+      "status": "ok",
+      "findings": 5,
+      "hazards": 0
+    },
+    {
+      "name": "sbom@app",
+      "status": "skipped",
+      "reason": "target (tgt@ace4550095c1): the configure failed; west spdx needs a full build"
+    },
+    {
+      "name": "sbom@mcuboot",
+      "status": "ok",
+      "findings": 5,
+      "hazards": 4
+    },
+    {
+      "name": "sbom@opendeck_bootloader",
+      "status": "ok",
+      "findings": 4,
+      "hazards": 3
+    },
+    {
+      "name": "storage",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "sysbuild",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    },
+    {
+      "name": "wire",
+      "status": "ok",
+      "findings": 0,
+      "hazards": 0
+    }
+  ],
+  "summary": {
+    "counts": {
+      "breaking": 1,
+      "risky": 21,
+      "info": 25
+    },
+    "top": [
+      "BUILD-TARGET-CONFIGURE-FAILED-ddb9f95e",
+      "API-MACRO-CHANGED-194f70e6",
+      "API-MACRO-CHANGED-32a11de3",
+      "API-MACRO-CHANGED-418e4273",
+      "API-MACRO-CHANGED-6d05096f"
+    ]
+  },
+  "findings": [
+    {
+      "id": "BUILD-TARGET-CONFIGURE-FAILED-ddb9f95e",
+      "category": "build",
+      "kind": "target-configure-failed",
+      "subject": "tgt@ace4550095c1",
+      "title": "The target configure fails and zmig can't compare builds",
+      "severity": "breaking",
+      "confidence": "high",
+      "old": null,
+      "new": null,
+      "evidence": [
+        {
+          "type": "tool_output",
+          "invocation": "target configure",
+          "excerpt": "  CMakeLists.txt:5 (find_package)\nCMake Error at cmake/modules/sysbuild_extensions.cmake:728 (message):\n  CMake configure failed for Zephyr project: app\n  Location:\n  <app>\nCall Stack (most recent call first):\n  cmake/modules/sysbuild_images.cmake:43 (ExternalZephyrProject_Cmake)\n  cmake/modules/sysbuild_default.cmake:21 (include)\n  $ZMIG_CACHE/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:66 (include)\n  $ZMIG_CACHE/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:83 (include_boilerplate)\n  $ZMIG_CACHE/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/share/sysbuild-package/cmake/SysbuildConfig.cmake:8 (include)\n  template/CMakeLists.txt:10 (find_package)"
+        }
+      ],
+      "action": "Fix the error in the evidence (often a board or toolchain change), then rerun; Kconfig and devicetree analysis need a configured target.",
+      "related": [],
+      "analyzer": "buildlog",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "API-MACRO-CHANGED-194f70e6",
+      "category": "api",
+      "kind": "macro-changed",
+      "subject": "UMP_NUM_WORDS",
+      "title": "Macro UMP_NUM_WORDS, which your code uses, changed: function-like macro, 1 parameter(s) \u2192 #define UMP_NUM_WORDS_LOOKUP_TABLE \\",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "function-like macro, 1 parameter(s)",
+      "new": "#define UMP_NUM_WORDS_LOOKUP_TABLE \\",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "firmware/src/protocol/midi/instance/impl/midi.cpp",
+          "line": 39,
+          "text": "UMP_NUM_WORDS"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/audio/midi.h:96: function-like macro, 1 parameter(s)"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the target",
+          "excerpt": "zephyr/include/zephyr/audio/midi.h:91: #define UMP_NUM_WORDS_LOOKUP_TABLE \\"
+        }
+      ],
+      "action": "It changed between object-like and function-like.",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "API-MACRO-CHANGED-32a11de3",
+      "category": "api",
+      "kind": "macro-changed",
+      "subject": "HTTP_SERVICE_DEFINE",
+      "title": "Macro HTTP_SERVICE_DEFINE, which your code uses, changed: function-like macro, 8 parameter(s) \u2192 #define HTTP_SERVICE_DEFINE_EMPTY(_name, _host, _port, _concurrent, _backlog, _detail,             \\",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "function-like macro, 8 parameter(s)",
+      "new": "#define HTTP_SERVICE_DEFINE_EMPTY(_name, _host, _port, _concurrent, _backlog, _detail,             \\",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "firmware/src/protocol/websockets/hwa/hw/hwa_hw.cpp",
+          "line": 33,
+          "text": "HTTP_SERVICE_DEFINE"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/net/http/service.h:260: function-like macro, 8 parameter(s)"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the target",
+          "excerpt": "zephyr/include/zephyr/net/http/service.h:219: #define HTTP_SERVICE_DEFINE_EMPTY(_name, _host, _port, _concurrent, _backlog, _detail,             \\"
+        }
+      ],
+      "action": "It changed between object-like and function-like.",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "API-MACRO-CHANGED-418e4273",
+      "category": "api",
+      "kind": "macro-changed",
+      "subject": "DNS_SD_REGISTER_SERVICE",
+      "title": "Macro DNS_SD_REGISTER_SERVICE, which your code uses, changed: function-like macro, 7 parameter(s) \u2192 #define DNS_SD_REGISTER_SERVICE(_id, _instance, _service, _proto,\t\\",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "function-like macro, 7 parameter(s)",
+      "new": "#define DNS_SD_REGISTER_SERVICE(_id, _instance, _service, _proto,\t\\",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "firmware/src/protocol/mdns/services/hw/services_osc.cpp",
+          "line": 21,
+          "text": "DNS_SD_REGISTER_SERVICE"
+        },
+        {
+          "type": "file_line",
+          "path": "firmware/src/protocol/mdns/services/hw/services_websockets.cpp",
+          "line": 21,
+          "text": "DNS_SD_REGISTER_SERVICE"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/net/dns_sd.h:112: function-like macro, 7 parameter(s)"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the target",
+          "excerpt": "zephyr/include/zephyr/net/dns_sd.h:112: #define DNS_SD_REGISTER_SERVICE(_id, _instance, _service, _proto,\t\\"
+        }
+      ],
+      "action": "It changed between object-like and function-like.",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "API-MACRO-CHANGED-6d05096f",
+      "category": "api",
+      "kind": "macro-changed",
+      "subject": "CONTAINER_OF",
+      "title": "Macro CONTAINER_OF, which your code uses, changed: function-like macro, 3 parameter(s) \u2192 #define CONTAINER_OF_VALIDATE(ptr, type, field)                                                    \\",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "function-like macro, 3 parameter(s)",
+      "new": "#define CONTAINER_OF_VALIDATE(ptr, type, field)                                                    \\",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/misc/userdata_struct.h",
+          "line": 44,
+          "text": "CONTAINER_OF"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/misc/userdata_struct.h",
+          "line": 59,
+          "text": "CONTAINER_OF"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/sys/util.h:281: function-like macro, 3 parameter(s)"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the target",
+          "excerpt": "zephyr/include/zephyr/sys/util.h:253: #define CONTAINER_OF_VALIDATE(ptr, type, field)                                                    \\"
+        }
+      ],
+      "action": "It changed between object-like and function-like.",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "API-MACRO-CHANGED-b90f6a1b",
+      "category": "api",
+      "kind": "macro-changed",
+      "subject": "__ASSERT",
+      "title": "Macro __ASSERT, which your code uses, changed: function-like macro, 3 parameter(s) \u2192 #define __ASSERT_PRINT(fmt, ...) assert_print(fmt, ##__VA_ARGS__)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "function-like macro, 3 parameter(s)",
+      "new": "#define __ASSERT_PRINT(fmt, ...) assert_print(fmt, ##__VA_ARGS__)",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "firmware/src/signaling/signaling.h",
+          "line": 590,
+          "text": "__ASSERT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/filters/filters.h",
+          "line": 235,
+          "text": "__ASSERT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/filters/filters.h",
+          "line": 283,
+          "text": "__ASSERT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/filters/filters.h",
+          "line": 295,
+          "text": "__ASSERT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/misc/datetime.h",
+          "line": 101,
+          "text": "__ASSERT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/misc/datetime.h",
+          "line": 102,
+          "text": "__ASSERT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/signaling/signaling.h",
+          "line": 287,
+          "text": "__ASSERT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/signaling/signaling.h",
+          "line": 313,
+          "text": "__ASSERT"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/sys/__assert.h:140: function-like macro, 3 parameter(s)"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the target",
+          "excerpt": "zephyr/include/zephyr/sys/__assert.h:25: #define __ASSERT_PRINT(fmt, ...) assert_print(fmt, ##__VA_ARGS__)"
+        }
+      ],
+      "action": "It changed between object-like and function-like.",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "API-MACRO-CHANGED-c9883978",
+      "category": "api",
+      "kind": "macro-changed",
+      "subject": "UMP_MT",
+      "title": "Macro UMP_MT, which your code uses, changed: function-like macro, 1 parameter(s) \u2192 #define UMP_MT_UTILITY             0x00",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "function-like macro, 1 parameter(s)",
+      "new": "#define UMP_MT_UTILITY             0x00",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "firmware/src/protocol/midi/instance/impl/midi.cpp",
+          "line": 789,
+          "text": "UMP_MT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/midi/midi_common.h",
+          "line": 505,
+          "text": "UMP_MT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/midi/midi_common.h",
+          "line": 519,
+          "text": "UMP_MT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/midi/midi_common.h",
+          "line": 524,
+          "text": "UMP_MT"
+        },
+        {
+          "type": "file_line",
+          "path": "zlibs/module/include/zlibs/utils/midi/midi_common.h",
+          "line": 697,
+          "text": "UMP_MT"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/audio/midi.h:78: function-like macro, 1 parameter(s)"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the target",
+          "excerpt": "zephyr/include/zephyr/audio/midi.h:59: #define UMP_MT_UTILITY             0x00"
+        }
+      ],
+      "action": "It changed between object-like and function-like.",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "API-MACRO-CHANGED-e9b6ca11",
+      "category": "api",
+      "kind": "macro-changed",
+      "subject": "DT_PHANDLE",
+      "title": "Macro DT_PHANDLE, which your code uses, changed: function-like macro, 2 parameter(s) \u2192 #define DT_PHANDLE_BY_NAME(node_id, pha, name) \\",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "function-like macro, 2 parameter(s)",
+      "new": "#define DT_PHANDLE_BY_NAME(node_id, pha, name) \\",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "firmware/src/io/i2c/hwa/hw/hwa_hw.h",
+          "line": 92,
+          "text": "DT_PHANDLE"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the source",
+          "excerpt": "zephyr/include/zephyr/devicetree.h:1922: function-like macro, 2 parameter(s)"
+        },
+        {
+          "type": "tool_output",
+          "invocation": "declaration at the target",
+          "excerpt": "zephyr/include/zephyr/devicetree.h:1856: #define DT_PHANDLE_BY_NAME(node_id, pha, name) \\"
+        }
+      ],
+      "action": "It changed between object-like and function-like.",
+      "related": [],
+      "analyzer": "api",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-CHANGED-5b8772c1",
+      "category": "devicetree",
+      "kind": "node-changed",
+      "subject": "&mdio:/soc/ethernet@40028000/mdio",
+      "title": "&mdio (/soc/ethernet@40028000/mdio) changed: (binding), compatible",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "compatible": [
+          "\"st,stm32-mdio\",\n             \"snps,dwmac-mdio\"",
+          "\"snps,dwmac-mdio\""
+        ],
+        "(binding)": [
+          "zephyr/dts/bindings/ethernet/mdio/st,stm32-mdio.yaml",
+          "zephyr/dts/bindings/ethernet/mdio/snps,dwmac-mdio.yaml"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/opendeck/nucleo_h563zi/common.overlay",
+          "line": 15,
+          "text": "&mdio {"
+        }
+      ],
+      "action": "Check these property changes against how your code uses the node.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-CHANGED-7a748765",
+      "category": "devicetree",
+      "kind": "node-changed",
+      "subject": "&mac:/soc/ethernet@40028000",
+      "title": "&mac (/soc/ethernet@40028000) changed: compatible, pinctrl-0, resets, snps,multicast-filter-bins, snps,perfect-filter-entries",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "compatible": [
+          "\"st,stm32h5-ethernet\",\n             \"st,stm32h7-ethernet\",\n             \"st,stm32-ethernet\"",
+          "\"st,stm32h5-ethernet\",\n             \"st,stm32h7-ethernet\",\n             \"st,stm32-ethernet\",\n             \"snps,dwmac\""
+        ],
+        "pinctrl-0": [
+          "< &eth_rxd0_pc4 &eth_rxd1_pc5 &eth_ref_clk_pa1 &eth_crs_dv_pa7 &eth_tx_en_pg11 &eth_txd0_pg13\n              &eth_txd1_pb15 >",
+          "< &eth_rmii_rxd0_pc4 &eth_rmii_rxd1_pc5 &eth_rmii_ref_clk_pa1 &eth_rmii_crs_dv_pa7\n              &eth_rmii_tx_en_pg11 &eth_rmii_txd0_pg13 &eth_rmii_txd1_pb15 >"
+        ],
+        "resets": [
+          null,
+          "< &rctl 0xc13 >"
+        ],
+        "snps,multicast-filter-bins": [
+          null,
+          "< 0x40 >"
+        ],
+        "snps,perfect-filter-entries": [
+          null,
+          "< 0x4 >"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/opendeck/nucleo_h563zi/common.overlay",
+          "line": 11,
+          "text": "&mac {"
+        }
+      ],
+      "action": "Check these property changes against how your code uses the node.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-CHANGED-7c25d300",
+      "category": "devicetree",
+      "kind": "node-changed",
+      "subject": "&mac:/soc/ethernet@40028000",
+      "title": "&mac (/soc/ethernet@40028000) changed: compatible, pinctrl-0, resets, snps,multicast-filter-bins, snps,perfect-filter-entries",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "compatible": [
+          "\"st,stm32h5-ethernet\",\n             \"st,stm32h7-ethernet\",\n             \"st,stm32-ethernet\"",
+          "\"st,stm32h5-ethernet\",\n             \"st,stm32h7-ethernet\",\n             \"st,stm32-ethernet\",\n             \"snps,dwmac\""
+        ],
+        "pinctrl-0": [
+          "< &eth_rxd0_pc4 &eth_rxd1_pc5 &eth_ref_clk_pa1 &eth_crs_dv_pa7 &eth_tx_en_pg11 &eth_txd0_pg13\n              &eth_txd1_pb15 >",
+          "< &eth_rmii_rxd0_pc4 &eth_rmii_rxd1_pc5 &eth_rmii_ref_clk_pa1 &eth_rmii_crs_dv_pa7\n              &eth_rmii_tx_en_pg11 &eth_rmii_txd0_pg13 &eth_rmii_txd1_pb15 >"
+        ],
+        "resets": [
+          null,
+          "< &rctl 0xc13 >"
+        ],
+        "snps,multicast-filter-bins": [
+          null,
+          "< 0x40 >"
+        ],
+        "snps,perfect-filter-entries": [
+          null,
+          "< 0x4 >"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/opendeck/nucleo_h563zi/common.overlay",
+          "line": 11,
+          "text": "&mac {"
+        }
+      ],
+      "action": "Check these property changes against how your code uses the node.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-CHANGED-af92ff88",
+      "category": "devicetree",
+      "kind": "node-changed",
+      "subject": "&adc1:/soc/adc@42028000/adc@42028000",
+      "title": "&adc1 (/soc/adc@42028000/adc@42028000) changed: clock-names, clocks, compatible, reg, sampling-times, st,adc-clock-source, st,adc-has-deep-powerdown, st,adc-has-differential-support, st,adc-has-injected-support, st,adc-internal-regulator, st,adc-oversampler, st,adc-prescaler, st,adc-resolutions, st,adc-sequencer, vref-mv",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "clock-names": [
+          "\"adcx\",\n              \"adc_ker\"",
+          null
+        ],
+        "clocks": [
+          "< &rcc 0x8c 0x400 >,\n         < &rcc 0x8 0x4000e8 >",
+          null
+        ],
+        "compatible": [
+          "\"st,stm32-adc\"",
+          null
+        ],
+        "reg": [
+          "< 0x42028000 0x400 >",
+          "< 0x42028000 0x100 >"
+        ],
+        "sampling-times": [
+          "< 0x3 0x7 0xd 0x19 0x30 0x5d 0xf8 0x281 >",
+          null
+        ],
+        "st,adc-clock-source": [
+          "\"ASYNC\"",
+          null
+        ],
+        "st,adc-has-deep-powerdown": [
+          "",
+          null
+        ],
+        "st,adc-has-differential-support": [
+          "",
+          null
+        ],
+        "st,adc-has-injected-support": [
+          "",
+          null
+        ],
+        "st,adc-internal-regulator": [
+          "\"startup-sw-delay\"",
+          null
+        ],
+        "st,adc-oversampler": [
+          "\"minimal\"",
+          null
+        ],
+        "st,adc-prescaler": [
+          "< 0x6 >",
+          null
+        ],
+        "st,adc-resolutions": [
+          "< 0xc 0xa 0x8 0x6 >",
+          null
+        ],
+        "st,adc-sequencer": [
+          "\"programmable\"",
+          null
+        ],
+        "vref-mv": [
+          "< 0xce4 >",
+          null
+        ],
+        "binding_defaults": {
+          "st,adc-has-channel-preselection": [
+            false,
+            null
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/bootloader.overlay",
+          "line": 13,
+          "text": "&adc1 {"
+        }
+      ],
+      "action": "Check these property changes against how your code uses the node.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-CHANGED-c229a757",
+      "category": "devicetree",
+      "kind": "node-changed",
+      "subject": "&mdio:/soc/ethernet@40028000/mdio",
+      "title": "&mdio (/soc/ethernet@40028000/mdio) changed: (binding), compatible",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "compatible": [
+          "\"st,stm32-mdio\",\n             \"snps,dwmac-mdio\"",
+          "\"snps,dwmac-mdio\""
+        ],
+        "(binding)": [
+          "zephyr/dts/bindings/ethernet/mdio/st,stm32-mdio.yaml",
+          "zephyr/dts/bindings/ethernet/mdio/snps,dwmac-mdio.yaml"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/opendeck/nucleo_h563zi/common.overlay",
+          "line": 15,
+          "text": "&mdio {"
+        }
+      ],
+      "action": "Check these property changes against how your code uses the node.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-CHANGED-e16bb0ad",
+      "category": "devicetree",
+      "kind": "node-changed",
+      "subject": "&adc2:/soc/adc@42028000/adc@42028100",
+      "title": "&adc2 (/soc/adc@42028000/adc@42028100) changed: clock-names, clocks, compatible, reg, sampling-times, st,adc-clock-source, st,adc-has-deep-powerdown, st,adc-has-differential-support, st,adc-has-injected-support, st,adc-internal-regulator, st,adc-oversampler, st,adc-prescaler, st,adc-resolutions, st,adc-sequencer, vref-mv",
+      "severity": "risky",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "clock-names": [
+          "\"adcx\",\n              \"adc_ker\"",
+          null
+        ],
+        "clocks": [
+          "< &rcc 0x8c 0x400 >,\n         < &rcc 0x8 0x4000e8 >",
+          null
+        ],
+        "compatible": [
+          "\"st,stm32-adc\"",
+          null
+        ],
+        "reg": [
+          "< 0x42028100 0x400 >",
+          "< 0x42028100 0x100 >"
+        ],
+        "sampling-times": [
+          "< 0x3 0x7 0xd 0x19 0x30 0x5d 0xf8 0x281 >",
+          null
+        ],
+        "st,adc-clock-source": [
+          "\"ASYNC\"",
+          null
+        ],
+        "st,adc-has-deep-powerdown": [
+          "",
+          null
+        ],
+        "st,adc-has-differential-support": [
+          "",
+          null
+        ],
+        "st,adc-has-injected-support": [
+          "",
+          null
+        ],
+        "st,adc-internal-regulator": [
+          "\"startup-sw-delay\"",
+          null
+        ],
+        "st,adc-oversampler": [
+          "\"minimal\"",
+          null
+        ],
+        "st,adc-prescaler": [
+          "< 0x6 >",
+          null
+        ],
+        "st,adc-resolutions": [
+          "< 0xc 0xa 0x8 0x6 >",
+          null
+        ],
+        "st,adc-sequencer": [
+          "\"programmable\"",
+          null
+        ],
+        "vref-mv": [
+          "< 0xce4 >",
+          null
+        ],
+        "binding_defaults": {
+          "st,adc-has-channel-preselection": [
+            false,
+            null
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/bootloader.overlay",
+          "line": 17,
+          "text": "&adc2 {"
+        }
+      ],
+      "action": "Check these property changes against how your code uses the node.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "IMAGES-MCUBOOT-REVISION-9dcffad6",
+      "category": "images",
+      "kind": "mcuboot-revision",
+      "subject": "mcuboot",
+      "title": "MCUboot moves from 0fae8920c4e5 (0fae892) to aa32eaaad41c (aa32eaa); 8 MCUboot source files compiled into mcuboot changed (0 added, 0 removed); 94 compiled files changed in that image overall",
+      "severity": "risky",
+      "confidence": "high",
+      "old": {
+        "sha": "0fae8920c4e5acb792b3fe766c89c668f42be6ee",
+        "describe": "0fae892"
+      },
+      "new": {
+        "sha": "aa32eaaad41cc345e6f6e6633368a4766fe23c25",
+        "describe": "aa32eaa",
+        "mcuboot_files": {
+          "changed": 8,
+          "added": 0,
+          "removed": 0
+        },
+        "image_files": {
+          "changed": 94,
+          "added": 6,
+          "removed": 2
+        }
+      },
+      "evidence": [],
+      "action": "Read MCUboot's release notes for that range; image format, swap and signature changes need the bootloader and app updated together.",
+      "related": [],
+      "analyzer": "images",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-MODULE-REPINNED-31d3f61c",
+      "category": "sbom",
+      "kind": "module-repinned",
+      "subject": "tf-psa-crypto",
+      "title": "Module tf-psa-crypto moves from 2d881593696a to 765af96a20a2; 14 files compiled into mcuboot changed (12 modified, 1 added, 1 removed)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "2d881593696aec687ca2246c53de207c2b9bf782",
+      "new": {
+        "sha": "765af96a20a2b408474dcd950372ba9af4d26b62",
+        "changed": [
+          "core/psa_crypto.c",
+          "drivers/builtin/src/bignum.c",
+          "drivers/builtin/src/chacha20.c",
+          "drivers/builtin/src/chacha20_neon.c",
+          "drivers/builtin/src/chachapoly.c",
+          "drivers/builtin/src/ecp.c",
+          "drivers/builtin/src/ecp_curves.c",
+          "drivers/builtin/src/ecp_curves_new.c",
+          "drivers/builtin/src/psa_crypto_ecp.c",
+          "drivers/builtin/src/psa_crypto_rsa.c",
+          "drivers/builtin/src/rsa.c",
+          "extras/pk_ecc.c"
+        ],
+        "added": [
+          "dispatch/psa_crypto_driver_wrappers_no_static.c"
+        ],
+        "removed": [
+          "core/psa_crypto_driver_wrappers_no_static.c"
+        ]
+      },
+      "evidence": [],
+      "action": "Read the module's changelog for that range.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-MODULE-REPINNED-47fdcd41",
+      "category": "sbom",
+      "kind": "module-repinned",
+      "subject": "mcuboot",
+      "title": "Module mcuboot moves from 0fae8920c4e5 to aa32eaaad41c; 4 files compiled into mcuboot changed (4 modified, 0 added, 0 removed)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "0fae8920c4e5acb792b3fe766c89c668f42be6ee",
+      "new": {
+        "sha": "aa32eaaad41cc345e6f6e6633368a4766fe23c25",
+        "changed": [
+          "boot/bootutil/src/bootutil_area.c",
+          "boot/bootutil/src/bootutil_img_hash.c",
+          "boot/bootutil/src/bootutil_misc.c",
+          "boot/bootutil/src/encrypted.c"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "evidence": [],
+      "action": "Read the module's changelog for that range.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-MODULE-REPINNED-60328fc1",
+      "category": "sbom",
+      "kind": "module-repinned",
+      "subject": "hal-stm32",
+      "title": "Module hal-stm32 moves from ff19fb0b03bc to a610be8d823d; 2 files compiled into opendeck_bootloader changed (2 modified, 0 added, 0 removed)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "ff19fb0b03bc9b3f1355e9f9b7b6b3a6c051f121",
+      "new": {
+        "sha": "a610be8d823de399e81c21e5126bb4b1d4b29d18",
+        "changed": [
+          "stm32cube/stm32h5xx/drivers/src/stm32h5xx_hal.c",
+          "stm32cube/stm32h5xx/drivers/src/stm32h5xx_hal_eth.c"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "evidence": [],
+      "action": "Read the module's changelog for that range.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-MODULE-REPINNED-668081d4",
+      "category": "sbom",
+      "kind": "module-repinned",
+      "subject": "hal-stm32",
+      "title": "Module hal-stm32 moves from ff19fb0b03bc to a610be8d823d; 1 file compiled into mcuboot changed (1 modified, 0 added, 0 removed)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "ff19fb0b03bc9b3f1355e9f9b7b6b3a6c051f121",
+      "new": {
+        "sha": "a610be8d823de399e81c21e5126bb4b1d4b29d18",
+        "changed": [
+          "stm32cube/stm32h5xx/drivers/src/stm32h5xx_hal.c"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "evidence": [],
+      "action": "Read the module's changelog for that range.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-MODULE-REPINNED-9dd6d9ae",
+      "category": "sbom",
+      "kind": "module-repinned",
+      "subject": "mbedtls",
+      "title": "Module mbedtls moves from 554163f6f7b2 to c43f34b93797; 11 files compiled into opendeck_bootloader changed (11 modified, 0 added, 0 removed)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "554163f6f7b2ec71fed9b423e81f2217a8615d29",
+      "new": {
+        "sha": "c43f34b93797e81fd0257c30004dcd0ae332ae51",
+        "changed": [
+          "library/mbedtls_config.c",
+          "library/pkcs7.c",
+          "library/ssl_client.c",
+          "library/ssl_tls.c",
+          "library/ssl_tls12_client.c",
+          "library/ssl_tls12_server.c",
+          "library/ssl_tls13_client.c",
+          "library/ssl_tls13_generic.c",
+          "library/ssl_tls13_server.c",
+          "library/x509_crt.c",
+          "library/x509_csr.c"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "evidence": [],
+      "action": "Read the module's changelog for that range.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-MODULE-REPINNED-bb64cc8e",
+      "category": "sbom",
+      "kind": "module-repinned",
+      "subject": "tf-psa-crypto",
+      "title": "Module tf-psa-crypto moves from 2d881593696a to 765af96a20a2; 14 files compiled into opendeck_bootloader changed (12 modified, 1 added, 1 removed)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "2d881593696aec687ca2246c53de207c2b9bf782",
+      "new": {
+        "sha": "765af96a20a2b408474dcd950372ba9af4d26b62",
+        "changed": [
+          "core/psa_crypto.c",
+          "drivers/builtin/src/bignum.c",
+          "drivers/builtin/src/chacha20.c",
+          "drivers/builtin/src/chacha20_neon.c",
+          "drivers/builtin/src/chachapoly.c",
+          "drivers/builtin/src/ecp.c",
+          "drivers/builtin/src/ecp_curves.c",
+          "drivers/builtin/src/ecp_curves_new.c",
+          "drivers/builtin/src/psa_crypto_ecp.c",
+          "drivers/builtin/src/psa_crypto_rsa.c",
+          "drivers/builtin/src/rsa.c",
+          "extras/pk_ecc.c"
+        ],
+        "added": [
+          "dispatch/psa_crypto_driver_wrappers_no_static.c"
+        ],
+        "removed": [
+          "core/psa_crypto_driver_wrappers_no_static.c"
+        ]
+      },
+      "evidence": [],
+      "action": "Read the module's changelog for that range.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-MODULE-REPINNED-c8d08343",
+      "category": "sbom",
+      "kind": "module-repinned",
+      "subject": "mbedtls",
+      "title": "Module mbedtls moves from 554163f6f7b2 to c43f34b93797; 11 files compiled into mcuboot changed (11 modified, 0 added, 0 removed)",
+      "severity": "risky",
+      "confidence": "high",
+      "old": "554163f6f7b2ec71fed9b423e81f2217a8615d29",
+      "new": {
+        "sha": "c43f34b93797e81fd0257c30004dcd0ae332ae51",
+        "changed": [
+          "library/mbedtls_config.c",
+          "library/pkcs7.c",
+          "library/ssl_client.c",
+          "library/ssl_tls.c",
+          "library/ssl_tls12_client.c",
+          "library/ssl_tls12_server.c",
+          "library/ssl_tls13_client.c",
+          "library/ssl_tls13_generic.c",
+          "library/ssl_tls13_server.c",
+          "library/x509_crt.c",
+          "library/x509_csr.c"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "evidence": [],
+      "action": "Read the module's changelog for that range.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "BUILD-FOOTPRINT-4abd16ab",
+      "category": "build",
+      "kind": "footprint",
+      "subject": "nucleo_h563zi/stm32h563xx",
+      "title": "ROM 33268 \u2192 33564 bytes (+296), RAM 30451 \u2192 30547 bytes (+96)",
+      "severity": "info",
+      "confidence": "high",
+      "old": {
+        "rom": 33268,
+        "ram": 30451
+      },
+      "new": {
+        "rom": 33564,
+        "ram": 30547,
+        "host_runtime_inflated": false,
+        "symbols": [
+          {
+            "symbol": "entropy_stm32_rng_init",
+            "delta": -248
+          },
+          {
+            "symbol": "sys_clock_set_timeout",
+            "delta": -240
+          },
+          {
+            "symbol": "timer_core_arm",
+            "delta": 228
+          },
+          {
+            "symbol": "entropy_stm32_init",
+            "delta": 224
+          },
+          {
+            "symbol": "z_impl_k_sleep_ticks",
+            "delta": 164
+          },
+          {
+            "symbol": "z_tick_sleep",
+            "delta": -128
+          },
+          {
+            "symbol": "z_sched_ready_locked",
+            "delta": 124
+          },
+          {
+            "symbol": "z_impl_k_mutex_unlock",
+            "delta": 120
+          },
+          {
+            "symbol": "timer_core_announce_from",
+            "delta": 112
+          },
+          {
+            "symbol": "slice_reset",
+            "delta": 84
+          }
+        ]
+      },
+      "evidence": [],
+      "action": "The symbols that grew or shrank most are listed; check them against your memory budget.",
+      "related": [],
+      "analyzer": "buildlog",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "BUILD-FOOTPRINT-ec74fdbb",
+      "category": "build",
+      "kind": "footprint",
+      "subject": "nucleo_h563zi/stm32h563xx",
+      "title": "ROM 140296 \u2192 140392 bytes (+96), RAM 88573 \u2192 88791 bytes (+218)",
+      "severity": "info",
+      "confidence": "high",
+      "old": {
+        "rom": 140296,
+        "ram": 88573
+      },
+      "new": {
+        "rom": 140392,
+        "ram": 88791,
+        "host_runtime_inflated": false,
+        "symbols": [
+          {
+            "symbol": "eth0_dma_buf",
+            "delta": 12224
+          },
+          {
+            "symbol": "dma_rx_buffer",
+            "delta": -6112
+          },
+          {
+            "symbol": "dma_tx_buffer",
+            "delta": -6112
+          },
+          {
+            "symbol": "mbedtls_internal_sha256_process.isra.0",
+            "delta": -308
+          },
+          {
+            "symbol": "K",
+            "delta": -256
+          },
+          {
+            "symbol": "entropy_stm32_rng_init",
+            "delta": -248
+          },
+          {
+            "symbol": "sys_clock_set_timeout",
+            "delta": -240
+          },
+          {
+            "symbol": "timer_core_arm",
+            "delta": 228
+          },
+          {
+            "symbol": "entropy_stm32_init",
+            "delta": 224
+          },
+          {
+            "symbol": "eth0_dma_desc",
+            "delta": 192
+          }
+        ]
+      },
+      "evidence": [],
+      "action": "The symbols that grew or shrank most are listed; check them against your memory budget.",
+      "related": [],
+      "analyzer": "buildlog",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-BINDING-DEFAULTS-243d280c",
+      "category": "devicetree",
+      "kind": "node-binding-defaults",
+      "subject": "&spi1:/soc/spi@40013000",
+      "title": "&spi1 (/soc/spi@40013000): binding defaults changed, not set in the DTS: st,gpio-control",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "st,gpio-control": [
+          null,
+          false
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/common.overlay",
+          "line": 23,
+          "text": "&spi1 {"
+        }
+      ],
+      "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-BINDING-DEFAULTS-bd28a32d",
+      "category": "devicetree",
+      "kind": "node-binding-defaults",
+      "subject": "&spi1:/soc/spi@40013000",
+      "title": "&spi1 (/soc/spi@40013000): binding defaults changed, not set in the DTS: st,gpio-control",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "st,gpio-control": [
+          null,
+          false
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/common.overlay",
+          "line": 23,
+          "text": "&spi1 {"
+        }
+      ],
+      "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-MOVED-4d896622",
+      "category": "devicetree",
+      "kind": "node-moved",
+      "subject": "&adc1",
+      "title": "&adc1 moved from /soc/adc@42028000 to /soc/adc@42028000/adc@42028000",
+      "severity": "info",
+      "confidence": "high",
+      "old": "/soc/adc@42028000",
+      "new": "/soc/adc@42028000/adc@42028000",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/bootloader.overlay",
+          "line": 13,
+          "text": "&adc1 {"
+        }
+      ],
+      "action": "Label-based references keep working; path-based ones don't.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-MOVED-76a2d25f",
+      "category": "devicetree",
+      "kind": "node-moved",
+      "subject": "&adc2",
+      "title": "&adc2 moved from /soc/adc@42028100 to /soc/adc@42028000/adc@42028100",
+      "severity": "info",
+      "confidence": "high",
+      "old": "/soc/adc@42028100",
+      "new": "/soc/adc@42028000/adc@42028100",
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/bootloader.overlay",
+          "line": 17,
+          "text": "&adc2 {"
+        }
+      ],
+      "action": "Label-based references keep working; path-based ones don't.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-52445074",
+      "category": "devicetree",
+      "kind": "node-properties-new_props",
+      "subject": "/chosen:/chosen",
+      "title": "/chosen (/chosen) has new properties in tgt@ace4550095c1: zephyr,system-timer",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "zephyr,system-timer": [
+          null,
+          "&lptim4"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/opendeck/nucleo_h563zi/bootloader.overlay",
+          "line": 2,
+          "text": "chosen {"
+        },
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/bootloader.overlay",
+          "line": 2,
+          "text": "chosen {"
+        },
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/common.overlay",
+          "line": 2,
+          "text": "chosen {"
+        },
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/common.overlay",
+          "line": 112,
+          "text": "chosen {"
+        },
+        {
+          "type": "file_line",
+          "path": "bootloader/firmware_loader.overlay",
+          "line": 2,
+          "text": "chosen {"
+        }
+      ],
+      "action": "New hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-852a4065",
+      "category": "devicetree",
+      "kind": "node-properties-new_props",
+      "subject": "/chosen:/chosen",
+      "title": "/chosen (/chosen) has new properties in tgt@ace4550095c1: zephyr,system-timer",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "zephyr,system-timer": [
+          null,
+          "&lptim4"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "file_line",
+          "path": "boards/opendeck/nucleo_h563zi/bootloader.overlay",
+          "line": 2,
+          "text": "chosen {"
+        },
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/common.overlay",
+          "line": 2,
+          "text": "chosen {"
+        },
+        {
+          "type": "file_line",
+          "path": "boards/zephyr/nucleo_h563zi_stm32h563xx/common.overlay",
+          "line": 112,
+          "text": "chosen {"
+        },
+        {
+          "type": "file_line",
+          "path": "sysbuild/mcuboot.overlay",
+          "line": 2,
+          "text": "chosen {"
+        }
+      ],
+      "action": "New hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-OTHER-NODES-4d714ff6",
+      "category": "devicetree",
+      "kind": "other-nodes",
+      "subject": "unreferenced",
+      "title": "65 nodes your app doesn't reference changed, disappeared or appeared; 116 more nodes only changed binding",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "changed": [
+          "/clocks/clk-hsi48",
+          "/soc/dma@40020000",
+          "/soc/dma@40021000",
+          "/soc/pin-controller@42020000",
+          "/soc/sai1@40015400",
+          "/soc/sai2@40015800",
+          "/soc/sdmmc@46008000",
+          "/soc/timers@40000000/counter",
+          "/soc/timers@40000400/counter",
+          "/soc/timers@40001000/counter",
+          "/soc/timers@40001400/counter",
+          "/soc/timers@40009400",
+          "/soc/timers@40012c00/counter",
+          "/soc/timers@44004400",
+          "/soc/timers@44004800",
+          "/soc/timers@44004c00",
+          "/soc/timers@44005000",
+          "/soc/timers@44005400",
+          "/soc/ucpd@4000dc00"
+        ],
+        "removed": [
+          "/soc/adc@42028000/channel@12",
+          "/soc/pin-controller@42020000/eth_crs_dv_pa7",
+          "/soc/pin-controller@42020000/eth_ref_clk_pa1",
+          "/soc/pin-controller@42020000/eth_rxd0_pc4",
+          "/soc/pin-controller@42020000/eth_rxd1_pc5",
+          "/soc/pin-controller@42020000/eth_tx_en_pg11",
+          "/soc/pin-controller@42020000/eth_txd0_pg13",
+          "/soc/pin-controller@42020000/eth_txd1_pb15",
+          "/soc/sai1@40015400/sai1a@4",
+          "/soc/sai1@40015400/sai1b@24",
+          "/soc/sai2@40015800/sai2a@4",
+          "/soc/sai2@40015800/sai2b@24",
+          "/soc/timers@40001000/pwm",
+          "/soc/timers@40001400/pwm"
+        ],
+        "added": [
+          "/soc/adc@42028000/adc@42028000",
+          "/soc/adc@42028000/adc@42028000/channel@12",
+          "/soc/adc@42028000/adc@42028100",
+          "/soc/crypto@420c0400",
+          "/soc/ethernet@40028000/ptp-clock",
+          "/soc/pin-controller@42020000/eth_rmii_crs_dv_pa7",
+          "/soc/pin-controller@42020000/eth_rmii_ref_clk_pa1",
+          "/soc/pin-controller@42020000/eth_rmii_rxd0_pc4",
+          "/soc/pin-controller@42020000/eth_rmii_rxd1_pc5",
+          "/soc/pin-controller@42020000/eth_rmii_tx_en_pg11",
+          "/soc/pin-controller@42020000/eth_rmii_txd0_pg13",
+          "/soc/pin-controller@42020000/eth_rmii_txd1_pb15",
+          "/soc/power@44020800",
+          "/soc/power@44020800/wakeup-controller",
+          "/soc/power@44020800/wakeup-controller/wkup@1",
+          "/soc/power@44020800/wakeup-controller/wkup@2",
+          "/soc/power@44020800/wakeup-controller/wkup@3",
+          "/soc/power@44020800/wakeup-controller/wkup@4",
+          "/soc/power@44020800/wakeup-controller/wkup@5",
+          "/soc/power@44020800/wakeup-controller/wkup@6",
+          "/soc/power@44020800/wakeup-controller/wkup@7",
+          "/soc/power@44020800/wakeup-controller/wkup@8",
+          "/soc/sai1@40015400/sai1a@40015404",
+          "/soc/sai1@40015400/sai1b@40015424",
+          "/soc/sai2@40015800/sai2a@40015804",
+          "/soc/sai2@40015800/sai2b@40015824",
+          "/soc/timers@40000000/qdec",
+          "/soc/timers@40000400/qdec",
+          "/soc/timers@40000800/qdec",
+          "/soc/timers@40000c00/qdec",
+          "/soc/timers@40012c00/qdec",
+          "/soc/timers@40013400/qdec"
+        ],
+        "binding_changed": [
+          "/clocks/clk-csi",
+          "/clocks/clk-hse",
+          "/clocks/clk-hsi",
+          "/clocks/clk-lse",
+          "/clocks/clk-lsi",
+          "/clocks/pll",
+          "/clocks/pll2",
+          "/clocks/pll3",
+          "/connector",
+          "/cpus/cpu@0",
+          "/cpus/cpu@0/mpu@e000ed90",
+          "/dietemp",
+          "/gpio_keys/button",
+          "/iocell",
+          "/mcos/mco1",
+          "/mcos/mco2",
+          "/smbus1",
+          "/smbus2",
+          "/smbus3",
+          "/smbus4",
+          "/soc/can@4000a800",
+          "/soc/crc@40023000",
+          "/soc/digi_dietemp@40008c00",
+          "/soc/ethernet@40028000/mdio/ethernet-phy@0",
+          "/soc/flash-controller@40022000",
+          "/soc/flash-controller@40022000/flash@8fff000",
+          "/soc/flash-controller@40022000/flash@8fff800",
+          "/soc/i2c@40005800",
+          "/soc/i2c@44002800",
+          "/soc/i2c@44002c00",
+          "/soc/i2s@40003800",
+          "/soc/i2s@40003c00",
+          "/soc/i2s@40013000",
+          "/soc/i3c@44003000",
+          "/soc/interrupt-controller@44022000",
+          "/soc/interrupt-controller@e000e100",
+          "/soc/memory-controller@47000400",
+          "/soc/memory@20040000",
+          "/soc/memory@20050000",
+          "/soc/memory@40036400",
+          "/soc/pin-controller@42020000/gpio@42020000",
+          "/soc/pin-controller@42020000/gpio@42020400",
+          "/soc/pin-controller@42020000/gpio@42020800",
+          "/soc/pin-controller@42020000/gpio@42020c00",
+          "/soc/pin-controller@42020000/gpio@42021000",
+          "/soc/pin-controller@42020000/gpio@42021400",
+          "/soc/pin-controller@42020000/gpio@42021800",
+          "/soc/pin-controller@42020000/gpio@42021c00",
+          "/soc/pin-controller@42020000/gpio@42022000",
+          "/soc/rcc@44020c00",
+          "/soc/rcc@44020c00/reset-controller",
+          "/soc/rng@420c0800",
+          "/soc/rtc@44007800",
+          "/soc/sdmmc@46008c00",
+          "/soc/serial@40004400",
+          "/soc/serial@40004c00",
+          "/soc/serial@40005000",
+          "/soc/serial@40006800",
+          "/soc/serial@40006c00",
+          "/soc/serial@40007800",
+          "/soc/serial@40007c00",
+          "/soc/serial@40008000",
+          "/soc/serial@40008400",
+          "/soc/serial@40013800",
+          "/soc/spi@40003800",
+          "/soc/spi@40003c00",
+          "/soc/spi@40014c00",
+          "/soc/spi@40015000",
+          "/soc/spi@44002000",
+          "/soc/spi@47001400",
+          "/soc/timer@e000e010",
+          "/soc/timers@40000000",
+          "/soc/timers@40000000/pwm",
+          "/soc/timers@40000400",
+          "/soc/timers@40000400/pwm",
+          "/soc/timers@40000800",
+          "/soc/timers@40000800/counter",
+          "/soc/timers@40000800/pwm",
+          "/soc/timers@40000c00",
+          "/soc/timers@40000c00/counter",
+          "/soc/timers@40000c00/pwm",
+          "/soc/timers@40001000",
+          "/soc/timers@40001400",
+          "/soc/timers@40001800",
+          "/soc/timers@40001800/counter",
+          "/soc/timers@40001800/pwm",
+          "/soc/timers@40001c00",
+          "/soc/timers@40001c00/counter",
+          "/soc/timers@40001c00/pwm",
+          "/soc/timers@40002000",
+          "/soc/timers@40002000/counter",
+          "/soc/timers@40002000/pwm",
+          "/soc/timers@40012c00",
+          "/soc/timers@40012c00/pwm",
+          "/soc/timers@40013400",
+          "/soc/timers@40013400/counter",
+          "/soc/timers@40013400/pwm",
+          "/soc/timers@40014000",
+          "/soc/timers@40014000/counter",
+          "/soc/timers@40014000/pwm",
+          "/soc/timers@40014400",
+          "/soc/timers@40014400/counter",
+          "/soc/timers@40014400/pwm",
+          "/soc/timers@40014800",
+          "/soc/timers@40014800/counter",
+          "/soc/timers@40014800/pwm",
+          "/soc/usb@40016000",
+          "/soc/vrefbuf@44007400",
+          "/soc/watchdog@40002c00",
+          "/soc/watchdog@40003000",
+          "/st-morpho-header",
+          "/usbphy",
+          "/vbat",
+          "/vbus",
+          "/vddcore",
+          "/vref"
+        ]
+      },
+      "evidence": [],
+      "action": "None needed unless you start using them.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "DEVICETREE-OTHER-NODES-4db97a9b",
+      "category": "devicetree",
+      "kind": "other-nodes",
+      "subject": "unreferenced",
+      "title": "67 nodes your app doesn't reference changed, disappeared or appeared; 116 more nodes only changed binding",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "changed": [
+          "/clocks/clk-hsi48",
+          "/soc/adc@42028000",
+          "/soc/dma@40020000",
+          "/soc/dma@40021000",
+          "/soc/pin-controller@42020000",
+          "/soc/sai1@40015400",
+          "/soc/sai2@40015800",
+          "/soc/sdmmc@46008000",
+          "/soc/timers@40000000/counter",
+          "/soc/timers@40000400/counter",
+          "/soc/timers@40001000/counter",
+          "/soc/timers@40001400/counter",
+          "/soc/timers@40009400",
+          "/soc/timers@40012c00/counter",
+          "/soc/timers@44004400",
+          "/soc/timers@44004800",
+          "/soc/timers@44004c00",
+          "/soc/timers@44005000",
+          "/soc/timers@44005400",
+          "/soc/ucpd@4000dc00"
+        ],
+        "removed": [
+          "/soc/adc@42028000/channel@12",
+          "/soc/adc@42028100",
+          "/soc/pin-controller@42020000/eth_crs_dv_pa7",
+          "/soc/pin-controller@42020000/eth_ref_clk_pa1",
+          "/soc/pin-controller@42020000/eth_rxd0_pc4",
+          "/soc/pin-controller@42020000/eth_rxd1_pc5",
+          "/soc/pin-controller@42020000/eth_tx_en_pg11",
+          "/soc/pin-controller@42020000/eth_txd0_pg13",
+          "/soc/pin-controller@42020000/eth_txd1_pb15",
+          "/soc/sai1@40015400/sai1a@4",
+          "/soc/sai1@40015400/sai1b@24",
+          "/soc/sai2@40015800/sai2a@4",
+          "/soc/sai2@40015800/sai2b@24",
+          "/soc/timers@40001000/pwm",
+          "/soc/timers@40001400/pwm"
+        ],
+        "added": [
+          "/soc/adc@42028000/adc@42028000",
+          "/soc/adc@42028000/adc@42028000/channel@12",
+          "/soc/adc@42028000/adc@42028100",
+          "/soc/crypto@420c0400",
+          "/soc/ethernet@40028000/ptp-clock",
+          "/soc/pin-controller@42020000/eth_rmii_crs_dv_pa7",
+          "/soc/pin-controller@42020000/eth_rmii_ref_clk_pa1",
+          "/soc/pin-controller@42020000/eth_rmii_rxd0_pc4",
+          "/soc/pin-controller@42020000/eth_rmii_rxd1_pc5",
+          "/soc/pin-controller@42020000/eth_rmii_tx_en_pg11",
+          "/soc/pin-controller@42020000/eth_rmii_txd0_pg13",
+          "/soc/pin-controller@42020000/eth_rmii_txd1_pb15",
+          "/soc/power@44020800",
+          "/soc/power@44020800/wakeup-controller",
+          "/soc/power@44020800/wakeup-controller/wkup@1",
+          "/soc/power@44020800/wakeup-controller/wkup@2",
+          "/soc/power@44020800/wakeup-controller/wkup@3",
+          "/soc/power@44020800/wakeup-controller/wkup@4",
+          "/soc/power@44020800/wakeup-controller/wkup@5",
+          "/soc/power@44020800/wakeup-controller/wkup@6",
+          "/soc/power@44020800/wakeup-controller/wkup@7",
+          "/soc/power@44020800/wakeup-controller/wkup@8",
+          "/soc/sai1@40015400/sai1a@40015404",
+          "/soc/sai1@40015400/sai1b@40015424",
+          "/soc/sai2@40015800/sai2a@40015804",
+          "/soc/sai2@40015800/sai2b@40015824",
+          "/soc/timers@40000000/qdec",
+          "/soc/timers@40000400/qdec",
+          "/soc/timers@40000800/qdec",
+          "/soc/timers@40000c00/qdec",
+          "/soc/timers@40012c00/qdec",
+          "/soc/timers@40013400/qdec"
+        ],
+        "binding_changed": [
+          "/clocks/clk-csi",
+          "/clocks/clk-hse",
+          "/clocks/clk-hsi",
+          "/clocks/clk-lse",
+          "/clocks/clk-lsi",
+          "/clocks/pll",
+          "/clocks/pll2",
+          "/clocks/pll3",
+          "/connector",
+          "/cpus/cpu@0",
+          "/cpus/cpu@0/mpu@e000ed90",
+          "/dietemp",
+          "/gpio_keys/button",
+          "/iocell",
+          "/mcos/mco1",
+          "/mcos/mco2",
+          "/smbus1",
+          "/smbus2",
+          "/smbus3",
+          "/smbus4",
+          "/soc/can@4000a800",
+          "/soc/crc@40023000",
+          "/soc/digi_dietemp@40008c00",
+          "/soc/ethernet@40028000/mdio/ethernet-phy@0",
+          "/soc/flash-controller@40022000",
+          "/soc/flash-controller@40022000/flash@8fff000",
+          "/soc/flash-controller@40022000/flash@8fff800",
+          "/soc/i2c@40005800",
+          "/soc/i2c@44002800",
+          "/soc/i2c@44002c00",
+          "/soc/i2s@40003800",
+          "/soc/i2s@40003c00",
+          "/soc/i2s@40013000",
+          "/soc/i3c@44003000",
+          "/soc/interrupt-controller@44022000",
+          "/soc/interrupt-controller@e000e100",
+          "/soc/memory-controller@47000400",
+          "/soc/memory@20040000",
+          "/soc/memory@20050000",
+          "/soc/memory@40036400",
+          "/soc/pin-controller@42020000/gpio@42020000",
+          "/soc/pin-controller@42020000/gpio@42020400",
+          "/soc/pin-controller@42020000/gpio@42020800",
+          "/soc/pin-controller@42020000/gpio@42020c00",
+          "/soc/pin-controller@42020000/gpio@42021000",
+          "/soc/pin-controller@42020000/gpio@42021400",
+          "/soc/pin-controller@42020000/gpio@42021800",
+          "/soc/pin-controller@42020000/gpio@42021c00",
+          "/soc/pin-controller@42020000/gpio@42022000",
+          "/soc/rcc@44020c00",
+          "/soc/rcc@44020c00/reset-controller",
+          "/soc/rng@420c0800",
+          "/soc/rtc@44007800",
+          "/soc/sdmmc@46008c00",
+          "/soc/serial@40004400",
+          "/soc/serial@40004c00",
+          "/soc/serial@40005000",
+          "/soc/serial@40006800",
+          "/soc/serial@40006c00",
+          "/soc/serial@40007800",
+          "/soc/serial@40007c00",
+          "/soc/serial@40008000",
+          "/soc/serial@40008400",
+          "/soc/serial@40013800",
+          "/soc/spi@40003800",
+          "/soc/spi@40003c00",
+          "/soc/spi@40014c00",
+          "/soc/spi@40015000",
+          "/soc/spi@44002000",
+          "/soc/spi@47001400",
+          "/soc/timer@e000e010",
+          "/soc/timers@40000000",
+          "/soc/timers@40000000/pwm",
+          "/soc/timers@40000400",
+          "/soc/timers@40000400/pwm",
+          "/soc/timers@40000800",
+          "/soc/timers@40000800/counter",
+          "/soc/timers@40000800/pwm",
+          "/soc/timers@40000c00",
+          "/soc/timers@40000c00/counter",
+          "/soc/timers@40000c00/pwm",
+          "/soc/timers@40001000",
+          "/soc/timers@40001400",
+          "/soc/timers@40001800",
+          "/soc/timers@40001800/counter",
+          "/soc/timers@40001800/pwm",
+          "/soc/timers@40001c00",
+          "/soc/timers@40001c00/counter",
+          "/soc/timers@40001c00/pwm",
+          "/soc/timers@40002000",
+          "/soc/timers@40002000/counter",
+          "/soc/timers@40002000/pwm",
+          "/soc/timers@40012c00",
+          "/soc/timers@40012c00/pwm",
+          "/soc/timers@40013400",
+          "/soc/timers@40013400/counter",
+          "/soc/timers@40013400/pwm",
+          "/soc/timers@40014000",
+          "/soc/timers@40014000/counter",
+          "/soc/timers@40014000/pwm",
+          "/soc/timers@40014400",
+          "/soc/timers@40014400/counter",
+          "/soc/timers@40014400/pwm",
+          "/soc/timers@40014800",
+          "/soc/timers@40014800/counter",
+          "/soc/timers@40014800/pwm",
+          "/soc/usb@40016000",
+          "/soc/vrefbuf@44007400",
+          "/soc/watchdog@40002c00",
+          "/soc/watchdog@40003000",
+          "/st-morpho-header",
+          "/usbphy",
+          "/vbat",
+          "/vbus",
+          "/vddcore",
+          "/vref"
+        ]
+      },
+      "evidence": [],
+      "action": "None needed unless you start using them.",
+      "related": [],
+      "analyzer": "devicetree",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "GUIDE-COVERAGE-734c47f0",
+      "category": "guide",
+      "kind": "coverage",
+      "subject": "documents",
+      "title": "Read 0 entries from 0 documents; 0 touch your app",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "documents": [],
+        "entries": 0,
+        "matched": []
+      },
+      "evidence": [],
+      "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+      "related": [],
+      "analyzer": "guide",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "IMAGES-IMAGES-SUMMARY-74ca8d46",
+      "category": "images",
+      "kind": "images-summary",
+      "subject": "images",
+      "title": "3 images at tgt@ace4550095c1: mcuboot (bootloader, 94 compiled files changed), opendeck_bootloader (other, 125 compiled files changed), app (app)",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": [
+        {
+          "image": "mcuboot",
+          "role": "bootloader",
+          "status": [
+            "ok",
+            "ok"
+          ],
+          "compiled_files": {
+            "changed": 94,
+            "added": 6,
+            "removed": 2
+          }
+        },
+        {
+          "image": "opendeck_bootloader",
+          "role": "other",
+          "status": [
+            "ok",
+            "ok"
+          ],
+          "compiled_files": {
+            "changed": 125,
+            "added": 6,
+            "removed": 2
+          }
+        },
+        {
+          "image": "app",
+          "role": "app",
+          "status": [
+            "ok",
+            "configure-failed"
+          ],
+          "compiled_files": null
+        }
+      ],
+      "evidence": [],
+      "action": "Per-image findings follow, grouped by image.",
+      "related": [],
+      "analyzer": "images",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-DEFAULT-CHANGED-5eaaf35d",
+      "category": "kconfig",
+      "kind": "default-changed",
+      "subject": "CONFIG_7 symbols",
+      "title": "7 Kconfig symbols: other symbols resolve to a different value in tgt@ace4550095c1",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "BOOT_SIGNATURE_KEY_FILE": [
+          "\"/home/user/.cache/zmig/workspaces/b51212cbfb596f09dacaa544a680912f69953673/bootloader/mcuboot/root-rsa-2048.pem\"",
+          "\"/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/bootloader/mcuboot/root-rsa-2048.pem\""
+        ],
+        "EARLY_CONSOLE": [
+          "n",
+          "y"
+        ],
+        "LEGACY_GENERATED_INCLUDE_PATH": [
+          "y",
+          "n"
+        ],
+        "NOTIFY": [
+          "n",
+          "y"
+        ],
+        "ONOFF": [
+          "n",
+          "y"
+        ],
+        "RING_BUFFER": [
+          "y",
+          "n"
+        ],
+        "TF_PSA_CRYPTO_MODULE_DIR": [
+          "\"/home/user/.cache/zmig/workspaces/b51212cbfb596f09dacaa544a680912f69953673/modules/crypto/tf-psa-crypto\"",
+          "\"/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/modules/crypto/tf-psa-crypto\""
+        ]
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-DEFAULT-CHANGED-c67f4649",
+      "category": "kconfig",
+      "kind": "default-changed",
+      "subject": "CONFIG_9 symbols",
+      "title": "9 Kconfig symbols: other symbols resolve to a different value in tgt@ace4550095c1",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "EARLY_CONSOLE": [
+          "n",
+          "y"
+        ],
+        "LEGACY_GENERATED_INCLUDE_PATH": [
+          "y",
+          "n"
+        ],
+        "MCUBOOT_SIGNATURE_KEY_FILE": [
+          "\"/home/user/.cache/zmig/workspaces/b51212cbfb596f09dacaa544a680912f69953673/bootloader/mcuboot/root-rsa-2048.pem\"",
+          "\"/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/bootloader/mcuboot/root-rsa-2048.pem\""
+        ],
+        "NOCACHE_MEMORY": [
+          "n",
+          "y"
+        ],
+        "NOTIFY": [
+          "n",
+          "y"
+        ],
+        "ONOFF": [
+          "n",
+          "y"
+        ],
+        "PSA_WANT_ALG_SHA_256": [
+          "y",
+          "n"
+        ],
+        "RING_BUFFER": [
+          "y",
+          "n"
+        ],
+        "TF_PSA_CRYPTO_MODULE_DIR": [
+          "\"/home/user/.cache/zmig/workspaces/b51212cbfb596f09dacaa544a680912f69953673/modules/crypto/tf-psa-crypto\"",
+          "\"/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/modules/crypto/tf-psa-crypto\""
+        ]
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-NEWLY-SET-8535ffbe",
+      "category": "kconfig",
+      "kind": "newly-set",
+      "subject": "CONFIG_27 symbols",
+      "title": "27 Kconfig symbols: symbols are newly enabled or set in tgt@ace4550095c1",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "ARCH_HAS_BIT_REV": "y",
+        "ARCH_HAS_CPU_IDLE_HOOKS": "y",
+        "ARCH_HAS_DIRECT_INTERRUPTS": "y",
+        "ARCH_HAS_IRQ_PENDING_OPS": "y",
+        "ARCH_HAS_ISR_TABLES_LOCAL_DECLARATION": "y",
+        "ARCH_HAS_SEMIHOST": "y",
+        "CLOCK_CONTROL_NRF_ONOFF": "y",
+        "CORTEX_M_SYSTICK_INTERRUPT_PRIORITY": "0",
+        "DNS_RESOLVER_MAX_SERVERS": "1",
+        "DNS_RESOLVER_MAX_SERVERS_LIMIT": "6",
+        "DT_HAS_SNPS_DWMAC_ENABLED": "y",
+        "DT_HAS_SNPS_DWMAC_PTP_CLOCK_ENABLED": "y",
+        "DT_HAS_ST_STM32U5_LPTIM_ENABLED": "y",
+        "DT_HAS_ST_STM32_ADC_ENABLED": "y",
+        "DT_HAS_ST_STM32_HSI48_CLOCK_ENABLED": "y",
+        "DT_HAS_ST_STM32_PWR_ENABLED": "y",
+        "ETH_STM32_HAL_RX_DESC_COUNT": "4",
+        "EXCEPTION_DUMP": "y",
+        "HAS_POWEROFF": "y",
+        "MDNS_RESPONDER_IFACE_POLICY_ALL": "y",
+        "NET_DHCPV4_INIT_REBOOT_ATTEMPTS": "1",
+        "NET_L2_ETHERNET_MCAST_FILTER_ADD_COUNT_IPV4": "2",
+        "NET_L2_ETHERNET_MCAST_FILTER_COUNT": "0",
+        "NET_PKT_LARGE_DEFAULTS": "y",
+        "SEM_LOCK_STRIPES": "1",
+        "TF_PSA_CRYPTO_DISPATCH_DIR": "\"/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/modules/crypto/tf-psa-crypto/dispatch\"",
+        "TIMEOUT_BACKEND_DLIST": "y"
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-NEWLY-SET-c07845fe",
+      "category": "kconfig",
+      "kind": "newly-set",
+      "subject": "CONFIG_19 symbols",
+      "title": "19 Kconfig symbols: symbols are newly enabled or set in tgt@ace4550095c1",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "ARCH_HAS_BIT_REV": "y",
+        "ARCH_HAS_CPU_IDLE_HOOKS": "y",
+        "ARCH_HAS_DIRECT_INTERRUPTS": "y",
+        "ARCH_HAS_IRQ_PENDING_OPS": "y",
+        "ARCH_HAS_ISR_TABLES_LOCAL_DECLARATION": "y",
+        "ARCH_HAS_SEMIHOST": "y",
+        "CLOCK_CONTROL_NRF_ONOFF": "y",
+        "CORTEX_M_SYSTICK_INTERRUPT_PRIORITY": "0",
+        "DT_HAS_SNPS_DWMAC_ENABLED": "y",
+        "DT_HAS_SNPS_DWMAC_PTP_CLOCK_ENABLED": "y",
+        "DT_HAS_ST_STM32U5_LPTIM_ENABLED": "y",
+        "DT_HAS_ST_STM32_HSI48_CLOCK_ENABLED": "y",
+        "DT_HAS_ST_STM32_PWR_ENABLED": "y",
+        "EXCEPTION_DUMP": "y",
+        "HAS_POWEROFF": "y",
+        "MCUBOOT_LOGICAL_SECTOR_SIZE": "0x0",
+        "SEM_LOCK_STRIPES": "1",
+        "TF_PSA_CRYPTO_DISPATCH_DIR": "\"/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/modules/crypto/tf-psa-crypto/dispatch\"",
+        "TIMEOUT_BACKEND_DLIST": "y"
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-NO-LONGER-SET-6ac6fe67",
+      "category": "kconfig",
+      "kind": "no-longer-set",
+      "subject": "CONFIG_5 symbols",
+      "title": "5 Kconfig symbols: symbols set before are absent in tgt@ace4550095c1",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "BOOT_USB_DFU_NO": "y",
+        "CLOCK_CONTROL_TISCI_PRIORITY": "40",
+        "DT_HAS_ST_STM32_MDIO_ENABLED": "y",
+        "STM32_IOCELL_PRIORITY": "50",
+        "USB_DEVICE_PRODUCT": "\"MCUBOOT\""
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "KCONFIG-NO-LONGER-SET-f63e6595",
+      "category": "kconfig",
+      "kind": "no-longer-set",
+      "subject": "CONFIG_6 symbols",
+      "title": "6 Kconfig symbols: symbols set before are absent in tgt@ace4550095c1",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "CLOCK_CONTROL_TISCI_PRIORITY": "40",
+        "DT_HAS_ST_STM32_MDIO_ENABLED": "y",
+        "MBEDTLS_SHA256_SMALLER": "y",
+        "NET_SOCKETS_TLS_SET_MAX_FRAGMENT_LENGTH": "y",
+        "NET_TCP_ISN_RFC6528": "y",
+        "STM32_IOCELL_PRIORITY": "50"
+      },
+      "evidence": [],
+      "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+      "related": [],
+      "analyzer": "kconfig",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "MANIFEST-MODULE-REPINNED-22adc23b",
+      "category": "manifest",
+      "kind": "module-repinned",
+      "subject": "hal_stm32",
+      "title": "Module hal_stm32, which the build uses, moves from ff19fb0b03bc to a610be8d823d",
+      "severity": "info",
+      "confidence": "high",
+      "old": "ff19fb0b03bc9b3f1355e9f9b7b6b3a6c051f121",
+      "new": "a610be8d823de399e81c21e5126bb4b1d4b29d18",
+      "evidence": [
+        {
+          "type": "tool_output",
+          "invocation": "manifest",
+          "excerpt": "zephyr/west.yml:261"
+        }
+      ],
+      "action": "The SBOM findings list what changed in the files the build compiles.",
+      "related": [],
+      "analyzer": "modules",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "MANIFEST-MODULE-REPINNED-74092668",
+      "category": "manifest",
+      "kind": "module-repinned",
+      "subject": "mcuboot",
+      "title": "Module mcuboot, which the build uses, moves from 0fae8920c4e5 to aa32eaaad41c",
+      "severity": "info",
+      "confidence": "high",
+      "old": "0fae8920c4e5acb792b3fe766c89c668f42be6ee",
+      "new": "aa32eaaad41cc345e6f6e6633368a4766fe23c25",
+      "evidence": [
+        {
+          "type": "tool_output",
+          "invocation": "manifest",
+          "excerpt": "zephyr/west.yml:332"
+        }
+      ],
+      "action": "The SBOM findings list what changed in the files the build compiles.",
+      "related": [],
+      "analyzer": "modules",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "MANIFEST-MODULE-REPINNED-86025b70",
+      "category": "manifest",
+      "kind": "module-repinned",
+      "subject": "mbedtls",
+      "title": "Module mbedtls, which the build uses, moves from 554163f6f7b2 to c43f34b93797",
+      "severity": "info",
+      "confidence": "high",
+      "old": "554163f6f7b2ec71fed9b423e81f2217a8615d29",
+      "new": "c43f34b93797e81fd0257c30004dcd0ae332ae51",
+      "evidence": [
+        {
+          "type": "tool_output",
+          "invocation": "manifest",
+          "excerpt": "zephyr/west.yml:327"
+        }
+      ],
+      "action": "The SBOM findings list what changed in the files the build compiles.",
+      "related": [],
+      "analyzer": "modules",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "MANIFEST-MODULE-REPINNED-b6057264",
+      "category": "manifest",
+      "kind": "module-repinned",
+      "subject": "cmsis_6",
+      "title": "Module cmsis_6, which the build uses, moves from b2dfbe1a20bb to 1c1840af7a7e",
+      "severity": "info",
+      "confidence": "high",
+      "old": "b2dfbe1a20bbd49c2d2c605073799671074bbb30",
+      "new": "1c1840af7a7e757d6e2fec3ddb0e5ce0dfcc93c8",
+      "evidence": [
+        {
+          "type": "tool_output",
+          "invocation": "manifest",
+          "excerpt": "zephyr/west.yml:130"
+        }
+      ],
+      "action": "The SBOM findings list what changed in the files the build compiles.",
+      "related": [],
+      "analyzer": "modules",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "MANIFEST-MODULE-REPINNED-e5faaf30",
+      "category": "manifest",
+      "kind": "module-repinned",
+      "subject": "tf-psa-crypto",
+      "title": "Module tf-psa-crypto, which the build uses, moves from 2d881593696a to 765af96a20a2",
+      "severity": "info",
+      "confidence": "high",
+      "old": "2d881593696aec687ca2246c53de207c2b9bf782",
+      "new": "765af96a20a2b408474dcd950372ba9af4d26b62",
+      "evidence": [
+        {
+          "type": "tool_output",
+          "invocation": "manifest",
+          "excerpt": "zephyr/west.yml:395"
+        }
+      ],
+      "action": "The SBOM findings list what changed in the files the build compiles.",
+      "related": [],
+      "analyzer": "modules",
+      "heuristics": [],
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-ZEPHYR-SOURCES-0505b5ff",
+      "category": "sbom",
+      "kind": "zephyr-sources",
+      "subject": "zephyr",
+      "title": "Zephyr files compiled: 136 \u2192 140 (5 added, 1 removed, 62 changed); 259 upstream commits touch the files the target compiles",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "added": [
+          "zephyr/arch/common/instr_mem.c",
+          "zephyr/lib/libc/common/source/stdlib/calloc.c",
+          "zephyr/lib/libc/common/source/stdlib/reallocarray.c",
+          "zephyr/lib/utils/notify.c",
+          "zephyr/lib/utils/onoff.c"
+        ],
+        "removed": [
+          "zephyr/lib/utils/ring_buffer.c"
+        ],
+        "changed": [
+          "zephyr/arch/arm/core/cortex_m/cpu_idle.c",
+          "zephyr/arch/arm/core/cortex_m/fault.c",
+          "zephyr/arch/arm/core/cortex_m/irq_manage.c",
+          "zephyr/arch/arm/core/cortex_m/swap_helper.S",
+          "zephyr/arch/arm/core/cortex_m/thread.c",
+          "zephyr/arch/arm/core/cortex_m/vector_table.S",
+          "zephyr/arch/arm/core/fatal.c",
+          "zephyr/arch/arm/core/mpu/arm_core_mpu.c",
+          "zephyr/arch/arm/core/mpu/arm_mpu.c",
+          "zephyr/arch/arm/core/tls.c",
+          "zephyr/drivers/clock_control/clock_stm32_ll_h5.c",
+          "zephyr/drivers/entropy/entropy_stm32.c",
+          "zephyr/drivers/flash/flash_stm32.c",
+          "zephyr/drivers/flash/flash_stm32l5x.c",
+          "zephyr/drivers/gpio/gpio_stm32.c",
+          "zephyr/drivers/serial/uart_stm32.c",
+          "zephyr/drivers/timer/cortex_m_systick.c",
+          "zephyr/drivers/timer/sys_clock_init.c",
+          "zephyr/kernel/busy_wait.c",
+          "zephyr/kernel/condvar.c",
+          "zephyr/kernel/device.c",
+          "zephyr/kernel/fatal.c",
+          "zephyr/kernel/idle.c",
+          "zephyr/kernel/init.c",
+          "zephyr/kernel/kheap.c",
+          "zephyr/kernel/mailbox.c",
+          "zephyr/kernel/mem_slab.c",
+          "zephyr/kernel/mempool.c",
+          "zephyr/kernel/msg_q.c",
+          "zephyr/kernel/mutex.c",
+          "zephyr/kernel/pipe.c",
+          "zephyr/kernel/queue.c",
+          "zephyr/kernel/sched.c",
+          "zephyr/kernel/scheduler.c",
+          "zephyr/kernel/sem.c",
+          "zephyr/kernel/sleep.c",
+          "zephyr/kernel/stack.c",
+          "zephyr/kernel/sys/thread_entry.c",
+          "zephyr/kernel/system_work_q.c",
+          "zephyr/kernel/thread.c",
+          "zephyr/kernel/timeout.c",
+          "zephyr/kernel/timer.c",
+          "zephyr/kernel/timeslicing.c",
+          "zephyr/kernel/work.c",
+          "zephyr/lib/heap/heap.c",
+          "zephyr/lib/libc/common/source/stdlib/malloc.c",
+          "zephyr/lib/libc/picolibc/assert.c",
+          "zephyr/lib/libc/picolibc/exit.c",
+          "zephyr/lib/libc/picolibc/stdio.c",
+          "zephyr/lib/os/cbprintf_nano.c",
+          "zephyr/lib/os/cbprintf_packaged.c",
+          "zephyr/lib/os/printk.c",
+          "zephyr/lib/utils/bitmask.c",
+          "zephyr/lib/utils/rb.c",
+          "zephyr/lib/utils/timeutil.c",
+          "zephyr/soc/st/stm32/common/gpioport_mgr.c",
+          "zephyr/soc/st/stm32/common/soc_config.c",
+          "zephyr/soc/st/stm32/common/stm32cube_hal.c",
+          "zephyr/soc/st/stm32/stm32h5x/soc.c",
+          "zephyr/subsys/crc/crc32_sw.c",
+          "zephyr/subsys/random/random_entropy_device.c",
+          "zephyr/subsys/tracing/tracing_none.c"
+        ],
+        "busiest": [
+          {
+            "file": "drivers/timer/cortex_m_systick.c",
+            "commits": 24
+          },
+          {
+            "file": "kernel/timeout.c",
+            "commits": 17
+          },
+          {
+            "file": "kernel/thread.c",
+            "commits": 15
+          },
+          {
+            "file": "drivers/entropy/entropy_stm32.c",
+            "commits": 15
+          },
+          {
+            "file": "kernel/sched.c",
+            "commits": 11
+          },
+          {
+            "file": "drivers/timer/sys_clock_init.c",
+            "commits": 10
+          },
+          {
+            "file": "drivers/serial/uart_stm32.c",
+            "commits": 8
+          },
+          {
+            "file": "kernel/init.c",
+            "commits": 8
+          },
+          {
+            "file": "kernel/msg_q.c",
+            "commits": 7
+          },
+          {
+            "file": "kernel/mutex.c",
+            "commits": 7
+          },
+          {
+            "file": "arch/arm/core/cortex_m/fault.c",
+            "commits": 6
+          },
+          {
+            "file": "arch/arm/core/mpu/arm_mpu.c",
+            "commits": 6
+          },
+          {
+            "file": "lib/heap/heap.c",
+            "commits": 6
+          },
+          {
+            "file": "kernel/queue.c",
+            "commits": 6
+          },
+          {
+            "file": "kernel/work.c",
+            "commits": 6
+          }
+        ]
+      },
+      "evidence": [],
+      "action": "The busiest files are listed first; review those against your app's behavior.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "image": "mcuboot",
+      "introduced_by_migration": true
+    },
+    {
+      "id": "SBOM-ZEPHYR-SOURCES-21c5c5b7",
+      "category": "sbom",
+      "kind": "zephyr-sources",
+      "subject": "zephyr",
+      "title": "Zephyr files compiled: 191 \u2192 195 (5 added, 1 removed, 100 changed); 496 upstream commits touch the files the target compiles",
+      "severity": "info",
+      "confidence": "high",
+      "old": null,
+      "new": {
+        "added": [
+          "zephyr/arch/common/instr_mem.c",
+          "zephyr/lib/libc/common/source/stdlib/calloc.c",
+          "zephyr/lib/libc/common/source/stdlib/reallocarray.c",
+          "zephyr/lib/utils/notify.c",
+          "zephyr/lib/utils/onoff.c"
+        ],
+        "removed": [
+          "zephyr/lib/utils/ring_buffer.c"
+        ],
+        "changed": [
+          "zephyr/arch/arm/core/__aeabi_atexit.c",
+          "zephyr/arch/arm/core/cortex_m/cpu_idle.c",
+          "zephyr/arch/arm/core/cortex_m/fault.c",
+          "zephyr/arch/arm/core/cortex_m/irq_manage.c",
+          "zephyr/arch/arm/core/cortex_m/swap_helper.S",
+          "zephyr/arch/arm/core/cortex_m/thread.c",
+          "zephyr/arch/arm/core/cortex_m/vector_table.S",
+          "zephyr/arch/arm/core/fatal.c",
+          "zephyr/arch/arm/core/mpu/arm_core_mpu.c",
+          "zephyr/arch/arm/core/mpu/arm_mpu.c",
+          "zephyr/arch/arm/core/tls.c",
+          "zephyr/drivers/clock_control/clock_stm32_ll_h5.c",
+          "zephyr/drivers/entropy/entropy_stm32.c",
+          "zephyr/drivers/ethernet/eth_stm32_hal_common.c",
+          "zephyr/drivers/ethernet/eth_stm32_hal_v2.c",
+          "zephyr/drivers/ethernet/mdio/mdio_stm32_hal.c",
+          "zephyr/drivers/ethernet/phy/phy_mii.c",
+          "zephyr/drivers/flash/flash_stm32.c",
+          "zephyr/drivers/flash/flash_stm32l5x.c",
+          "zephyr/drivers/gpio/gpio_stm32.c",
+          "zephyr/drivers/hwinfo/hwinfo_stm32.c",
+          "zephyr/drivers/timer/cortex_m_systick.c",
+          "zephyr/drivers/timer/sys_clock_init.c",
+          "zephyr/kernel/busy_wait.c",
+          "zephyr/kernel/condvar.c",
+          "zephyr/kernel/device.c",
+          "zephyr/kernel/fatal.c",
+          "zephyr/kernel/idle.c",
+          "zephyr/kernel/init.c",
+          "zephyr/kernel/kheap.c",
+          "zephyr/kernel/mailbox.c",
+          "zephyr/kernel/mem_slab.c",
+          "zephyr/kernel/mempool.c",
+          "zephyr/kernel/msg_q.c",
+          "zephyr/kernel/mutex.c",
+          "zephyr/kernel/pipe.c",
+          "zephyr/kernel/poll.c",
+          "zephyr/kernel/queue.c",
+          "zephyr/kernel/sched.c",
+          "zephyr/kernel/scheduler.c",
+          "zephyr/kernel/sem.c",
+          "zephyr/kernel/sleep.c",
+          "zephyr/kernel/stack.c",
+          "zephyr/kernel/sys/thread_entry.c",
+          "zephyr/kernel/system_work_q.c",
+          "zephyr/kernel/thread.c",
+          "zephyr/kernel/timeout.c",
+          "zephyr/kernel/timer.c",
+          "zephyr/kernel/timeslicing.c",
+          "zephyr/kernel/work.c",
+          "zephyr/lib/cpp/abi/cpp_dtors.c",
+          "zephyr/lib/heap/heap.c",
+          "zephyr/lib/libc/common/source/stdlib/malloc.c",
+          "zephyr/lib/libc/picolibc/assert.c",
+          "zephyr/lib/libc/picolibc/exit.c",
+          "zephyr/lib/libc/picolibc/stdio.c",
+          "zephyr/lib/net_buf/buf.c",
+          "zephyr/lib/net_buf/buf_simple.c",
+          "zephyr/lib/os/cbprintf_complete.c",
+          "zephyr/lib/os/cbprintf_packaged.c",
+          "zephyr/lib/os/printk.c",
+          "zephyr/lib/utils/bitmask.c",
+          "zephyr/lib/utils/rb.c",
+          "zephyr/lib/utils/timeutil.c",
+          "zephyr/soc/st/stm32/common/gpioport_mgr.c",
+          "zephyr/soc/st/stm32/common/soc_config.c",
+          "zephyr/soc/st/stm32/common/stm32cube_hal.c",
+          "zephyr/soc/st/stm32/stm32h5x/soc.c",
+          "zephyr/subsys/crc/crc32_sw.c",
+          "zephyr/subsys/net/ip/connection.c",
+          "zephyr/subsys/net/ip/icmpv4.c",
+          "zephyr/subsys/net/ip/igmp.c",
+          "zephyr/subsys/net/ip/ipv4.c",
+          "zephyr/subsys/net/ip/net_context.c",
+          "zephyr/subsys/net/ip/net_core.c",
+          "zephyr/subsys/net/ip/net_if.c",
+          "zephyr/subsys/net/ip/net_mgmt.c",
+          "zephyr/subsys/net/ip/net_pkt.c",
+          "zephyr/subsys/net/ip/net_timeout.c",
+          "zephyr/subsys/net/ip/route.c",
+          "zephyr/subsys/net/ip/route_ipv4.c",
+          "zephyr/subsys/net/ip/tcp.c",
+          "zephyr/subsys/net/ip/udp.c",
+          "zephyr/subsys/net/ip/utils.c",
+          "zephyr/subsys/net/l2/ethernet/arp.c",
+          "zephyr/subsys/net/l2/ethernet/ethernet.c",
+          "zephyr/subsys/net/lib/dhcpv4/dhcpv4.c",
+          "zephyr/subsys/net/lib/dns/dispatcher.c",
+          "zephyr/subsys/net/lib/dns/dns_sd.c",
+          "zephyr/subsys/net/lib/dns/mdns_responder.c",
+          "zephyr/subsys/net/lib/http/http_client.c",
+          "zephyr/subsys/net/lib/http/http_server_core.c",
+          "zephyr/subsys/net/lib/http/http_server_http1.c",
+          "zephyr/subsys/net/lib/sockets/getaddrinfo.c",
+          "zephyr/subsys/net/lib/sockets/sockets.c",
+          "zephyr/subsys/net/lib/sockets/sockets_inet.c",
+          "zephyr/subsys/net/lib/sockets/sockets_service.c",
+          "zephyr/subsys/net/lib/websocket/websocket.c",
+          "zephyr/subsys/random/random_entropy_device.c",
+          "zephyr/subsys/tracing/tracing_none.c"
+        ],
+        "busiest": [
+          {
+            "file": "subsys/net/ip/net_if.c",
+            "commits": 29
+          },
+          {
+            "file": "drivers/timer/cortex_m_systick.c",
+            "commits": 24
+          },
+          {
+            "file": "subsys/net/lib/dns/mdns_responder.c",
+            "commits": 24
+          },
+          {
+            "file": "subsys/net/ip/tcp.c",
+            "commits": 23
+          },
+          {
+            "file": "subsys/net/l2/ethernet/ethernet.c",
+            "commits": 20
+          },
+          {
+            "file": "kernel/timeout.c",
+            "commits": 17
+          },
+          {
+            "file": "subsys/net/ip/net_context.c",
+            "commits": 17
+          },
+          {
+            "file": "subsys/net/lib/sockets/sockets_inet.c",
+            "commits": 15
+          },
+          {
+            "file": "subsys/net/lib/dns/dispatcher.c",
+            "commits": 15
+          },
+          {
+            "file": "kernel/thread.c",
+            "commits": 15
+          },
+          {
+            "file": "drivers/entropy/entropy_stm32.c",
+            "commits": 15
+          },
+          {
+            "file": "subsys/net/ip/net_core.c",
+            "commits": 12
+          },
+          {
+            "file": "subsys/net/ip/net_pkt.c",
+            "commits": 11
+          },
+          {
+            "file": "kernel/sched.c",
+            "commits": 11
+          },
+          {
+            "file": "drivers/ethernet/eth_stm32_hal_common.c",
+            "commits": 10
+          }
+        ]
+      },
+      "evidence": [],
+      "action": "The busiest files are listed first; review those against your app's behavior.",
+      "related": [],
+      "analyzer": "sbom",
+      "heuristics": [],
+      "image": "opendeck_bootloader",
+      "introduced_by_migration": true
+    }
+  ],
+  "upgrade_path": {
+    "verdict": "needs-changes",
+    "unchecked": [
+      "ble",
+      "mcuboot",
+      "storage",
+      "wire"
+    ],
+    "confidence": "low",
+    "categories": {
+      "layout": {
+        "status": "clean",
+        "confidence": "high",
+        "checked": [
+          "partitions of image mcuboot @ src@b51212cbfb59 (7) and mcuboot @ tgt@ace4550095c1 (7) from the final devicetree",
+          "partition roles from MCUboot's Zephyr port and the storage subsystems at both refs"
+        ]
+      },
+      "mcuboot": {
+        "status": "unknown",
+        "confidence": "low",
+        "checked": [],
+        "reason": "image app at tgt@ace4550095c1 has no .config (configure-failed)",
+        "assumptions": [],
+        "directions": {}
+      },
+      "storage": {
+        "status": "unknown",
+        "confidence": "low",
+        "checked": [],
+        "reason": "app image at tgt@ace4550095c1 has no .config (configure-failed)"
+      },
+      "ble": {
+        "status": "unknown",
+        "confidence": "low",
+        "checked": [],
+        "reason": "app image at tgt@ace4550095c1 has no .config (configure-failed)"
+      },
+      "wire": {
+        "status": "unknown",
+        "confidence": "low",
+        "checked": [],
+        "reason": "no resolved configuration to compare for: app (target)"
+      },
+      "sysbuild": {
+        "status": "not-applicable",
+        "confidence": "high",
+        "checked": [
+          "not a sysbuild build"
+        ]
+      },
+      "images": {
+        "status": "clean",
+        "confidence": "high",
+        "checked": [
+          "images findings of the analyzer"
+        ]
+      },
+      "crossimage": {
+        "status": "clean",
+        "confidence": "high",
+        "checked": [
+          "crossimage findings of the analyzer"
+        ]
+      }
+    },
+    "remedies": {
+      "unknown": [
+        "IMAGES-MCUBOOT-REVISION-9dcffad6"
+      ]
+    },
+    "assumptions": [
+      "deployed app == the source build's app image"
+    ],
+    "basis": [
+      "the target configure failed: the categories come from its configuration and whatever the failed build produced; confidence capped at low",
+      "remedies are a lower bound: not established for ble, mcuboot, storage, wire"
+    ]
+  },
+  "not_checked": [
+    {
+      "area": "API use in common/src/atomic_compat.cpp (source parse)",
+      "reason": "1 parse error(s); first: cstdint: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in common/src/atomic_compat.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/database/instance/impl/database.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/database/instance/impl/database.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/analog/instance/impl/analog.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/analog/instance/impl/analog.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/analog/instance/impl/mapper.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/analog/instance/impl/mapper.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/digital/encoders/instance/impl/encoders.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/digital/encoders/instance/impl/encoders.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/digital/encoders/instance/impl/mapper.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/digital/encoders/instance/impl/mapper.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/digital/instance/impl/digital.cpp (source parse)",
+      "reason": "23 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/digital/instance/impl/digital.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/digital/switches/instance/impl/mapper.cpp (source parse)",
+      "reason": "26 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/digital/switches/instance/impl/mapper.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/digital/switches/instance/impl/switches.cpp (source parse)",
+      "reason": "26 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/digital/switches/instance/impl/switches.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/instance/impl/i2c.cpp (source parse)",
+      "reason": "28 parse error(s); first: algorithm: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/instance/impl/i2c.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/display/instance/impl/display.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/display/instance/impl/display.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/display/instance/impl/elements.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/display/instance/impl/elements.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_apds9960/instance/impl/mapper.cpp (source parse)",
+      "reason": "23 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_apds9960/instance/impl/mapper.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_apds9960/instance/impl/sensor_apds9960.cpp (source parse)",
+      "reason": "23 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_apds9960/instance/impl/sensor_apds9960.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_bno085/instance/impl/mapper.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_bno085/instance/impl/mapper.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_bno085/instance/impl/sensor_bno085.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_bno085/instance/impl/sensor_bno085.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_cap1188/instance/impl/sensor_cap1188.cpp (source parse)",
+      "reason": "22 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_cap1188/instance/impl/sensor_cap1188.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_vl53l4cx/instance/impl/mapper.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_vl53l4cx/instance/impl/mapper.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_vl53l4cx/instance/impl/port/vl53l4cx_port.cpp (source parse)",
+      "reason": "26 parse error(s); first: algorithm: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_vl53l4cx/instance/impl/port/vl53l4cx_port.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_vl53l4cx/instance/impl/sensor_vl53l4cx.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_vl53l4cx/instance/impl/sensor_vl53l4cx.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_vl53l5cx/instance/impl/port/vl53l5cx_port.cpp (source parse)",
+      "reason": "28 parse error(s); first: algorithm: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_vl53l5cx/instance/impl/port/vl53l5cx_port.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_vl53l5cx/instance/impl/sensor_vl53l5cx.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/i2c/peripherals/sensor_vl53l5cx/instance/impl/sensor_vl53l5cx.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/indicators/instance/impl/indicators.cpp (source parse)",
+      "reason": "30 parse error(s); first: algorithm: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/indicators/instance/impl/indicators.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/outputs/instance/impl/mapper.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/outputs/instance/impl/mapper.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/outputs/instance/impl/outputs.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/outputs/instance/impl/outputs.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/touchscreen/instance/impl/models/nextion/nextion.cpp (source parse)",
+      "reason": "22 parse error(s); first: cstddef: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/touchscreen/instance/impl/models/nextion/nextion.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/touchscreen/instance/impl/touchscreen.cpp (source parse)",
+      "reason": "22 parse error(s); first: cstddef: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/io/touchscreen/instance/impl/touchscreen.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/main.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/main.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/mdns/instance/impl/mdns.cpp (source parse)",
+      "reason": "25 parse error(s); first: cstddef: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/mdns/instance/impl/mdns.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/mdns/services/hw/services_hw.cpp (source parse)",
+      "reason": "25 parse error(s); first: cstddef: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/mdns/services/hw/services_hw.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/mdns/services/hw/services_osc.cpp (source parse)",
+      "reason": "25 parse error(s); first: cstddef: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/mdns/services/hw/services_osc.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/mdns/services/hw/services_websockets.cpp (source parse)",
+      "reason": "25 parse error(s); first: cstddef: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/mdns/services/hw/services_websockets.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/midi/instance/impl/midi.cpp (source parse)",
+      "reason": "22 parse error(s); first: cstddef: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/midi/instance/impl/midi.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/osc/instance/impl/osc.cpp (source parse)",
+      "reason": "23 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/osc/instance/impl/osc.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/osc/packet/packet.cpp (source parse)",
+      "reason": "26 parse error(s); first: algorithm: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/osc/packet/packet.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/websockets/handler/firmware_upload/firmware_upload_handler.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/websockets/handler/firmware_upload/firmware_upload_handler.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/websockets/handler/sysex_config/sysex_config_handler.cpp (source parse)",
+      "reason": "26 parse error(s); first: algorithm: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/websockets/handler/sysex_config/sysex_config_handler.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/websockets/hwa/hw/hwa_hw.cpp (source parse)",
+      "reason": "11 parse error(s); first: cerrno: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/protocol/websockets/hwa/hw/hwa_hw.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/system/instance/impl/system.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/system/instance/impl/system.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/util/cinfo/cinfo.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/util/cinfo/cinfo.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/util/configurable/configurable.cpp (source parse)",
+      "reason": "25 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in firmware/src/util/configurable/configurable.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/drivers/uart_hw/uart_hw.cpp (source parse)",
+      "reason": "25 parse error(s); first: atomic: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/drivers/uart_hw/uart_hw.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/emueeprom/emueeprom.cpp (source parse)",
+      "reason": "24 parse error(s); first: cstddef: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/emueeprom/emueeprom.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/filters/filters.cpp (source parse)",
+      "reason": "24 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/filters/filters.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/lessdb/lessdb.cpp (source parse)",
+      "reason": "23 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/lessdb/lessdb.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/midi/midi.cpp (source parse)",
+      "reason": "24 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/midi/midi.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/midi/transport/transport_serial.cpp (source parse)",
+      "reason": "23 parse error(s); first: cstddef: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/midi/transport/transport_serial.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/misc/misc.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/signaling/signaling.cpp (source parse)",
+      "reason": "31 parse error(s); first: algorithm: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/signaling/signaling.cpp (target parse)",
+      "reason": "31 parse error(s); first: algorithm: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/signaling/signaling.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/sysex_conf/sysex_conf.cpp (source parse)",
+      "reason": "24 parse error(s); first: array: file not found (parsed with an empty stand-in)",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/sysex_conf/sysex_conf.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "API use in zlibs/module/src/utils/threads/threads.cpp at tgt@ace4550095c1",
+      "reason": "the target build has no compile command for it (not configured, or no longer compiled), so its declarations at the target are unknown",
+      "analyzer": "api"
+    },
+    {
+      "area": "BLE state",
+      "reason": "app image at tgt@ace4550095c1 has no .config (configure-failed)",
+      "analyzer": "ble"
+    },
+    {
+      "area": "MCUboot / image format",
+      "reason": "image app at tgt@ace4550095c1 has no .config (configure-failed)",
+      "analyzer": "mcuboot"
+    },
+    {
+      "area": "fork triage of modules",
+      "reason": "module history is unavailable (shallow clones: cmsis_6, hal_stm32, mbedtls, mcuboot, tf-psa-crypto), so commits a project carries on top of upstream modules can't be classified; run `zmig plan` on a full workspace for that",
+      "analyzer": "scan"
+    },
+    {
+      "area": "persistent storage",
+      "reason": "app image at tgt@ace4550095c1 has no .config (configure-failed)",
+      "analyzer": "storage"
+    },
+    {
+      "area": "salvage of files the app doesn't own",
+      "reason": "salvage only disables lines in the app's own config and overlay files; a target configure failure caused by board, module or generated files can't be salvaged (no salvage was needed in this run)",
+      "analyzer": "scan"
+    },
+    {
+      "area": "sysbuild configuration",
+      "reason": "not a sysbuild build at both refs",
+      "analyzer": "sysbuild"
+    },
+    {
+      "area": "the project's own system calls",
+      "reason": "no zephyr/misc/generated/syscalls.json in the target build (it stopped before generating it)",
+      "analyzer": "api"
+    },
+    {
+      "area": "usable image size",
+      "reason": "no imgtool sign command in the app's build at both refs",
+      "analyzer": "layout"
+    },
+    {
+      "area": "wire formats",
+      "reason": "no resolved configuration to compare for: app (target)",
+      "analyzer": "wire"
+    }
+  ],
+  "checked": [
+    {
+      "area": "binary boundaries (abidiff)",
+      "result": "clean",
+      "detail": "no prebuilt static library from the project tree on the link line, and CONFIG_LLEXT isn't set: no binary ABI to compare",
+      "analyzer": "api"
+    },
+    {
+      "area": "declarations the project uses",
+      "result": "clean",
+      "detail": "0 Zephyr/module declaration(s) the project's TUs use, compared at both refs",
+      "analyzer": "api"
+    },
+    {
+      "area": "declarations the project uses",
+      "result": "found",
+      "detail": "212 Zephyr/module declaration(s) the project's TUs use, compared at both refs",
+      "analyzer": "api"
+    },
+    {
+      "area": "declarations the project uses",
+      "result": "clean",
+      "detail": "24 Zephyr/module declaration(s) the project's TUs use, compared at both refs",
+      "analyzer": "api"
+    },
+    {
+      "area": "libclang parse coverage",
+      "result": "clean",
+      "detail": "clang version 18.1.1: 0 project TU(s) with the source flags (0 with errors), 0 with the target flags (0 with errors); 0 parsed, 0 from the parse cache, 0 TU(s) skipped (no included file changed)",
+      "analyzer": "api"
+    },
+    {
+      "area": "libclang parse coverage",
+      "result": "partial",
+      "detail": "clang version 18.1.1: 3 project TU(s) with the source flags (1 with errors), 3 with the target flags (1 with errors); 0 parsed, 0 from the parse cache, 0 TU(s) skipped (no included file changed)",
+      "analyzer": "api"
+    },
+    {
+      "area": "libclang parse coverage",
+      "result": "partial",
+      "detail": "clang version 18.1.1: 51 project TU(s) with the source flags (49 with errors), 0 with the target flags (0 with errors); 0 parsed, 0 from the parse cache, 0 TU(s) skipped (no included file changed)",
+      "analyzer": "api"
+    },
+    {
+      "area": "struct layouts at the source (pahole)",
+      "result": "clean",
+      "detail": "13 of 35 field offset(s) clang modelled checked against the GCC-built ELF; 0 disagree",
+      "analyzer": "api"
+    },
+    {
+      "area": "the project's own system calls",
+      "result": "clean",
+      "detail": "0 __syscall declaration(s) in 0 project header(s) compared with both builds' syscalls.json",
+      "analyzer": "api"
+    },
+    {
+      "area": "device and SYS_INIT init order",
+      "result": "clean",
+      "detail": "0 project init call(s) present at both refs compared, among 23 init calls at the source and 23 at the target",
+      "analyzer": "initorder"
+    },
+    {
+      "area": "device and SYS_INIT init order",
+      "result": "clean",
+      "detail": "0 project init call(s) present at both refs compared, among 31 init calls at the source and 30 at the target",
+      "analyzer": "initorder"
+    },
+    {
+      "area": "module set",
+      "result": "clean",
+      "detail": "5 module(s) the source build used compared in both Zephyr manifests (5 changed); the target build needed no other module",
+      "analyzer": "modules"
+    }
+  ]
+}

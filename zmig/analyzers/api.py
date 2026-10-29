@@ -148,7 +148,7 @@ class ApiAnalyzer:
         src, tgt, gaps = self._parse_both(ctx, version)
         not_checked += gaps
         errs = [sum(1 for t in tus if t["errors"]) for tus in (src, tgt)]
-        stats = ctx.shared.get("api_parse_stats", {})
+        stats = parse_stats(ctx.shared, ctx.image)
         checked.append(
             Checked(
                 "libclang parse coverage",
@@ -265,7 +265,9 @@ class ApiAnalyzer:
                   src_deps)  # fmt: skip
         todo = {r: e for r, e in todo.items() if r not in same}
         tgt = run(ctx.new, new_roots, todo, tgt_deps) if todo else []
-        ctx.shared.setdefault("api_parse_stats", stats)
+        # Per image: `shared` is common to every image of a sysbuild build (regression: the
+        # app's record showed MCUboot's 0/0 counts, DOGFOOD-5 M20).
+        record_parse_stats(ctx.shared, ctx.image, stats)
         todo_all = {rel: tgt_entries[rel] for rel in src_entries if rel in tgt_entries}
         for rel in sorted(set(src_entries) - set(todo_all)):
             gaps.append(
@@ -827,6 +829,16 @@ class ApiAnalyzer:
         )
 
 
+def record_parse_stats(shared: dict[str, Any], image: str, stats: dict[str, int]) -> None:
+    shared.setdefault("api_parse_stats", {})[image] = stats
+
+
+def parse_stats(shared: dict[str, Any], image: str) -> dict[str, int]:
+    """This image's parse counts (`shared` is common to every image of a sysbuild build)."""
+    stats: dict[str, int] = shared.get("api_parse_stats", {}).get(image, {})
+    return stats
+
+
 def _bare(type_name: str) -> str:
     """A type name without qualifiers: diagnostics say 'const state_execution'."""
     return " ".join(w for w in type_name.split() if w not in ("const", "volatile"))
@@ -868,12 +880,23 @@ def _macro_at(ws: Any, where: str, name: str) -> dict[str, Any] | None:
     for f in (Path(str(ws.root)) / path,):
         if not f.is_file():
             continue
-        for i, line in enumerate(f.read_text(errors="replace").splitlines(), 1):
-            m = re.match(rf"^\s*#\s*define\s+{re.escape(name)}(\(([^)]*)\))?", line)
+        lines = f.read_text(errors="replace").splitlines()
+        for i, line in enumerate(lines, 1):
+            # The name must end there (regression: CONTAINER_OF matched
+            # "#define CONTAINER_OF_VALIDATE(" earlier in the header, DOGFOOD-5 M17).
+            m = re.match(rf"^\s*#\s*define\s+{re.escape(name)}(?![\w])(\()?", line)
             if not m:
                 continue
             fn = m[1] is not None
-            params = [p for p in (m[2] or "").split(",") if p.strip()]
+            params: list[str] = []
+            if fn:
+                # A parameter list continued over backslash-continued lines
+                # (DNS_SD_REGISTER_SERVICE: 7 parameters on two lines).
+                text, j = line[m.end() :], i
+                while ")" not in text and text.rstrip().endswith("\\") and j < len(lines):
+                    text = text.rstrip()[:-1] + " " + lines[j]
+                    j += 1
+                params = [p for p in text.split(")", 1)[0].split(",") if p.strip()]
             return {
                 "kind": "macro",
                 "function_like": fn,

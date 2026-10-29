@@ -1,0 +1,46 @@
+-- Cache files will be written to: /home/user/.cache/zephyr
+-- Zephyr version: 4.4.99 (/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr)
+-- Found west (found suitable version "1.5.0", minimum required is "0.14.0")
+-- Board: nucleo_h563zi, qualifiers: stm32h563xx
+-- Found host-tools: zephyr 1.0.1 (/home/user/.cache/zmig/sdks/zephyr-sdk-1.0.1)
+-- Found toolchain: zephyr 1.0.1 (/home/user/.cache/zmig/sdks/zephyr-sdk-1.0.1)
+-- Found Dtc: /usr/bin/dtc (found suitable version "1.7.2", minimum required is "1.4.6")
+-- Found BOARD.dts: /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/boards/st/nucleo_h563zi/nucleo_h563zi.dts
+-- Found devicetree overlay: /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/apps/c7a11154f9afed3c/app/boards/zephyr/nucleo_h563zi_stm32h563xx/common.overlay
+-- Found devicetree overlay: /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/apps/c7a11154f9afed3c/app/boards/zephyr/nucleo_h563zi_stm32h563xx/firmware.overlay
+-- Found devicetree overlay: /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/apps/c7a11154f9afed3c/app/boards/opendeck/nucleo_h563zi/common.overlay
+-- Found devicetree overlay: /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/apps/c7a11154f9afed3c/app/boards/opendeck/nucleo_h563zi/firmware.overlay
+devicetree error: /soc/ethernet@40028000: undefined node label 'eth_rxd0_pc4'
+CMake Error at /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/cmake/modules/dts.cmake:326 (execute_process):
+  execute_process failed command indexes:
+
+    1: "Child return code: 1"
+
+Call Stack (most recent call first):
+  /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/cmake/modules/dts.cmake:447 (dts_edt_pickle)
+  /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/cmake/modules/zephyr_default.cmake:119 (dts_init)
+  /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/cmake/modules/zephyr_default.cmake:119 (cmake_language)
+  /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:57 (include)
+  /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:88 (include_boilerplate)
+  CMakeLists.txt:5 (find_package)
+
+
+-- Configuring incomplete, errors occurred!
+CMake Error at cmake/modules/sysbuild_extensions.cmake:728 (message):
+  CMake configure failed for Zephyr project: app
+
+  Location:
+  /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/apps/c7a11154f9afed3c/app
+Call Stack (most recent call first):
+  cmake/modules/sysbuild_images.cmake:43 (ExternalZephyrProject_Cmake)
+  cmake/modules/sysbuild_default.cmake:21 (include)
+  /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:66 (include)
+  /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:83 (include_boilerplate)
+  /home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/share/sysbuild-package/cmake/SysbuildConfig.cmake:8 (include)
+  template/CMakeLists.txt:10 (find_package)
+
+
+-- Configuring incomplete, errors occurred!
+FATAL ERROR: command exited with status 1: /usr/bin/cmake -DWEST_PYTHON=/home/user/code/zmig/.venv/bin/python -DWEST_TOPDIR=/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292 -DWEST_VERSION=1.5.0 -B/home/user/.cache/zmig/builds/c8080986dc225627 -GNinja '-DWEST_PYTHON_PROPERTIES="Python;3;14;4;64;;cpython-314-x86_64-linux-gnu.so;abi3;/usr/lib/python3.14;/home/user/code/zmig/.venv/lib/python3.14;/home/user/code/zmig/.venv/lib/python3.14/site-packages;/home/user/code/zmig/.venv/lib/python3.14/site-packages"' -DBOARD=nucleo_h563zi/stm32h563xx -DPython3_EXECUTABLE=/home/user/code/zmig/.venv/bin/python -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCONFIG_BUILD_OUTPUT_META=y -DZephyr_DIR=/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/share/zephyr-package/cmake -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF -DZENV_PRESET_NAME=default -DZENV_BUILD_TYPE=release '-DCONF_FILE=/home/user/.cache/zmig/dogfood/d6/x/pre/OpenDeck/app/common.conf;/home/user/.cache/zmig/dogfood/d6/x/pre/OpenDeck/app/release.conf' -DZEPHYR_EXTRA_MODULES=/home/user/.cache/zmig/dogfood/d6/x/pre/modules/zlibs '-DZEPHYR_MODULES=/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/modules/hal/cmsis_6;/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/modules/hal/stm32;/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/modules/crypto/mbedtls;/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/bootloader/mcuboot;/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/modules/crypto/tf-psa-crypto' -S/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292/zephyr/share/sysbuild
+
+$ cmake -DCONFIG_BUILD_OUTPUT_META=y /home/user/.cache/zmig/builds/c8080986dc225627/mcuboot
