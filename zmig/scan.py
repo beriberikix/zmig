@@ -9,6 +9,7 @@ present on both sides (app, MCUboot, ...). Analyzers that look at the build as a
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field, replace
 from functools import cached_property
@@ -29,6 +30,7 @@ from zmig.snapshots import (
     edt,
     kconfig_symbols,
 )
+from zmig.tiers import BuildUse
 from zmig.tools import Runner
 from zmig.usage import ProjectUsage
 from zmig.usage import scan as usage_scan
@@ -156,6 +158,30 @@ class ScanContext:
             return None
         roots = project_roots(self.old, self.old_img.dir)
         return {rel for files in deps.values() for f in files if (rel := project_path(f, roots))}
+
+    @cached_property
+    def build_use(self) -> BuildUse:
+        """Which project files this image's source build used, for tiers (zmig.tiers):
+        compiled sources and headers (`build_files`), overlays and Kconfig fragments the
+        configure applied. Paths as evidence shows them."""
+        app = self.old.spec.app.resolve()
+        builds = [b for b in (self.old, self.new_raw, self.new) if b is not None]
+
+        def rel(paths: list[Path]) -> frozenset[str]:
+            return frozenset(os.path.relpath(p, app).replace(os.sep, "/") for p in paths)
+
+        overlays = [
+            real
+            for o in self.old_facts.overlays
+            if (real := from_copy(Path(o).resolve(), app, builds) or Path(o)).is_file()
+        ]
+        conf = self.config_files
+        files = self.build_files
+        return BuildUse(
+            sources=frozenset(files) if files is not None else None,
+            overlays=rel(overlays) if self.old_facts.overlays else None,
+            configs=rel(conf) if conf is not None else None,
+        )
 
     @property
     def app_usage(self) -> ProjectUsage:

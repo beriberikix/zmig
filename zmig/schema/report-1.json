@@ -445,6 +445,14 @@
               ]
             }
           }
+        },
+        "tier": {
+          "enum": [
+            "act-now",
+            "review",
+            "fyi"
+          ],
+          "description": "Presentation tier (zmig.tiers); additive, not used for the verdict, exit codes or fingerprints."
         }
       }
     },

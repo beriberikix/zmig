@@ -157,6 +157,9 @@ class Finding:
     # Hazard findings only: what resolves it, and where the evidence and role came from.
     remedy: Remedy | None = None
     provenance: JSON | None = None
+    # Presentation tier (zmig.tiers): act-now / review / fyi. Additive; nothing reads it
+    # to decide anything.
+    tier: str | None = None
 
     @property
     def id(self) -> str:
@@ -190,6 +193,7 @@ class Finding:
             "introduced_by_migration": self.introduced_by_migration,
             **({"remedy": str(self.remedy)} if self.remedy else {}),
             **({"provenance": self.provenance} if self.provenance else {}),
+            **({"tier": self.tier} if self.tier else {}),
         }
 
 

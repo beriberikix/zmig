@@ -157,6 +157,30 @@ def _categories(findings: list[Finding], level: str) -> list[str]:
     return out
 
 
+_TIER_TITLES = {
+    "act-now": "Act now: breaking, high confidence, at a project file:line the build used",
+    "review": "Review: other breaking findings, and risky ones at a file:line the build used",
+    "fyi": "FYI: everything else (still listed in full below)",
+}
+
+
+def _tiers(report: Report) -> list[str]:
+    """Every finding grouped by tier (zmig.tiers). A grouping only: each finding is listed
+    once, in its usual order, and all of them stay in the sections below."""
+    tiered = [f for f in report.sorted_findings() if f.tier]
+    if not tiered:
+        return []
+    out = ["## By tier", ""]
+    for t in ("act-now", "review", "fyi"):
+        fs = [f for f in tiered if f.tier == t]
+        out += [f"### {_TIER_TITLES[t]} ({len(fs)})", ""]
+        for f in fs:
+            where = f"[{f.image}] " if f.image else ""
+            out.append(f"- **{f.severity}** / {f.confidence}: {where}{f.title} (`{f.id}`)")
+        out.append("")
+    return out
+
+
 def _image_roles(report: Report) -> dict[str, str]:
     roles: dict[str, str] = {}
     for c in report.contexts:
@@ -195,6 +219,7 @@ def render_markdown(report: Report) -> str:
             where = f"[{f.image}] " if f.image else ""
             out.append(f"{i}. **{f.severity}**: {where}{f.title} (`{f.id}`)")
         out.append("")
+        out += _tiers(report)
         groups: dict[str | None, list[Finding]] = {}
         for f in introduced:
             groups.setdefault(f.image, []).append(f)

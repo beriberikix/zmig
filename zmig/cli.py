@@ -20,6 +20,7 @@ from zmig.buildctx import (
     build,
     build_with_salvage,
     hash_tree,
+    pair_images,
     sdk_identity,
 )
 from zmig.cache import Cache, default_cache_root
@@ -32,6 +33,7 @@ from zmig.plan import PlanContext
 from zmig.refs import ResolvedRef, resolve_ref
 from zmig.report import render
 from zmig.scan import ScanContext
+from zmig.tiers import assign as assign_tiers
 from zmig.tools import (
     Runner,
     check_mcuboot_python,
@@ -505,6 +507,13 @@ def scan_report(
     report.findings, report.analyzers, report.not_checked = analyzers.run_build_analyzers(
         selected, ctx
     )
+    # Presentation tiers (additive; zmig.tiers): each image's build use, from its own records.
+    uses = {
+        (None if pc.is_app else pc.image): pc.build_use
+        for o, n in pair_images(ctx.old, ctx.new)
+        if (pc := ScanContext.for_pair(ctx, o, n))
+    }
+    report.findings = assign_tiers(report.findings, uses)
     # Tool versions analyzers recorded (the libclang the API diff used).
     report.environment.update(ctx.shared.get("environment", {}))
     report.checked = list(ctx.shared.get("checked", []))
