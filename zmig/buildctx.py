@@ -323,6 +323,17 @@ def project_roots(b: BuildContext, img_dir: Path) -> dict[str, str]:
     the app ("") and every module outside zmig's workspace, i.e. the project's own modules
     passed with ZEPHYR_EXTRA_MODULES ("<module name>/")."""
     roots = {str(b.src): ""}
+    # The build key hashes the app's content, not its directory name, so a cached build
+    # may have been configured from another copy of the same tree (apps/<hash>/<name>):
+    # its ninja records and messages name that copy (regression: tests/fixtures/app and a
+    # copy named fixture-app; every source then looked uncompiled).
+    cache = img_dir / "CMakeCache.txt"
+    if cache.is_file() and (
+        m := re.search(r"^APPLICATION_SOURCE_DIR:PATH=(.+)$", cache.read_text(), re.M)
+    ):
+        built_from = Path(m[1].strip())
+        if built_from != b.src and built_from.parent == b.src.parent:
+            roots[str(built_from)] = ""
     modules = img_dir / Artifact.MODULES.value
     if modules.is_file():
         for ln in modules.read_text().splitlines():

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from zmig.analyzers.kconfig import norm_value, rename_candidates
 from zmig.boards import map_board
 from zmig.buildctx import SALVAGE_TAG, _apply_edits, locate_salvage_edits
@@ -119,3 +121,62 @@ def test_header_changed_needs_api_coverage_to_be_demoted() -> None:
     assert not api_covers({"src/main.c"}, None, set())  # API analyzer didn't run
     assert not api_covers({"src/main.c"}, {"tus": 1, "not_interpreted": 0}, set())  # old record
     assert not api_covers(set(), cov, set())
+
+
+def _copies(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Two copies of one app tree in a zmig workspace (apps/<tree hash>/<basename>), and
+    a build directory configured from the first one."""
+    ws = tmp_path / "ws"
+    first, second = (
+        ws / "apps" / "81bec4faf9ea0405" / "app",
+        ws / "apps" / "81bec4faf9ea0405" / "fixture-app",
+    )
+    build = tmp_path / "build"
+    build.mkdir()
+    (build / "CMakeCache.txt").write_text(f"APPLICATION_SOURCE_DIR:PATH={first}\n")
+    return first, second, build
+
+
+def test_project_roots_follow_the_copy_a_cached_build_was_configured_from(tmp_path: Path) -> None:
+    """The build key hashes the app's content, not its directory name, so tests/fixtures/app
+    and a copy named fixture-app share one build whose ninja records name .../app/src/main.c
+    (found while verifying AUDIT.md F7: every source then looked uncompiled)."""
+    from types import SimpleNamespace
+
+    from zmig.buildctx import project_path, project_roots
+
+    first, second, build = _copies(tmp_path)
+    b = SimpleNamespace(src=second, workspace=SimpleNamespace(root=tmp_path / "ws"))
+    roots = project_roots(b, build)  # type: ignore[arg-type]
+    assert project_path(f"{first}/src/main.c", roots) == "src/main.c"
+    assert project_path(f"{second}/src/main.c", roots) == "src/main.c"
+
+    # A sysbuild image configured from another app (MCUboot) is not an alias of this one.
+    (build / "CMakeCache.txt").write_text(
+        f"APPLICATION_SOURCE_DIR:PATH={tmp_path}/ws/bootloader/mcuboot/boot/zephyr\n"
+    )
+    roots = project_roots(b, build)  # type: ignore[arg-type]
+    assert project_path(f"{tmp_path}/ws/bootloader/mcuboot/boot/zephyr/main.c", roots) is None
+
+
+def test_build_files_unknown_when_no_record_maps_to_the_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An app always compiles a file of its own: ninja records that map to none mean the
+    mapping failed, not that nothing was compiled."""
+    from types import SimpleNamespace
+
+    from zmig import scan
+
+    first, second, build = _copies(tmp_path)
+    (build / "CMakeCache.txt").write_text("")  # no recorded source dir to follow
+    deps = {"CMakeFiles/app.dir/src/main.c.obj": [f"{first}/src/main.c", "/z/include/k.h"]}
+    monkeypatch.setattr(scan, "build_dependencies", lambda img, runner: deps)
+    fake = SimpleNamespace(
+        old=SimpleNamespace(src=second, workspace=SimpleNamespace(root=tmp_path / "ws")),
+        old_img=SimpleNamespace(dir=build),
+        runner=None,
+    )
+    assert scan.ScanContext.build_files.func(fake) is None  # type: ignore[attr-defined]
+    deps["CMakeFiles/app.dir/src/main.c.obj"].append(f"{second}/src/main.c")
+    assert scan.ScanContext.build_files.func(fake) == {"src/main.c"}  # type: ignore[attr-defined]

@@ -157,7 +157,10 @@ class ScanContext:
         if deps is None:
             return None
         roots = project_roots(self.old, self.old_img.dir)
-        return {rel for files in deps.values() for f in files if (rel := project_path(f, roots))}
+        files = {rel for fs in deps.values() for f in fs if (rel := project_path(f, roots))}
+        # An app always compiles a file of its own; none mapping means the paths didn't
+        # (unknown), not that nothing was compiled.
+        return files or None
 
     @cached_property
     def build_use(self) -> BuildUse:
