@@ -30,6 +30,7 @@ from zmig.findings import (
 from zmig.scan import ScanContext
 from zmig.size import footprint
 from zmig.snapshots import kconfig_symbols
+from zmig.tools import find_tool
 
 MAX_ERRORS = 5
 TOP_SYMBOLS = 10
@@ -89,6 +90,47 @@ def configure_error(log: str) -> tuple[str | None, list[str]] | None:
                 block.append(nxt.strip())
             return image, block
     return None
+
+
+_AT_LINE = re.compile(r"(/[^\s:]+):(\d+)(?::\d+)?:")
+_DT_UNDEFINED_LABEL = re.compile(r"devicetree error: (\S+): undefined node label '([^']+)'")
+_DTC_ANNOTATION = re.compile(r"/\* (\S+?):(\d+):\d+-\S* \*/")
+
+
+def configure_locations(
+    lines: list[str], img_dir: Path, roots: dict[str, str], runner: Any
+) -> list[tuple[str, int, str]]:
+    """The project's own file and line behind a configure error, from the tools' own
+    output, never by searching the sources:
+    - errors that carry "<file>:<line>:" (Kconfig, CMake, conf warnings);
+    - devicetree "undefined node label" errors, which name only the node: the devicetree
+      compiler, run with source annotations (`dtc -T -T`) on the image's preprocessed
+      zephyr.dts.pre, names the file and line of the property that references the label
+      (regression: OpenDeck's firmware.overlay:20, DOGFOOD-5 D1)."""
+    out: list[tuple[str, int, str]] = []
+    for ln in lines:
+        for m in _AT_LINE.finditer(ln):
+            if (own := project_path(m[1], roots)) is not None:
+                out.append((own, int(m[2]), ln.strip()[:200]))
+    dt = next((d for ln in lines if (d := _DT_UNDEFINED_LABEL.search(ln))), None)
+    pre = img_dir / "zephyr" / "zephyr.dts.pre"
+    if dt is not None and pre.is_file():
+        label = re.compile(rf"&{re.escape(dt[2])}\b")
+        proc = runner.run(
+            [find_tool("dtc"), "-f", "-q", "-T", "-T", "-I", "dts", "-O", "dts", str(pre)],
+            check=False,
+        )
+        for line in proc.stdout.splitlines():
+            a = _DTC_ANNOTATION.search(line) if label.search(line) else None
+            own = project_path(a[1], roots) if a else None
+            if a and own is not None:
+                prop = line.strip().split(" = ", 1)[0]
+                out.append((own, int(a[2]), f"{prop} references undefined label '{dt[2]}'"))
+    unique: list[tuple[str, int, str]] = []
+    for x in out:
+        if all((x[0], x[1]) != (y[0], y[1]) for y in unique):
+            unique.append(x)
+    return unique
 
 
 def build_errors(log: str) -> list[BuildError]:
@@ -189,20 +231,34 @@ class BuildlogAnalyzer:
             first = configure_error(log)
             cause = ""
             ev_first: tuple[JSON, ...] = ()
+            locs: list[tuple[str, int, str]] = []
             if first is not None:
                 image, lines = first
                 where = f"{image} image: " if image else ""
                 cause = f": {where}{ctx.runner.redact(lines[0])[:160]}"
+                img_dir = ctx.new_img.dir
+                if image and (ctx.new_img.dir.parent / image).is_dir():
+                    img_dir = ctx.new_img.dir.parent / image
+                locs = configure_locations(
+                    lines, img_dir, project_roots(ctx.new, img_dir), ctx.runner
+                )
                 ev_first = (
+                    *(file_line(p, ln, ctx.runner.redact(text)) for p, ln, text in locs),
                     tool_output("first configure error", ctx.runner.redact("\n".join(lines))),
                 )
+            at = f"{locs[0][0]}:{locs[0][1]}" if locs else ""
             add(
                 "target-configure-failed",
                 ctx.new_spec,
                 f"The target configure fails{salvaged}{cause}",
                 Severity.BREAKING,
-                "Fix the error in the evidence (often a board or toolchain change), then "
-                "rerun; Kconfig and devicetree analysis need a configured target.",
+                (
+                    f"Fix {at} (see the first configure error), then rerun; "
+                    if at
+                    else "Fix the error in the evidence (often a board or toolchain change), then "
+                    "rerun; "
+                )
+                + "Kconfig and devicetree analysis need a configured target.",
                 (*ev_first, tool_output("target configure", ctx.runner.redact("\n".join(tail)))),
             )
             return AnalyzerResult(findings)

@@ -153,3 +153,39 @@ def test_mostly_uninterpreted_api_means_partial_and_low_confidence() -> None:
     assert any("49 of 51 project TU(s) of app not interpreted" in b for b in up2["basis"])
     up3 = upgrade_path({"api_coverage": {"app": {"tus": 51, "not_interpreted": 2}}}, [], [])
     assert not any("not interpreted" in b for b in up3["basis"])
+
+
+WS = "/home/user/.cache/zmig/workspaces/ace4550095c1f4a6e135cd20c320392dd8468292"
+
+
+def test_configure_errors_cite_the_users_source_line() -> None:
+    """D1: 'undefined node label' names only the node; the devicetree compiler's own
+    annotated output (dtc -T -T on the image's zephyr.dts.pre) names the overlay line.
+    Post-baseline fix; D1 is no longer a clean measurement."""
+    import shutil
+
+    from zmig.analyzers.buildlog import configure_error, configure_locations
+    from zmig.tools import Runner
+
+    if shutil.which("dtc") is None:
+        pytest.skip("dtc isn't installed")
+    _image, lines = configure_error((FIX / "target-configure.log").read_text()) or (None, [])
+    roots = {f"{WS}/apps/c7a11154f9afed3c/app": ""}
+    assert configure_locations(lines, FIX / "app-image", roots, Runner()) == [
+        (
+            "boards/zephyr/nucleo_h563zi_stm32h563xx/firmware.overlay",
+            20,
+            "pinctrl-0 references undefined label 'eth_rxd0_pc4'",
+        )
+    ]
+
+
+def test_kconfig_errors_cite_the_users_kconfig_line(tmp_path: Path) -> None:
+    """The post-tree's failed Kconfig function (from the patch that no longer applies)."""
+    from zmig.analyzers.buildlog import configure_locations
+    from zmig.tools import Runner
+
+    line = (FIX / "post-tree-kconfig-error.txt").read_text().strip()
+    roots = {f"{WS}/apps/8d595cbbe33f9378/app": ""}
+    locs = configure_locations([line], tmp_path, roots, Runner())
+    assert [(p, ln) for p, ln, _ in locs] == [("firmware/Kconfig", 185)]
