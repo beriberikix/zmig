@@ -22,6 +22,7 @@ reported at the project's lines. Parse gaps are "not interpreted", never clean.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any, ClassVar, Literal
@@ -50,6 +51,8 @@ from zmig.findings import (
 )
 from zmig.scan import ScanContext
 from zmig.snapshots import build_dependencies
+
+log = logging.getLogger("zmig")
 
 _EXPECTED = re.compile(r"(?:assigning to|initializing|passing|returning) '([^']+)'")
 SYSCALLS_JSON = "zephyr/misc/generated/syscalls.json"
@@ -158,14 +161,17 @@ class ApiAnalyzer:
         not_checked += gaps
         errs = [sum(1 for t in tus if t["errors"]) for tus in (src, tgt)]
         stats = parse_stats(ctx.shared, ctx.image)
+        log.info(
+            "api@%s: %d TU parse(s), %d from the parse cache",
+            ctx.image,
+            stats.get("parsed", 0),
+            stats.get("cached", 0),
+        )
         checked.append(
             Checked(
                 "libclang parse coverage",
                 "partial" if gaps else "clean",
-                f"{version}: {len(src)} project TU(s) with the source flags ({errs[0]} with "
-                f"errors), {len(tgt)} with the target flags ({errs[1]} with errors); "
-                f"{stats.get('parsed', 0)} parsed, {stats.get('cached', 0)} from the parse "
-                f"cache, {stats.get('unchanged', 0)} TU(s) skipped (no included file changed)",
+                coverage_detail(version, (len(src), errs[0]), (len(tgt), errs[1]), stats),
                 self.name,
             )
         )
@@ -848,6 +854,20 @@ class ApiAnalyzer:
                 "APPLICATION_DEFINED_SYSCALL": has_kconfig,
             },
         )
+
+
+def coverage_detail(
+    version: str, src: tuple[int, int], tgt: tuple[int, int], stats: dict[str, int]
+) -> str:
+    """The parse-coverage record: (TUs, with errors) per side. Parses served from zmig's
+    parse cache count as parsed, so a warm cache doesn't change report.json (docs/DESIGN.md
+    §3); the split is logged."""
+    parsed = stats.get("parsed", 0) + stats.get("cached", 0)
+    return (
+        f"{version}: {src[0]} project TU(s) with the source flags ({src[1]} with errors), "
+        f"{tgt[0]} with the target flags ({tgt[1]} with errors); {parsed} parsed, "
+        f"{stats.get('unchanged', 0)} TU(s) skipped (no included file changed)"
+    )
 
 
 def record_parse_stats(shared: dict[str, Any], image: str, stats: dict[str, int]) -> None:

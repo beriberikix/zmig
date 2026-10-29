@@ -399,3 +399,16 @@ def test_parse_cache_key_ignores_build_and_workspace_location(tmp_path: Path) ->
         _object_of({"file": "a.c", "command": "cc -o CMakeFiles/a.c.obj -c a.c"})
         == "CMakeFiles/a.c.obj"
     )
+
+
+def test_parse_coverage_detail_is_the_same_on_a_warm_cache() -> None:
+    """report.json is byte-stable whether or not the cache was warm (docs/DESIGN.md §3):
+    "2 parsed, 0 from the parse cache" on a cold run vs "0 parsed, 2 from the parse
+    cache" on the next failed test_deterministic once a build-key change made the
+    fixture's builds cold."""
+    from zmig.analyzers.api import coverage_detail
+
+    cold = coverage_detail("clang 18", (1, 0), (1, 0), {"parsed": 2, "cached": 0, "unchanged": 0})
+    warm = coverage_detail("clang 18", (1, 0), (1, 0), {"parsed": 0, "cached": 2, "unchanged": 0})
+    assert cold == warm
+    assert "2 parsed" in cold and "1 project TU(s) with the source flags (0 with errors)" in cold
