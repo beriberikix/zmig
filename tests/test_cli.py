@@ -59,3 +59,26 @@ def test_unknown_analyzer(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
         ]
     )
     assert rc == 1 and "unknown analyzer" in capsys.readouterr().err
+
+
+def test_readme_lists_no_shipped_subcommand_as_unimplemented() -> None:
+    """README's "Not implemented yet" line went stale once watch, API diffing and the
+    MCUboot checks shipped (AUDIT.md F15). A subcommand is unimplemented only if its own
+    help says so."""
+    import argparse
+    import re
+
+    from zmig.cli import build_parser
+
+    sub = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
+    helps = {a.dest: a.help or "" for a in sub._choices_actions}
+    readme = (Path(__file__).parent.parent / "README.md").read_text()
+    m = re.search(r"^Not implemented yet.*?(?:\n\n|\Z)", readme, re.M | re.S)
+    assert m, "README lost its 'Not implemented yet' paragraph"
+    listed = set(re.findall(r"`(\w+)`", m[0]))
+    shipped = {c for c, h in helps.items() if "not in the MVP" not in h}
+    assert not listed & shipped, (
+        f"README calls shipped subcommands unimplemented: {listed & shipped}"
+    )
+    for feature in ("API/ABI diffing", "MCUboot"):
+        assert feature not in m[0]

@@ -216,5 +216,5 @@ zmig itself unsets it for builds.
 Design, findings schema and analyzer interface: [docs/DESIGN.md](docs/DESIGN.md).
 Analyzers are plugins: register a class under the `zmig.analyzers` entry-point group.
 
-Not implemented yet (extension points exist): `fix` (codemods), `verify`, `watch` (CI),
-API/ABI diffing, MCUboot/flash-layout checks, security advisories.
+Not implemented yet (extension points exist): `verify`, codemods for C sources (the fix
+command renames Kconfig assignments only), security advisories.
