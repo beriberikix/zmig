@@ -25,6 +25,7 @@ from zmig.findings import (
     Category,
     Confidence,
     Finding,
+    NotChecked,
     Severity,
     doc_entry,
     file_line,
@@ -67,6 +68,29 @@ class GuideAnalyzer:
     per_image: ClassVar[bool] = False  # matches the whole app against the guides
     kind: ClassVar[Literal["build"]] = "build"
     requires: ClassVar[frozenset[Artifact]] = frozenset()
+
+    @staticmethod
+    def guide_gaps(versions: list[str], docs: list[Document]) -> list[NotChecked]:
+        """A "not checked" for every crossed release with no migration guide. Zephyr has
+        doc/releases/migration-guide-X.Y.rst only from 3.5 on; before that, a crossing read
+        at most the release notes' Removed/Deprecated sections (AUDIT.md F4: a 2.7 -> 3.7 scan
+        read no guide for 3.0-3.4 and reported ok)."""
+        guides = {d.version for d in docs if d.kind == "guide"}
+        notes = {d.version for d in docs if d.kind == "notes"}
+        return [
+            NotChecked(
+                f"{v} migration guide",
+                f"no doc/releases/migration-guide-{v}.rst at {v} or the target; "
+                + (
+                    "only its release notes' Removed/Deprecated sections were read"
+                    if v in notes
+                    else "and no release notes either: nothing about this release was read"
+                ),
+                "guide",
+            )
+            for v in versions
+            if v not in guides
+        ]
 
     def analyze(self, ctx: ScanContext) -> AnalyzerResult:
         u = ctx.app_usage
@@ -240,7 +264,15 @@ class GuideAnalyzer:
                 },
             )
         )
-        return AnalyzerResult(findings)
+        gaps = self.guide_gaps(ctx.crossed_versions, docs)
+        return AnalyzerResult(
+            findings,
+            status="partial" if gaps else "ok",
+            reason=f"no migration guide for {', '.join(g.area.split()[0] for g in gaps)}"
+            if gaps
+            else None,
+            not_checked=gaps,
+        )
 
     def _finding(
         self,

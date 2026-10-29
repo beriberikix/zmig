@@ -132,3 +132,22 @@ def test_release_notes_section_filter() -> None:
     )
     es = parse(notes, "rn", "9.9", "RN", re.compile(r"^(removed|deprecated)\b", re.I))
     assert [m.value for e in es for m in e.mentions] == ["old_api"]
+
+
+def test_crossed_releases_without_a_migration_guide_are_not_checked() -> None:
+    """AUDIT.md F4: Zephyr has doc/releases/migration-guide-X.Y.rst only from 3.5 on, so a
+    2.7 -> 3.7 scan read no guide for 3.0-3.4 and still reported the guide analyzer ok."""
+    from zmig.analyzers.guide import GuideAnalyzer
+    from zmig.guides import Document
+
+    def doc(v: str, kind: str) -> Document:
+        name = "migration-guide" if kind == "guide" else "release-notes"
+        return Document(f"doc/releases/{name}-{v}.rst", v, "v3.7.0", "", kind)  # type: ignore[arg-type]
+
+    docs = [doc("3.4", "notes"), doc("3.5", "guide"), doc("3.5", "notes"), doc("3.6", "guide")]
+    gaps = GuideAnalyzer.guide_gaps(["3.3", "3.4", "3.5", "3.6"], docs)
+    assert [g.area for g in gaps] == ["3.3 migration guide", "3.4 migration guide"]
+    assert "no release notes either" in gaps[0].reason
+    assert "only its release notes' Removed/Deprecated sections" in gaps[1].reason
+    assert all(g.analyzer == "guide" for g in gaps)
+    assert GuideAnalyzer.guide_gaps(["3.5", "3.6"], docs) == []
