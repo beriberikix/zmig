@@ -62,11 +62,11 @@ echo "remote $branch: ${remote_sha:-(none)}"
 echo "scanning $n commit(s): $what"
 echo
 
-if ! git rev-list --reverse "$range" | python3 -I - "$private" "$allow" <<'PY'
+scan_py=$(cat <<'PY'
 import re, subprocess, sys
 from collections import Counter
 
-private_file, allow_file = sys.argv[1], sys.argv[2]
+private_file, allow_file, rev_range, expected = sys.argv[1:5]
 
 def entries(path):
     out = []
@@ -131,7 +131,10 @@ def check(sha, where, text):
         for m in rx.finditer(text):
             hits.append((f"private:{kind}", sha, where, m[0]))
 
-for sha in sys.stdin.read().split():
+shas = git("rev-list", "--reverse", rev_range).split()
+if len(shas) != int(expected):
+    sys.exit(f"error: scanned {len(shas)} commits, expected {expected}")
+for sha in shas:
     short = sha[:7]
     meta = git("log", "-1", "--format=%an <%ae>%n%cn <%ce>%n%B", sha)
     check(short, "commit metadata/message", meta)
@@ -153,6 +156,7 @@ for sha in sys.stdin.read().split():
 
 kinds = ["secret", "email", "home-path", "internal-url", "private:name", "private:url", "private:path"]
 counts = Counter(h[0] for h in hits)
+print(f"scanned {len(shas)} commit(s)\n")
 print("Check          Hits")
 for k in kinds + sorted(set(counts) - set(kinds)):
     print(f"{k:<14} {counts.get(k, 0)}")
@@ -172,7 +176,8 @@ if hits:
     sys.exit(1)
 print("\nclean")
 PY
-then
+)
+if ! python3 -I -c "$scan_py" "$private" "$allow" "$range" "$n"; then
   echo
   echo "Not pushing: the scan found the hits above." >&2
   exit 1
