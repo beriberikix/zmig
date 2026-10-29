@@ -356,16 +356,31 @@ class ForksAnalyzer:
                 tuple(ev),
                 new,
             )
-        if c.overlap:
+        if c.overlap_near:
+            new["overlap_near"] = list(c.overlap_near)
             return _finding(
                 scope,
                 "applies-cleanly",
                 subject,
-                f"{label} {short} applies cleanly but touches files upstream changed",
+                f"{label} {short} applies cleanly, but upstream changed lines next to it",
                 Severity.RISKY,
                 Confidence.HIGH,
-                f"Applies without conflicts; review it against upstream changes to "
-                f"{_files_note(c.overlap)}.",
+                f"Applies without conflicts; review it against the upstream changes next to "
+                f"its lines in {_files_note(c.overlap_near)}.",
+                tuple(ev),
+                new,
+            )
+        if c.overlap:
+            # Upstream changed the same files, but nowhere near the commit's lines.
+            return _finding(
+                scope,
+                "applies-cleanly",
+                subject,
+                f"{label} {short} applies cleanly; upstream changed other parts of "
+                f"{_files_note(c.overlap)}",
+                Severity.INFO,
+                Confidence.HIGH,
+                "Nothing to do unless the commit depends on code elsewhere in those files.",
                 tuple(ev),
                 new,
             )

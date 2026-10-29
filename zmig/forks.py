@@ -14,7 +14,8 @@ Classification of each local, non-merge commit, first match wins:
               conflict_files if keeping them would conflict
   applies     merges cleanly onto target plus the previously applied local commits
   conflicts   merge-tree reports conflicted paths
-Independently, `overlap` lists files the commit touches that upstream also changed.
+Independently, `overlap` lists files the commit touches that upstream also changed, and
+`overlap_near` those where upstream changed lines within NEAR_LINES of the commit's own.
 
 How a commit "applies" depends on how the project applies its patches (`methods`):
   3way       `git merge-tree` with the commit's parent as base, i.e. a cherry-pick /
@@ -101,6 +102,7 @@ class CommitResult:
     signals: Literal["agree", "disagree"] | None = None
     methods: tuple[MethodResult, ...] = ()
     absorbed: bool = False
+    overlap_near: tuple[str, ...] = ()
 
     @property
     def disagreement(self) -> bool:
@@ -186,6 +188,7 @@ def classify(
 
     results: list[CommitResult] = []
     chains = {m: target for m in methods}  # each method's replay chain
+    upstream_ranges: dict[str, list[tuple[int, int]]] = {}
     for c in local:
         subject = git.out("log", "-1", "--format=%s", c).strip()
         files = tuple(
@@ -194,6 +197,7 @@ def classify(
         pid_out = git.out("patch-id", "--stable", input=git.out("show", "--format=commit %H", c))
         pid = pid_out.split()[0] if pid_out.strip() else ""
         overlap = tuple(sorted(set(files) & upstream_changed))
+        overlap_near = tuple(f for f in overlap if _near(git, c, mb, target, f, upstream_ranges))
         overlap_commits: tuple[tuple[str, str], ...] = ()
         if overlap:
             lines = git.out(
@@ -213,6 +217,7 @@ def classify(
             patch_id=pid,
             state="applies",
             overlap=overlap,
+            overlap_near=overlap_near,
             overlap_commits=overlap_commits,
             unpushed=c in unpushed,
         )
@@ -286,6 +291,34 @@ def classify(
         else:
             results.append(replace(res, state="conflicts", conflict_files=conflicted))
     return ForkResult(head, base, target, mb, tuple(results), merges)
+
+
+# A patch whose file upstream changed only far from the patch's own lines still applies the
+# same way; only changes this close (git's default diff context) can change what it means
+# (regression: 7 OpenDeck patches flagged risky for changes 5-176 lines away, DOGFOOD-5).
+NEAR_LINES = 3
+_HUNK_OLD = re.compile(r"^@@ -(\d+)(?:,(\d+))?", re.M)
+
+
+def _old_ranges(diff: str) -> list[tuple[int, int]]:
+    out = []
+    for m in _HUNK_OLD.finditer(diff):
+        start, n = int(m[1]), int(m[2]) if m[2] is not None else 1
+        out.append((start, start + max(n, 1) - 1))
+    return out
+
+
+def _near(
+    git: _Git, c: str, mb: str, target: str, path: str, cache: dict[str, list[tuple[int, int]]]
+) -> bool:
+    """Upstream changed `path` within NEAR_LINES of the lines `c` changes (both in the merge
+    base's line numbers, approximately: `c`'s parent may carry earlier local commits)."""
+    if path not in cache:
+        cache[path] = _old_ranges(git.out("diff", "-U0", "--no-color", mb, target, "--", path))
+    mine = _old_ranges(git.out("diff", "-U0", "--no-color", f"{c}^", c, "--", path))
+    if not mine or not cache[path]:
+        return bool(cache[path]) and not mine  # a new file upstream also adds: near
+    return any(max(a, x) - min(b, y) <= NEAR_LINES for a, b in mine for x, y in cache[path])
 
 
 def _telling(text: str) -> bool:

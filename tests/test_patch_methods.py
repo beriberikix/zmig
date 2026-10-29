@@ -137,3 +137,57 @@ def test_findings_name_the_patch_file_and_the_failing_hunk(
     )
     assert g.kind == "upstreamed" and "upstream already absorbed the change" in g.action
     assert "Drop the project's patch p/esp32_eth_pass_multicast_frames.patch" in g.action
+
+
+NEAR = (
+    "esp32s3_reset_with_watchdog_after_flash.patch",
+    "usb_midi2_01_configurable_buffer_size.patch",
+)
+
+
+@pytest.fixture(scope="module")
+def near_repo(tmp_path_factory: pytest.TempPathFactory) -> tuple[SimpleNamespace, str, str, str]:
+    w = tmp_path_factory.mktemp("near")
+    _git(w, "init", "-q", "-b", "main")
+    shutil.copytree(FIX / "base", w, dirs_exist_ok=True)
+    _git(w, "add", "-A")
+    _git(w, "commit", "-q", "-m", "upstream base 769c4f2")
+    base = _git(w, "rev-parse", "HEAD")
+    _git(w, "checkout", "-q", "-b", "fork")
+    for p in NEAR:
+        _git(w, "apply", str(FIX / "patches" / p))
+        _git(w, "add", "-A")
+        _git(w, "commit", "-q", "-m", p)
+    head = _git(w, "rev-parse", "HEAD")
+    _git(w, "checkout", "-q", "main")
+    shutil.copytree(FIX / "target", w, dirs_exist_ok=True)
+    _git(w, "add", "-A")
+    _git(w, "commit", "-q", "-m", "upstream target 70be2ff")
+    target = _git(w, "rev-parse", "HEAD")
+    _git(w, "branch", "-D", "fork")
+    _git(w, "update-ref", "refs/fork/head", head)
+    mirror = SimpleNamespace(path=w / ".git", git=shutil.which("git"), runner=Runner())
+    return mirror, head, base, target
+
+
+def test_overlap_is_risky_only_next_to_the_patch_lines(
+    near_repo: tuple[SimpleNamespace, str, str, str],
+) -> None:
+    """Post-baseline fix (DOGFOOD-5 plan precision): 7 OpenDeck patches that apply were
+    flagged risky because upstream changed the same files, 5-176 lines away. Only a change
+    within 3 lines (git's diff context) of the patch's own lines stays risky."""
+    from zmig.analyzers.forks import ForksAnalyzer
+    from zmig.findings import Severity
+
+    mirror, head, base, target = near_repo
+    res = _by_patch(classify(mirror, head, base, target).commits)  # type: ignore[arg-type]
+    midi = res["usb_midi2_01_configurable_buffer_size.patch"]
+    wdt = res["esp32s3_reset_with_watchdog_after_flash.patch"]
+    assert midi.state == wdt.state == "applies"
+    assert midi.overlap and midi.overlap_near == ()
+    assert wdt.overlap_near == ("boards/espressif/esp32s3_devkitc/board.cmake",)
+    fm = ForksAnalyzer._commit_finding(midi, "zephyr", ("s",))
+    fw = ForksAnalyzer._commit_finding(wdt, "zephyr", ("s",))
+    assert (fm.severity, fw.severity) == (Severity.INFO, Severity.RISKY)
+    assert "upstream changed other parts of" in fm.title
+    assert "upstream changed lines next to it" in fw.title

@@ -1,0 +1,10 @@
+diff --git a/boards/espressif/esp32s3_devkitc/board.cmake b/boards/espressif/esp32s3_devkitc/board.cmake
+index 2f04d1fe886..79d5110621e 100644
+--- a/boards/espressif/esp32s3_devkitc/board.cmake
++++ b/boards/espressif/esp32s3_devkitc/board.cmake
+@@ -6,4 +6,5 @@ endif()
+ find_program(OPENOCD openocd PATHS ${ESPRESSIF_TOOLCHAIN_PATH}/openocd-esp32/bin NO_DEFAULT_PATH)
+ 
+ include(${ZEPHYR_BASE}/boards/common/esp32.board.cmake)
++board_runner_args(esp32 --reset-type=watchdog-reset)
+ include(${ZEPHYR_BASE}/boards/common/openocd.board.cmake)
