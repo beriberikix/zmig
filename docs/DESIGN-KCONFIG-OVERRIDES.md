@@ -30,12 +30,16 @@ zmig already sees these from the target build's own Kconfig warning:
 |---|---|---|---|
 | `LV_Z_DPI` | 21 `Kconfig.defconfig` files | `f4fce9e1`: moved the defaults to LVGL's `LV_DPI_DEF` | no: LVGL's own Kconfig defines `LV_DPI_DEF`; nothing links the two symbols |
 | `SSD1306_REVERSE_MODE` | 22 `Kconfig.defconfig` files | `f4fce9e1`: replaced by the devicetree property `inversion-on` | no: the replacement isn't in Kconfig at all |
-| `BT_LL_SW_LLCP_IMPL` (a choice) | `app/Kconfig:175` | `a6c03994`: dropped the override | no: the choice was removed |
+| `BT_LL_SW_LLCP_IMPL` (a choice) | `app/Kconfig:175` | `a6c03994`: dropped the override | no. The target's warning, "`<choice BT_LL_SW_LLCP_IMPL>` (defined at …`app/Kconfig:175`) defined with type unknown", shows Zephyr no longer defines the choice. zmig's symbol dump has no choices, so this one wasn't checked against the source tree |
 | `LV_Z_MEM_POOL_MIN_SIZE`, `LV_Z_MEM_POOL_MAX_SIZE` | `src/display/Kconfig:32, 35` | `b2a0a357`: replaced both by `LV_Z_MEM_POOL_SIZE` | no Kconfig link; two values became one, so the meaning changed |
 
 `MAX17048` is also reported (`module/drivers/sensor/max17048/Kconfig:6`). It isn't a
 removed symbol but a name collision: Zephyr added a symbol with the app's name. It's out
 of this note's scope.
+
+Checked against the four builds' Kconfig symbol dumps: `LV_Z_DPI`, `SSD1306_REVERSE_MODE`
+and both `LV_Z_MEM_POOL_*` are in the source tree, aren't deprecated and select nothing,
+and have no Kconfig-level replacement in either target tree (`kconfig_replacements`).
 
 ## Could they ever be auto-fixed safely?
 
