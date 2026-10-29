@@ -107,6 +107,13 @@ Lenient recall can't move further without new pairs.
 
 ## Known limitations (all still open)
 
+- **Quickstart timing is unmeasured.** The first-run clone is about 1 GB. The time of a
+  scan after that (warm mirror) hasn't been measured on a clean cache. A run on
+  2026-10-29 was stopped on hotel wifi after 44 minutes: 224 MB of the mirror at about
+  50 KB/s, before any scan. The steps before the clone took 3 s, and `zmig doctor` passed.
+  `~/.cache/zmig/dogfood/d8/quickstart2.sh` reruns it from a clean cache and times three
+  scans: cold, warm mirror without builds, and fully warm.
+
 1. **A failed target configure blinds most analyzers** for that image. That's the common
    case in real upgrades: ZMK, OpenDeck, A1-native.
 2. **Missing-module inference is partial.** mbedtls's need for `tf-psa-crypto` isn't

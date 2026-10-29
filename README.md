@@ -15,8 +15,9 @@ copies of your app there.
 
 ## Quickstart
 
-**Time:** the first run clones a Zephyr mirror of about 1 GB into `~/.cache/zmig`, which
-takes about 20 minutes on a slow link. After that, a scan takes about 5 minutes.
+**Time:** the first run makes an about 1 GB mirror clone of Zephyr into `~/.cache/zmig`:
+roughly 20 minutes at 1 MB/s, hours on slow wifi. How long later runs take hasn't been
+measured yet (docs/EVALUATION.md).
 
 **Prerequisites:** Linux, Python 3.12+, git ≥ 2.38, CMake, Ninja, `dtc`, and a host GCC
 with 32-bit multilib (for `native_sim`; e.g. `apt install gcc-multilib`). Other boards
@@ -65,8 +66,8 @@ unrecorded changes; and a suggested upgrade path through LTS releases for large 
 zmig scan --app path/to/app --board native_sim_64 --from v3.6.0 --to v3.7.0 --out out/scan
 ```
 
-The first run clones Zephyr (~1 GB, about 20 minutes on a slow link) into `~/.cache/zmig`;
-later runs reuse it and every build. Add `--module <name>` for each west module your app needs, `--fast` for a
+The first run clones Zephyr (about 1 GB: roughly 20 minutes at 1 MB/s, hours on slow wifi)
+into `~/.cache/zmig`; later runs reuse it and every build. Add `--module <name>` for each west module your app needs, `--fast` for a
 configure-only comparison, and `--to-board` if you know the target board name.
 
 **3. Read the results**
