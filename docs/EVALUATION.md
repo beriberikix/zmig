@@ -29,6 +29,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | **smp_svr** (nrf52840dk, MCUboot, BLE DFU) | v4.2.2 → v4.3.0 | 1 field-upgrade hazard | **tuned** | caught after fixes | — | before the fixes, 4 spurious remedies and a spurious storage pin | — | ok | needs-changes (medium): MCUboot mode mismatch, remedy config-pin | DOGFOOD-1 §1, "Verdict honesty" |
 | **Golioth B** nucleo_h563zi | v4.1.0 → v4.2.0 | 2 | clean: DOGFOOD-2 baseline | 0 (0%) | 1 (50%) | 0/9 (0%) | — | ok | direct-ok (medium) | DOGFOOD-2-baseline §3–4 |
 | ″ | ″ | 2 | tuned (Step 2, P2) | 1 (50%) | 1 (50%) | 2/6 (33%) → 5/9 (56%) | 0 | ok | direct-ok (medium) | DOGFOOD-2 §3, DOGFOOD-3 §2–3 |
+| ″ | ″ | 2 | tuned (audit fixes, re-run at `aa95a10`) | 1 (50%) | 1 (50%) | **5/7 (71%)** | 0 | ok | direct-ok (medium) | DOGFOOD-6 |
 | Golioth B-rak | ″ | 3 | clean: DOGFOOD-3 baseline | 2 | 2 | 4/8 (50%) | 0 | ok | | DOGFOOD-3 §2–3 |
 | ″ | ″ | 3 | tuned (P2) | 2 | 2 | 8/13 (62%) | 0 | ok | | ″ |
 | Golioth B-esp | ″ | 2 | clean: DOGFOOD-3 baseline | 1 | 1 | 7/11 (64%) | 0 | ok | | ″ |
@@ -36,20 +37,25 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | Golioth B-native | ″ | 1 | clean: DOGFOOD-3 baseline | 0 | 0 | 2/5 (40%) | 0 | ok | | ″ |
 | **bms-firmware A1** bms_16s100_sc | v4.0 → v4.2 | 2 | clean: DOGFOOD-2 baseline | 0 (0%) | 1 (50%) | 1/6 (17%) | — | **build failed** (no cmsis_6) | unknown (medium) | DOGFOOD-2-baseline §5–6 |
 | ″ | ″ | 2 | tuned (Step 2 → P2; re-run 2026-10-29) | 0 → 1 | 1 | 1/2 (50%) → **1/9 (11%)** | 0 | ok after module recovery | unknown (medium) | DOGFOOD-2 §4, DOGFOOD-3 §2–3, DOGFOOD-5 §10 |
+| ″ | ″ | 2 | tuned (audit fixes, re-run at `aa95a10`) | 1 | 1 | **1/4 (25%)** | 0 | ok after module recovery | unknown (medium) | DOGFOOD-6 |
 | bms A1-native | ″ | 5 | clean: DOGFOOD-3 baseline (one caveat, §7.3) | 2 | 4 | 10/10 (100%) | 0 | configure-failed | | DOGFOOD-3 §2–3 |
 | ″ | ″ | 5 | tuned (P2) | 2 | 4 | 9/9 (100%) | 0 | | | ″ |
 | bms A1-oled | ″ | 3 | clean: DOGFOOD-3 baseline (same caveat) | 2 | 2 | 2/2 (100%) | 0 | build failed | | ″ |
 | ″ | ″ | 3 | tuned (P2) | 2 | 2 | 3/3 (100%) | 0 | | | ″ |
 | **CANnectivity C1** usb2canfdv1 | v1.1.0 → v1.2.0 (Zephyr v4.1.0 → v4.2-branch) | 3 | clean: DOGFOOD-4 baseline | 1 (33%) | 2 (67%) | 7/11 (64%) | 0 | build failed (link: `smf_set_handled`) | direct-ok (**low**) | DOGFOOD-4-baseline §2–3 |
 | ″ | ″ | 3 | tuned (M13–M15; definition sites) | 1 → **2** | 2 | 7/8 (88%) | 0 | ″ | ″ | DOGFOOD-4 §6, C2 correction |
+| ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | 7/8 (88%) | 0 | ″ | ″ | DOGFOOD-6 |
 | CANnectivity C2 candlelight | ″ | 3 | clean: DOGFOOD-4 baseline | 1 (33%) | 2 (67%) | 7/8 (88%) | 0 | build failed | direct-ok (low) | ″ |
 | ″ | ″ | 3 | tuned (definition sites) | **2** | 2 | 7/8 (88%) | 0 | ″ | ″ | `oracles/cannectivity-c2-correction-2026-10-28.md` |
+| ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | 7/8 (88%) | 0 | ″ | ″ | DOGFOOD-6 |
 | CANnectivity frdm_k64f | ″ | — | **not run** (the download was stopped) | | | | | | | ″ |
 | **OpenDeck** nucleo_h563zi, scan | bump `ab8f6af` (Zephyr `main` 4.4.99, both sides plus OpenDeck's patches) | 5 | clean: DOGFOOD-5 baseline | 0 (0%) | 2 (40%) | 11/22 (50%) | 0 | **configure failed** (devicetree label; a patch-supplied Kconfig function behind it) | needs-changes (low) | DOGFOOD-5-baseline §2–5 |
 | ″ | ″ | 5 | tuned (§10, §11) | 1 (20%) | 1 (20%) | 11/11 (100%) | 1/5 | ″ | ″ | DOGFOOD-5 §10–11 |
+| ″ | ″ | 5 | tuned (audit fixes, re-run at `aa95a10`) | 1 (20%) | 1 (20%) | 11/11 (100%) | 1/5 | ″ | ″ | DOGFOOD-6 |
 | **OpenDeck** plan (patch triage) | ″ | 9 | clean: DOGFOOD-5 baseline | 6 (67%) | 9 (100%) | 8/15 (53%) | 0 | — | — | DOGFOOD-5-baseline §4–5 |
 | ″ | ″ | 9 | tuned (§10, §11) | 9 (100%) | 9 (100%) | 8/9 (89%) | 8/9 | — | — | DOGFOOD-5 §10–11 |
 | ″ | ″ | 9 | tuned (§10, §11, §11.4 hunk window) | 9 (100%) | 9 (100%) | 8/8 (100%) | 8/9 | — | — | DOGFOOD-5 §11.4 |
+| ″ | ″ | 9 | tuned (audit fixes, re-run at `aa95a10`) | 9 (100%) | 9 (100%) | 8/8 (100%) | 8/9 | — | — | DOGFOOD-6 |
 | **P1 fixtures** (`tests/fixtures/p1-layout`, `p1-mode`, `p1-rename`, `p1-ble`, `xapp*`) | v4.2.2 → v4.3.0 (constructed) | — | **tuned by construction** (written to exercise P1) | — | — | — | — | | each fixture's expected verdict (layout hazard, MCUboot mode, rename, BLE clean; cross-image) is asserted by `tests/test_p1_fixture.py`, `test_cross_fixture.py` | DESIGN-P1 §11 |
 
 ### Clean results only
@@ -88,7 +94,7 @@ Lenient recall can't move further without new pairs.
 
 | Where | Before → after | Why |
 |---|---|---|
-| bms A1 precision | 1/2 (50%, DOGFOOD-2 Step 2) → 1/9 (11%, DOGFOOD-3 P2 and the 2026-10-29 re-run) | more risky findings, all harmless here: `header-changed` for 5 headers the app includes (from the SBOM), 2 module repins, and the OpenThread guide false positive. Strict recall rose from 0 to 1 in the same step (module recovery) |
+| bms A1 precision | 1/2 (50%, DOGFOOD-2 Step 2) → 1/9 (11%, DOGFOOD-3 P2 and the 2026-10-29 re-run) | more risky findings, all harmless here: `header-changed` for 5 headers the app includes (from the SBOM), 2 module repins, and the OpenThread guide false positive. Strict recall rose from 0 to 1 in the same step (module recovery). Re-measured after the audit fixes: **1/4 (25%)**, the 5 `header-changed` are now info (DOGFOOD-6) |
 | ZMK precision | 12/22 (55%) → 15/28 (54%) | P2 added 6 findings, 3 of them harmless (`SENSOR_CHAN_*` renumbering) |
 | OpenDeck scan lenient | 2/5 → 1/5 (§10) | M19 demoted the bootloader's ADC findings, D2's only partial, which were harmless; the item is now missed |
 | OpenDeck verdict confidence | low → low, now also for "51 of 51 app TUs not interpreted" | the API diff of the app can't run, because the target never configures |
