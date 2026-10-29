@@ -286,6 +286,9 @@ class ApiAnalyzer:
         ctx.shared.setdefault("api_coverage", {})[ctx.image] = {
             "tus": len(src_entries),
             "not_interpreted": len(uninterpreted),
+            # Compared at both refs without parse errors (or no included file changed):
+            # the sbom analyzer trusts these TUs' "no declaration changed" (AUDIT.md F8).
+            "clean_tus": sorted(set(todo_all) - uninterpreted),
         }
         for rel in sorted(set(src_entries) - set(todo_all)):
             gaps.append(
