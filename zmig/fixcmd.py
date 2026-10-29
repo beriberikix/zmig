@@ -59,8 +59,15 @@ def _fragments(
     seen: dict[Path, None] = {}
     outside: list[str] = []
     copies = [b.src.resolve() for b in (ctx.old, ctx.new_raw, ctx.new) if b is not None]
-    for paths in (ctx.old_facts.configs, ctx.new_raw_facts.configs):
+    # The base configuration (the board's defconfig, user-owned for a board the project
+    # ships) and the fragments merged after it.
+    for paths in (
+        (ctx.old_facts.base_config, *ctx.old_facts.configs),
+        (ctx.new_raw_facts.base_config, *ctx.new_raw_facts.configs),
+    ):
         for raw in paths:
+            if not raw:
+                continue
             p = Path(raw).resolve()
             real = None
             for c in copies:
@@ -187,7 +194,13 @@ def propose(ctx: ScanContext, col: Collected) -> list[Proposal]:
 
 
 def format_plan(props: list[Proposal], col: Collected, header: str) -> str:
-    lines = [header, ""]
+    files = sorted({a.path for a, _ in col.assignments})
+    lines = [
+        header,
+        f"Checked {len(col.assignments)} assignment(s) in {len(files)} file(s): "
+        + (", ".join(files) or "none"),
+        "",
+    ]
     groups = [
         *(
             (

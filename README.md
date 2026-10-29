@@ -141,6 +141,38 @@ MCUboot") and what isn't checked are listed in the report.
 
 Design: [docs/DESIGN-P1.md](docs/DESIGN-P1.md).
 
+## `zmig fix kconfig`: renames with Kconfig evidence only
+
+```sh
+zmig fix kconfig --app path/to/app --board <board> --from v3.6.0 --to v3.7.0          # dry run
+zmig fix kconfig --app path/to/app --board <board> --from v3.6.0 --to v3.7.0 --apply  # commit
+```
+
+It takes the same arguments as `scan`. It checks every assignment in your own Kconfig
+fragments: `prj.conf`, board `.conf` and defconfig files, per-image files such as
+`sysbuild/mcuboot.conf`, `EXTRA_CONF_FILE`/`OVERLAY_CONFIG` fragments, and `SB_CONFIG_*`
+in `sysbuild.conf`.
+
+It renames a symbol only when all of these hold:
+
+- the target's Kconfig tree no longer defines it;
+- the source tree shows what replaced it: the old symbol was deprecated and selects the
+  new one, or one is `default` the other;
+- the replacement has the same type and a prompt;
+- the target's own kconfiglib gives it the assigned value;
+- no migration-guide entry about either symbol mentions a value or unit change.
+
+Everything else is listed, not edited:
+
+- renames only the guide names;
+- symbols that are still defined but whose dependencies are unmet;
+- fragments outside the project.
+
+`--apply` refuses a dirty tree. It commits each kind of evidence separately on a new
+branch, then rebuilds the target and reruns the analyzers. It exits 3 only if the fix
+introduced a finding; findings that an earlier configure failure had hidden are reported
+as revealed. Results: [docs/P3-FIX-KCONFIG.md](docs/P3-FIX-KCONFIG.md).
+
 ## Determinism and trust
 
 - Same inputs → byte-identical `report.json` (no timestamps or machine paths; finding ids
