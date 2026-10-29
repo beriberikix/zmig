@@ -26,22 +26,28 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | Project / configuration | Upgrade | Items in scope | Clean? | Strict | Lenient | Precision | Actionable | Target build | Field-upgrade verdict | Source |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **ZMK** corne ∪ niceview | v3.2 → v3.5 | 18 | **tuned** (the development project) | 6 (33%) | 13 (72%) | 11/22 (50%) → 12/22 (55%) → 15/28 (54%) | 1/18 | configure failed (salvaged) | unknown (medium) | DOGFOOD-2-baseline §1, DOGFOOD-2 §2, DOGFOOD-3 §2–3, §7.1 |
+| ″ | ″ | 18 | tuned (audit fixes, re-run at `aa95a10`) | 6 (33%) | 13 (72%) | **15/21 (71%)** | 1/18 | configure failed (salvaged) | unknown (low) | DOGFOOD-7 |
 | **smp_svr** (nrf52840dk, MCUboot, BLE DFU) | v4.2.2 → v4.3.0 | 1 field-upgrade hazard | **tuned** | caught after fixes | — | before the fixes, 4 spurious remedies and a spurious storage pin | — | ok | needs-changes (medium): MCUboot mode mismatch, remedy config-pin | DOGFOOD-1 §1, "Verdict honesty" |
 | **Golioth B** nucleo_h563zi | v4.1.0 → v4.2.0 | 2 | clean: DOGFOOD-2 baseline | 0 (0%) | 1 (50%) | 0/9 (0%) | — | ok | direct-ok (medium) | DOGFOOD-2-baseline §3–4 |
 | ″ | ″ | 2 | tuned (Step 2, P2) | 1 (50%) | 1 (50%) | 2/6 (33%) → 5/9 (56%) | 0 | ok | direct-ok (medium) | DOGFOOD-2 §3, DOGFOOD-3 §2–3 |
 | ″ | ″ | 2 | tuned (audit fixes, re-run at `aa95a10`) | 1 (50%) | 1 (50%) | **5/7 (71%)** | 0 | ok | direct-ok (medium) | DOGFOOD-6 |
 | Golioth B-rak | ″ | 3 | clean: DOGFOOD-3 baseline | 2 | 2 | 4/8 (50%) | 0 | ok | | DOGFOOD-3 §2–3 |
 | ″ | ″ | 3 | tuned (P2) | 2 | 2 | 8/13 (62%) | 0 | ok | | ″ |
+| ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | **8/11 (73%)** | 0 | ok | blocked (medium) | DOGFOOD-7 |
 | Golioth B-esp | ″ | 2 | clean: DOGFOOD-3 baseline | 1 | 1 | 7/11 (64%) | 0 | ok | | ″ |
 | ″ | ″ | 2 | tuned (P2) | 1 | 1 | 15/22 (68%) | 0 | ok | | ″ |
+| ″ | ″ | 2 | tuned (audit fixes, re-run at `aa95a10`) | 1 | 1 | **15/20 (75%)** | 0 | ok | blocked (medium) | DOGFOOD-7 |
 | Golioth B-native | ″ | 1 | clean: DOGFOOD-3 baseline | 0 | 0 | 2/5 (40%) | 0 | ok | | ″ |
+| ″ | ″ | 1 | tuned (audit fixes, re-run at `aa95a10`) | 0 | 0 | **2/3 (67%)** | 0 | ok | direct-ok (medium) | DOGFOOD-7 |
 | **bms-firmware A1** bms_16s100_sc | v4.0 → v4.2 | 2 | clean: DOGFOOD-2 baseline | 0 (0%) | 1 (50%) | 1/6 (17%) | — | **build failed** (no cmsis_6) | unknown (medium) | DOGFOOD-2-baseline §5–6 |
 | ″ | ″ | 2 | tuned (Step 2 → P2; re-run 2026-10-29) | 0 → 1 | 1 | 1/2 (50%) → **1/9 (11%)** | 0 | ok after module recovery | unknown (medium) | DOGFOOD-2 §4, DOGFOOD-3 §2–3, DOGFOOD-5 §10 |
 | ″ | ″ | 2 | tuned (audit fixes, re-run at `aa95a10`) | 1 | 1 | **1/4 (25%)** | 0 | ok after module recovery | unknown (medium) | DOGFOOD-6 |
 | bms A1-native | ″ | 5 | clean: DOGFOOD-3 baseline (one caveat, §7.3) | 2 | 4 | 10/10 (100%) | 0 | configure-failed | | DOGFOOD-3 §2–3 |
 | ″ | ″ | 5 | tuned (P2) | 2 | 4 | 9/9 (100%) | 0 | | | ″ |
+| ″ | ″ | 5 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 4 | 8/8 (100%); P2 corrected to 8/9 (89%) | 0 | | direct-ok (low) | DOGFOOD-7 §2 correction |
 | bms A1-oled | ″ | 3 | clean: DOGFOOD-3 baseline (same caveat) | 2 | 2 | 2/2 (100%) | 0 | build failed | | ″ |
 | ″ | ″ | 3 | tuned (P2) | 2 | 2 | 3/3 (100%) | 0 | | | ″ |
+| ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | 3/3 (100%) | 0 | | direct-ok (low) | DOGFOOD-7 |
 | **CANnectivity C1** usb2canfdv1 | v1.1.0 → v1.2.0 (Zephyr v4.1.0 → v4.2-branch) | 3 | clean: DOGFOOD-4 baseline | 1 (33%) | 2 (67%) | 7/11 (64%) | 0 | build failed (link: `smf_set_handled`) | direct-ok (**low**) | DOGFOOD-4-baseline §2–3 |
 | ″ | ″ | 3 | tuned (M13–M15; definition sites) | 1 → **2** | 2 | 7/8 (88%) | 0 | ″ | ″ | DOGFOOD-4 §6, C2 correction |
 | ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | 7/8 (88%) | 0 | ″ | ″ | DOGFOOD-6 |
