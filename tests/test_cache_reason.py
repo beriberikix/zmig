@@ -65,3 +65,27 @@ def test_no_recorded_build_of_this_app(tmp_path: Path) -> None:
     app = tmp_path / "app"
     _marker(tmp_path, "legacy", app, None)
     assert miss_reason(tmp_path, app, INPUTS).startswith("no earlier build of this app")
+
+
+def test_copies_with_different_directory_names_do_not_share_a_build(tmp_path: Path) -> None:
+    """The app copy a build compiles is apps/<tree hash>/<directory name>, so its ninja
+    records and image names carry the name. Keyed on content alone, tests/fixtures/app and
+    an identical copy named fixture-app shared one build: every source looked uncompiled,
+    and the scan reported phantom input-added and image-added/removed findings."""
+    from types import SimpleNamespace
+
+    from zmig.buildctx import _INPUT_NAMES, BuildSpec, build_key
+
+    a, b, c = tmp_path / "x" / "app", tmp_path / "y" / "fixture-app", tmp_path / "z" / "app"
+    for d in (a, b, c):
+        (d / "src").mkdir(parents=True)
+        (d / "src" / "main.c").write_text("int main(void) { return 0; }\n")
+        (d / "prj.conf").write_text("")
+    ws = SimpleNamespace(resolved=SimpleNamespace(ref=SimpleNamespace(key={"sha": "1" * 40})))
+
+    def key(app: Path) -> str:
+        return build_key(ws, BuildSpec(app=app, board="native_sim"), [])  # type: ignore[arg-type]
+
+    assert key(a) != key(b)
+    assert key(a) == key(c)  # same content and name, wherever it lives: one build
+    assert "app_name" in _INPUT_NAMES

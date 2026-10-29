@@ -137,28 +137,6 @@ def _copies(tmp_path: Path) -> tuple[Path, Path, Path]:
     return first, second, build
 
 
-def test_project_roots_follow_the_copy_a_cached_build_was_configured_from(tmp_path: Path) -> None:
-    """The build key hashes the app's content, not its directory name, so tests/fixtures/app
-    and a copy named fixture-app share one build whose ninja records name .../app/src/main.c
-    (found while verifying AUDIT.md F7: every source then looked uncompiled)."""
-    from types import SimpleNamespace
-
-    from zmig.buildctx import project_path, project_roots
-
-    first, second, build = _copies(tmp_path)
-    b = SimpleNamespace(src=second, workspace=SimpleNamespace(root=tmp_path / "ws"))
-    roots = project_roots(b, build)  # type: ignore[arg-type]
-    assert project_path(f"{first}/src/main.c", roots) == "src/main.c"
-    assert project_path(f"{second}/src/main.c", roots) == "src/main.c"
-
-    # A sysbuild image configured from another app (MCUboot) is not an alias of this one.
-    (build / "CMakeCache.txt").write_text(
-        f"APPLICATION_SOURCE_DIR:PATH={tmp_path}/ws/bootloader/mcuboot/boot/zephyr\n"
-    )
-    roots = project_roots(b, build)  # type: ignore[arg-type]
-    assert project_path(f"{tmp_path}/ws/bootloader/mcuboot/boot/zephyr/main.c", roots) is None
-
-
 def test_build_files_unknown_when_no_record_maps_to_the_project(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
