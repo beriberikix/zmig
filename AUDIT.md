@@ -401,3 +401,101 @@ Housekeeping (not ranked): fix README's "not implemented yet" line (F15); make
    agent)? The README mentions "for scripts or an agent"; if so, the per-finding
    `old`/`new` payloads are undocumented per kind (DESIGN §3.1 says "each analyzer documents
    them"; none do in-code).
+
+---
+
+## Response (2026-10-29, branch `audit-fixes`)
+
+Appended by the maintainer session; the audit text above is unchanged. Every item was
+re-checked against `ddf6b2b` before acting.
+
+### Verification
+
+- **F1–F15:** 13 confirmed. Two are partly right:
+  - **F3:** the mechanics are right, but the severity is not. It fails as an uncaught
+    `ValueError` traceback, which is loud, not silent. Zephyr's menuconfig rule has the
+    `cmake -E env` shape the parser expects. M, not H.
+  - **F6:** dependency expressions are read, by `references()`, but never compared. Choice
+    membership is dumped and used by sysbuild, storage and mcuboot, not by `kconfig.py`.
+- **Citations:** most are within ±3 lines. Wrong locations: F15 is `README.md:219-220`;
+  deprecation availability is read in `apidiff.py:303,434`, not `api.py:480-484`.
+- **§2 "Kconfig.deprecated" row:** partly right. `split()` does find `B || DEPRECATED`; it
+  misses only when `DEPRECATED` touches a parenthesis or `!`.
+- **§5.2 and §5.3:** both runs reproduced exactly (15 and 19 findings, same severities).
+- **Severity ordering:**
+  - F7 should be H. It is the same class as F1: breaking/high findings on code the build
+    doesn't compile.
+  - F4 is worse than stated: no `migration-guide-*.rst` exists before v3.5, so a 2.7→3.7
+    LTS scan reads no guide for 3.0–3.4 and reports `ok`.
+
+### Fixed (one commit each, test first)
+
+| Audit item | Commit | Effect on the §5 runs |
+|---|---|---|
+| F15 README | f82c644 | — |
+| §6.1 / F1 diagnostics new at the target | d5e3561 | settings: `STDOUT_CONSOLE` breaking/act-now → info/fyi |
+| §6.4 / F7 uncompiled sources | 54aa423 | echo_server: DSA and `tunnel.c` guide matches breaking → info |
+| §6.3 / F8 `header-changed` | d0f9e03 | settings: `settings.h` risky → info; fixture: the 3 `header-changed` → info |
+| (new) shared-build path mapping | 5753b7a | see below |
+| §6.2 module at both refs (module half) | 49bc2d1 | settings without `--module`: `module-required` breaking/act-now → info; source rebuilt with littlefs |
+| §6.6 binding checks (narrowed) | d4181ac | none (native_sim has no overlays) |
+| §6.5 dependency expressions (as info) | 22a5405 | echo_server: +1 info; `dependency-changed POSIX_MESSAGE_PASSING` now names its cause |
+
+**Net change** (breaking / risky / info):
+
+| Run | Before | After |
+|---|---|---|
+| settings `--module littlefs` | 1 / 2 / 12 | 0 / 1 / 14 |
+| settings without `--module` | 2 / 1 / 8 | 0 / 1 / 15 |
+| echo_server | 7 / 3 / 9 | 5 / 3 / 12 |
+
+echo_server's two forced changes are still caught as before (the net_mgmt callback
+breaking/high; TLS rename breaking/low).
+
+**Departures from the audit's proposals:**
+
+- **Pre-existing diagnostics.** These follow `docs/DESIGN-P1.md` §2.3: severity is kept and
+  `introduced_by_migration` is false. Two exceptions, now recorded in §2.3:
+  - an assignment never taken at either ref is info;
+  - a module missing at both refs is info.
+- **`header-changed`.** Demoted per including TU: any API finding in an including TU keeps
+  the header risky. API findings don't record the declaring header, so a per-header check
+  isn't possible.
+- **Dependency expressions.** One info finding plus action-text notes, not risky/medium per
+  symbol. Within one build, every effective expression change is already a value change.
+- **Schema.** No finding ID, fingerprint or `schema_version` changed.
+
+### Found during the fixes, not in the audit
+
+- **Shared builds across app copies.** The build key hashes the app's *content*
+  (`buildctx.py` `key_inputs`), but the app copy is `apps/<hash>/<basename>`. Two apps with
+  identical trees and different directory names share one cached build. Its records name the
+  other copy, so:
+  - at `ddf6b2b`, `build_files` came out as an empty set and devicetree findings were silently
+    dropped (the fixture lost `node-gone DT_PATH(gpio_800)`);
+  - commit 54aa423 widened this to kconfig, guide and API findings.
+
+  5753b7a follows the build's recorded `APPLICATION_SOURCE_DIR` and treats an unmappable set
+  as unknown. Still open: phantom `input-added` and `image-added`/`image-removed` findings and
+  missing `dependency-changed` findings in that situation. The root fix (the basename in the
+  build key) invalidates every cached build once, so it awaits a decision.
+- **Buildlog warnings.** The buildlog analyzer keys warnings on their text, including the
+  "defined at" line. The `STDOUT_CONSOLE` warning therefore still shows as an info "new
+  warning" plus "1 resolved". This is the F1 class in another analyzer, and only info.
+
+### Deferred (each needs a design doc)
+
+- **§6.7** Persisted change database.
+- **§6.8** Mining in-tree adaptations.
+- **§6.9** Confidence derived from claim validity.
+- **§6.10** Replacing the regex usage lexer. It also covers the TLS match inside an `#if`
+  that is off, which item 4 cannot catch.
+- **F13** Line-level salvage at the source.
+- **§6.6, rest** Bindings-YAML diff and compatible-level deprecation.
+
+### Evaluation status
+
+`samples/subsys/settings` and `samples/net/sockets/echo_server` informed these fixes, so
+they are **tuned** under the clean-vs-tuned rule in `docs/EVALUATION.md`. EVALUATION.md was
+not edited. Rows that may be stale are named in each commit message, chiefly bms A1
+precision (d0f9e03). None was re-measured.
