@@ -230,12 +230,34 @@ def outside_build(findings: list[Finding], base: ScanContext) -> list[Finding]:
     no build used (another board's .conf, a shield's overlay) become info, saying so. They
     stay in the report as hints for those configurations (regression: Golioth's
     rak5010_nrf52840.conf and an STM32H5 USB node blamed on rak5010's overlay,
-    docs/DOGFOOD-2-baseline.md M2/M3)."""
+    docs/DOGFOOD-2-baseline.md M2/M3).
+
+    Likewise for findings whose only evidence is in app source files the build doesn't
+    compile (regression: echo_server's tunnel.c and vlan.c, built only with
+    CONFIG_NET_L2_IPIP / CONFIG_NET_VLAN, AUDIT.md F7). Compiled files come from the app
+    image's ninja records, so only app-image findings are judged."""
     from zmig.findings import Severity
+    from zmig.usage import SOURCE_SUFFIXES
 
     inputs = build_inputs(base)
-    if inputs is None:
+    compiled = base.build_files
+    if inputs is None and compiled is None:
         return findings
+
+    def unused(files: set[str], image: str | None) -> str | None:
+        """How the build doesn't use these files, or None if it might."""
+        if inputs is not None and all(
+            p.endswith(BUILD_INPUT_SUFFIXES) and p not in inputs for p in files
+        ):
+            return "use"
+        if (
+            compiled is not None
+            and image is None
+            and all(p.endswith(SOURCE_SUFFIXES) and p not in compiled for p in files)
+        ):
+            return "compile"
+        return None
+
     out = []
     for f in findings:
         files = {str(e["path"]) for e in f.evidence if e.get("type") == "file_line"}
@@ -246,12 +268,12 @@ def outside_build(findings: list[Finding], base: ScanContext) -> list[Finding]:
             f.severity is not Severity.INFO
             and files
             and not any(p.startswith("<") for p in files)
-            and all(p.endswith(BUILD_INPUT_SUFFIXES) and p not in inputs for p in files)
+            and (how := unused(files, f.image))
         ):
             f = replace(
                 f,
                 severity=Severity.INFO,
-                title=f"{f.title} (only in files this build doesn't use: "
+                title=f"{f.title} (only in files this build doesn't {how}: "
                 f"{', '.join(sorted(files)[:3])}{', ...' if len(files) > 3 else ''})",
                 heuristics=(*f.heuristics, "outside-build"),
             )

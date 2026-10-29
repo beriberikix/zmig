@@ -370,25 +370,68 @@ def test_findings_only_in_unused_input_files_become_info(tmp_path: Path) -> None
     )
     img = SimpleNamespace(dir=img_dir, log=log)
     b = SimpleNamespace(src=app, workspace=SimpleNamespace(root=tmp_path / "ws"), images=(img,))
-    base = SimpleNamespace(old=b, new=b, new_raw=b)
+    # The source build compiled src/main.c and the header it includes (ninja's records).
+    base = SimpleNamespace(old=b, new=b, new_raw=b, build_files={"src/main.c", "src/app.h"})
 
-    def finding(path: str, sev: Severity = Severity.BREAKING) -> Finding:
-        return Finding(Category.KCONFIG, "symbol-removed", path, "t", sev, Confidence.HIGH, "a",
-                       "kconfig", ("s",), evidence=(file_line(path, 27, "x"),))  # fmt: skip
+    def finding(*paths: str, sev: Severity = Severity.BREAKING) -> Finding:
+        return Finding(Category.KCONFIG, "symbol-removed", paths[0], "t", sev, Confidence.HIGH,
+                       "a", "kconfig", ("s",),
+                       evidence=tuple(file_line(p, 27, "x") for p in paths))  # fmt: skip
 
     rak, used, src = (
         finding("boards/rak5010_nrf52840.conf"),
         finding("app.overlay"),
-        finding("src/main.c", Severity.RISKY),
+        finding("src/main.c", sev=Severity.RISKY),
     )
-    artifact = finding("<v4.1.0 hello>/zephyr/zephyr.dts", Severity.RISKY)
+    artifact = finding("<v4.1.0 hello>/zephyr/zephyr.dts", sev=Severity.RISKY)
     out = outside_build([rak, used, src, artifact], base)  # type: ignore[arg-type]
     assert out[3].severity is Severity.RISKY  # a generated file, never "outside the build"
     assert out[0].severity is Severity.INFO
     assert "only in files this build doesn't use: boards/rak5010_nrf52840.conf" in out[0].title
     assert "outside-build" in out[0].heuristics
     assert out[1].severity is Severity.BREAKING  # applied overlay
-    assert out[2].severity is Severity.RISKY  # sources aren't judged by this rule
+    assert out[2].severity is Severity.RISKY  # a compiled source
+
+
+def test_findings_only_in_uncompiled_sources_become_info(tmp_path: Path) -> None:
+    """AUDIT.md F7/§5.3: echo_server's tunnel.c and vlan.c are only compiled with
+    CONFIG_NET_L2_IPIP / CONFIG_NET_VLAN, yet guide matches on them were breaking."""
+    from zmig.analyzers import outside_build
+    from zmig.findings import Category, Confidence, Finding, Severity, file_line
+
+    log = tmp_path / "log"
+    log.write_text("")
+    (tmp_path / "zephyr").mkdir()
+    (tmp_path / "zephyr" / "zephyr.dts.d").write_text("")
+    img = SimpleNamespace(dir=tmp_path, log=log)
+    b = SimpleNamespace(
+        src=tmp_path / "app", workspace=SimpleNamespace(root=tmp_path), images=(img,)
+    )
+
+    def finding(*paths: str, image: str | None = None) -> Finding:
+        return Finding(Category.GUIDE, "entry-match", paths[0], "t", Severity.BREAKING,
+                       Confidence.MEDIUM, "a", "guide", ("s",), image=image,
+                       evidence=tuple(file_line(p, 12, "x") for p in paths))  # fmt: skip
+
+    unbuilt = finding("src/tunnel.c", "src/vlan.c")
+    header = finding("src/tunnel.h")
+    built = finding("src/echo-server.c")
+    mixed = finding("src/echo-server.c", "src/tunnel.c")
+    other_image = finding("src/tunnel.c", image="mcuboot")
+    base = SimpleNamespace(old=b, new=b, new_raw=b, build_files={"src/echo-server.c"})
+    out = outside_build([unbuilt, header, built, mixed, other_image], base)  # type: ignore[arg-type]
+    assert out[0].severity is Severity.INFO
+    assert "only in files this build doesn't compile: src/tunnel.c, src/vlan.c" in out[0].title
+    assert "outside-build" in out[0].heuristics
+    assert out[0].id == unbuilt.id
+    assert out[1].severity is Severity.INFO  # a header no compiled file includes
+    assert out[2].severity is Severity.BREAKING
+    assert out[3].severity is Severity.BREAKING  # one compiled file is enough
+    assert out[4].severity is Severity.BREAKING  # build_files describes the app image only
+
+    # No ninja records: nothing is judged.
+    base = SimpleNamespace(old=b, new=b, new_raw=b, build_files=None)
+    assert outside_build([unbuilt], base)[0].severity is Severity.BREAKING  # type: ignore[arg-type]
 
 
 DEVICE_ERROR_LOG = """\
