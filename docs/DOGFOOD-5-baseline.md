@@ -270,3 +270,53 @@ API coverage in these runs: every TU interpreted (Golioth `hello` 31/31, CANnect
 
 The missing detection of mbedtls's `tf-psa-crypto` dependency (L2) is recorded, not
 fixed.
+
+## 11. Round 2 after the baseline: plan precision and source locations (**not clean**)
+
+### 11.1 The 7 false or unhelpful plan findings (§10's 8/15)
+
+All 7 are risky `applies-cleanly` "applies cleanly but touches files upstream changed".
+Plan wasn't scored on any other project: there were no patch sets before OpenDeck, and
+DOGFOOD-1 only timed `plan` and recorded its hop and fork messages.
+
+| Patch | Maintainers | Nearest upstream change to the patch's lines | Verdict | Cause | Generic? |
+|---|---|---|---|---|---|
+| P3 `bossac_reset_cap` | edited (voluntary) | 56 lines | harmless | file-level overlap counted as a hazard | yes |
+| `esp32s3_mcuboot_rodata_region_start` | unchanged | 17 | harmless | same | yes |
+| `esp32s3_reset_with_watchdog_after_flash` | unchanged | **1** (adjacent line) | unhelpful: true and worth a look, but no action needed | same | yes |
+| `usb_midi2_01_configurable_buffer_size` | unchanged | 5 (`Kconfig.midi2`), 118 (`usbd_midi2.c`) | harmless | same | yes |
+| `udc_rpi_pico_disconnect_on_disable` | unchanged | 176 | harmless | same | yes |
+| `usb_midi2_02_ump_burst` | unchanged | 9 | harmless | same | yes |
+| `esp32_mcuboot_rodata_region_start` | unchanged | 60 | harmless | same | yes |
+
+None of them is **wrong**: each patch does touch a file upstream changed. The finding just
+isn't a hazard.
+
+**Fix (`76196d6`, post-baseline, generic).** Overlap is risky only when upstream changed
+lines within 3 lines of the patch's own changed lines (3 is git's default diff context).
+Otherwise it's info: "applies cleanly; upstream changed other parts of …". There's a
+regression test on the real Zephyr files with two of these patches.
+
+### 11.2 Source locations for configure errors (`a622add`, post-baseline, generic)
+
+| Error | What the tools say | What the finding now cites |
+|---|---|---|
+| devicetree "undefined node label 'eth_rxd0_pc4'" | edtlib names only the node. `dtc -T -T` on the image's `zephyr.dts.pre` annotates the property: `firmware.overlay:20:5-26:34` | `boards/zephyr/nucleo_h563zi_stm32h563xx/firmware.overlay:20`, "pinctrl-0 references undefined label 'eth_rxd0_pc4'". Action: "Fix …/firmware.overlay:20 …" |
+| Kconfig "…/app/firmware/Kconfig:185: error: couldn't parse …" (post-tree verification log) | the path and line are in the message | `firmware/Kconfig:185` |
+
+The location comes from the tools' own output, never from searching the sources.
+Regression tests use the real log and preprocessed devicetree.
+
+### 11.3 Three columns (zmig `a622add`)
+
+| | Baseline (clean) | After §10 fixes † | **After §11 fixes †** |
+|---|---|---|---|
+| Scan strict / lenient | 0/5 / 2/5 | 0/5 / 1/5 | **1/5 / 1/5**: D1 caught † (location and cause) |
+| Scan precision | 11/22 | 11/11 | 11/11 |
+| Scan actionable | 0 | 0 | **1/5**: D1's action names the overlay the maintainers edited |
+| Plan strict / lenient | 6/9 / 9/9 | 9/9 / 9/9 | 9/9 / 9/9 |
+| Plan precision | 8/15 (53%) | 8/15 (53%) | **8/9 (89%)**: the one left is the adjacent-line overlap (unhelpful) |
+| Plan actionable | 0 | 8/9 | 8/9 |
+
+† Not a clean measurement. D1 changed in both §10 and §11, D2 in §10, and P5, P7 and P8
+in §10.
