@@ -1,83 +1,102 @@
-# Proposal: presentation tiers (act now / review / FYI)
+# Design proposal: presentation tiers (act now / review / FYI)
 
-Status: **proposal only, not implemented**, waiting for review (2026-10-29).
+Status: **design only, not implemented, not a measured improvement.** Waiting for review
+(revised 2026-10-29).
 
-## The idea
+## What it is
 
-Today every breaking or risky finding is shown with the same weight. The proposal groups
-them by evidence zmig already records. Nothing about how findings are produced changes,
-and no finding is dropped.
+Today every breaking and risky finding is shown with the same weight. The proposal groups
+them into three tiers for presentation. It doesn't change how findings are produced, and
+it doesn't change any finding.
 
-| Tier | Rule (all from existing fields) |
+## Inputs: run-time evidence only
+
+Tier assignment may use **only what zmig has when it runs**:
+
+| Input | Where it comes from at run time |
 |---|---|
-| **Act now** | `severity` breaking, **and** `confidence` high, **and** at least one `file_line` evidence in a project file **the scanned build used** |
-| **Review** | any other breaking finding; a risky finding with a project `file_line` the scanned build used |
-| **FYI** | risky findings with no project location, or whose project locations the scanned build didn't use; all info findings |
+| severity | `Finding.severity` |
+| evidence kind | the `type` of each evidence item (`file_line`, `artifact_diff`, `tool_output`, …) |
+| user file:line present | a `file_line` evidence item whose path is a project file, not Zephyr's or a module's |
+| in the scanned build | the cited project file is one this image's build used: compiled or included (`ScanContext.build_files`, from ninja's dependency records), or applied as an overlay or `.conf` (the image's configure log) |
 
-"The scanned build used" already exists per image:
+**Oracle labels are never inputs.** "Confirmed", "harmless", "unverifiable", recall
+labels and oracle items exist only in evaluation documents written after a run. They
+appear below only to *evaluate* the design, never to assign a tier.
 
-- C and C++: `ScanContext.build_files`, from ninja's dependency records;
-- overlays and `.conf` files: the files that image's configure log applied (`usage` per
-  image).
+## Rule
 
-Order inside a tier stays as it is (severity, confidence, category).
+| Tier | A finding is in it if |
+|---|---|
+| **Act now** | severity breaking **and** at least one user `file_line` in the scanned build |
+| **Review** | any other breaking finding; or risky with at least one user `file_line` in the scanned build |
+| **FYI** | everything else: risky without a user location in the scanned build, and all info |
 
-## What it would have given on the clean measurements
+Within a tier, the order stays as it is today (severity, confidence, category, id).
 
-Only three clean baseline reports are still on disk: CANnectivity C1 and C2
-(`dogfood/d4/base`) and the OpenDeck scan (`dogfood/d6/scan`). The Golioth and bms-firmware
-baseline reports were lost with an earlier scratch directory. Their numbers in
-EVALUATION.md come from the written scoring, not from a report, so they can't be re-tiered.
+## Invariants (to be enforced by tests when implemented)
 
-Verdicts are the recorded ones: DOGFOOD-4-baseline §3 and DOGFOOD-5-baseline §5. Each
-finding was assigned to a tier by hand with the rule above. The build-use facts come from
-the same sections: `dfu.c` isn't compiled in C1 (M15); 1 of `counter2`'s 5 overlays is
-C1's board.
+1. **Nothing is hidden or dropped.**
+   - Every finding appears in exactly one tier.
+   - `report.json`, MIGRATION.md and SARIF keep every finding.
+   - The count per tier is printed even when a tier is collapsed in the terminal.
+2. **A breaking finding in the scanned build can never be in FYI.** By the rule, no
+   breaking finding is ever FYI: it is act-now or review.
+3. **Tier assignment is deterministic.**
+   - It is a pure function of the finding's fields and the build-use sets, with no
+     ordering, time or environment dependence.
+   - Tests: the tier of every finding in the stored report fixtures (`tests/fixtures/watch/*.json`,
+     `tests/fixtures/opendeck/scan-report.json`) is asserted, and shuffling the finding
+     order must not change any finding's tier.
+   - Invariant 2 is checked over all fixtures, as `invariant_violations` does for the verdict.
+4. **Oracle labels are not read.** The tier function takes no evaluation data. A test asserts
+   its signature takes only a finding and the build-use sets.
+
+## Evaluation on the clean reports (small sample, does not generalize)
+
+**Sample:**
+
+- 3 clean baseline reports: CANnectivity C1 and C2 (`dogfood/d4/base`), and the OpenDeck
+  scan (`dogfood/d6/scan`). The Golioth and bms-firmware baseline reports are no longer on
+  disk, so they can't be tiered.
+- 41 breaking/risky findings.
+- Tiers were assigned by hand with the rule above, from each report's fields and the
+  build-use facts the scan records. `dfu.c` isn't compiled in C1; 1 of `counter2`'s 5
+  overlays is C1's board.
+- The labels used to evaluate them are the recorded ones (DOGFOOD-4-baseline §3,
+  DOGFOOD-5-baseline §5).
 
 | Clean report | Act now | Review | FYI (breaking/risky only) |
 |---|---|---|---|
-| CANnectivity C1 (11) | **2/2 confirmed**: `function-removed` `smf_set_handled` (`led.c:225`), `callback-type-changed` (`led.c:348`) | 5/8: build failed, cmsis_6 required, guide entry, 2 new warnings confirmed; `&zephyr_udc0` unverifiable; `led0`, `counter2` phandle harmless | 0/1: `mcuboot_led0` phandle (`dfu.c`, not compiled), harmless |
-| CANnectivity C2 (8) | **2/2 confirmed**: the same two | 5/6: as C1, minus the phandle findings | — |
-| OpenDeck scan (22) | **0**: the one breaking finding (configure failed) has no project location | 3/14: configure failed, `&mac`/`&mdio` in the bootloader confirmed; 7 false macro findings, `&mac`/`&mdio` in MCUboot and `&adc1`/`&adc2` in the bootloader harmless | 8/8 confirmed: MCUboot revision, 7 module repins (not oracle items) |
-| **Total** | **4/4 (100%)** | 13/28 (46%) | 8/9 (89%) |
+| CANnectivity C1 (11) | 3, all labelled confirmed: `function-removed`, `callback-type-changed`, guide `entry-match` (all at `src/led.c`) | 7, 4 confirmed: build failed, cmsis_6 required (no `file_line`: `west.yml`), 2 new warnings; `&zephyr_udc0` unverifiable; `led0`, `counter2` phandle harmless | 1, harmless: `mcuboot_led0` phandle (`dfu.c` not compiled) |
+| CANnectivity C2 (8) | 3, all confirmed: the same three | 5, 4 confirmed | 0 |
+| OpenDeck scan (22) | 0: its one breaking finding (configure failed) has no project location | 14, 3 confirmed | 8, all confirmed (MCUboot revision, 7 module repins; not oracle items) |
+| **Total (n = 41, 3 reports)** | **6 findings, 6 confirmed** | 26 findings, 11 confirmed | 9 findings, 8 confirmed |
 
-Precision of all breaking/risky findings on these three reports is 25/41 (61%), the same
-as today, because no finding moves out.
+The previous draft also required `confidence: high` for act-now. That is run-time data
+too, but not among the inputs listed above. With it, act-now held **4 findings** (the two
+guide `entry-match` findings are medium confidence and drop to review), all 4 confirmed.
+Whether confidence may be an input is open question 1.
 
-**Recall in the act-now tier:**
+**What the numbers can and can't say:**
 
-- **CANnectivity:** N1b (`smf_set_handled`) is caught in it, at exactly the lines the
-  maintainers changed. N1a's finding is in it too, at the initializers rather than the
-  definitions (partly). N2 (`cmsis_6`) is in review, because `west.yml` evidence isn't a
-  `file_line`.
-- **OpenDeck:** no item reaches act-now. D1's symptom is in review.
-
-**Actionable:**
-
-- **Strict (the action names a file the maintainers edited): still 0 on every clean
-  report.** Tiers don't change action text. The act-now actions are "Find its replacement
-  in the migration guides" and "Change their signatures to match (…)".
-- **Weaker (the act-now evidence names the edited file):** CANnectivity N1 in both
-  configurations (`src/led.c`). That's 2 of the 3 clean reports' item sets.
-
-## What it would and wouldn't fix
-
-- **It helps** by keeping the few findings with a confirmed cause and a location in your
-  build apart from the long risky tail. On OpenDeck that tail was 7 false macro findings
-  and 4 harmless devicetree findings (since fixed, but this was the clean run).
-- **It doesn't raise strict actionable.** That needs actions that name the file to edit,
-  a separate change.
-- **It can hide a real hazard in FYI.** The 7 module repins and the MCUboot revision were
-  all real, though not oracle items. Mitigation: FYI stays in the report and in
-  MIGRATION.md under its own heading. Only the terminal summary would show act-now first.
-- **The sample is small:** 4 act-now findings, all from one project's two configurations.
-  The 100% says little until more clean projects are measured.
+- **The sample is too small to generalize.** 6 (or 4) act-now findings, from 3 reports.
+  Every one comes from **one project**, in two configurations of the same code. OpenDeck
+  contributes none. "All confirmed" here is 6/6 from one project, not a precision estimate.
+- **Precision of all breaking/risky findings is unchanged:** 25/41 on these reports. The
+  tiers move no finding out of the report.
+- **Strict actionable stays 0 on all 3 reports.** Tiers don't change action text. The
+  act-now actions are "Find its replacement in the migration guides", "Change their
+  signatures to match (…)", and "Read MG-4.2-0137 and update the lines listed".
+- **FYI can hold real hazards.** On OpenDeck it holds 8 findings, all real. That's why
+  invariant 1 matters: FYI is collapsed, never removed.
 
 ## Open questions for review
 
-1. Should a breaking finding with no location (configure or build failed) be act-now
-   when it's the first failure? It's what blocks everything else, but it has no file to
-   act on.
-2. Should `west.yml` evidence count as a project location (N2 would move to act-now)?
-3. Should the tier be a report field (schema 1.5) or presentation only (terminal and
+1. May `confidence` be an input (4 act-now findings instead of 6 here)?
+2. Should a breaking finding with no location (configure or build failed) go to act-now
+   when it is the first failure? It blocks everything else, but there is no file to act on.
+3. Should `west.yml` evidence count as a user location? CANnectivity's `cmsis_6` finding
+   would then move to act-now.
+4. Should the tier be a report field (schema 1.5), or presentation only (terminal and
    MIGRATION.md)?
