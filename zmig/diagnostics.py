@@ -10,6 +10,7 @@ They have been stable from v3.6 through v4.4; tests pin them against real logs.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -93,6 +94,20 @@ class LogFacts:
     configs: tuple[str, ...] = ()  # merged configuration fragments, in order
     base_config: str = ""  # the board defconfig Kconfig loaded first
     diagnostics: tuple[Diagnostic, ...] = field(default_factory=tuple)
+
+
+def _identity(d: Diagnostic) -> tuple[str, ...]:
+    """What makes two configures' diagnostics the same one: not the "defined at" lines,
+    which move between refs, nor build paths. A message without a subject (dt-error) is
+    compared as text with its paths masked."""
+    text = "" if d.symbol else re.sub(r"\S*/\S*", "<path>", d.message)
+    return (d.kind, d.symbol, d.value, d.got, d.node, text)
+
+
+def preexisting(d: Diagnostic, source: Iterable[Diagnostic]) -> bool:
+    """True if the source configure printed the same diagnostic (AUDIT.md F1: the
+    settings sample's CONFIG_STDOUT_CONSOLE warning was reported as new at v4.2.0)."""
+    return _identity(d) in {_identity(s) for s in source}
 
 
 def _join_wrapped(text: str) -> str:

@@ -13,7 +13,7 @@ from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact, find_dt_property
-from zmig.diagnostics import app_relative
+from zmig.diagnostics import app_relative, preexisting
 from zmig.findings import (
     JSON,
     Category,
@@ -76,6 +76,7 @@ class DevicetreeAnalyzer:
             old_v: Any = None,
             new_v: Any = None,
             heuristics: tuple[str, ...] = (),
+            introduced: bool = True,
         ) -> None:
             findings.append(
                 Finding(
@@ -92,12 +93,16 @@ class DevicetreeAnalyzer:
                     old=old_v,
                     new=new_v,
                     heuristics=heuristics,
+                    introduced_by_migration=introduced,
                 )
             )
 
-        # Diagnostics: the target configure rejected the app's devicetree.
+        # Diagnostics: the target configure rejected the app's devicetree. The same error
+        # at the source is pre-existing; it keeps its severity (docs/DESIGN-P1.md §2.3).
         overlays = list(app_relative(ctx.new_raw_facts.overlays, ctx.new_raw.src))
         for d in ctx.new_raw_facts.diagnostics:
+            pre = preexisting(d, ctx.old_facts.diagnostics)
+            also = " (pre-existing: the source configure printed the same error)" if pre else ""
             if d.kind == "dt-undeclared-property":
                 hit = find_dt_property(ctx.usage.app, overlays, d.symbol)
                 ev: tuple[JSON, ...] = ((file_line(hit[0], hit[1]),) if hit else ()) + (
@@ -107,23 +112,25 @@ class DevicetreeAnalyzer:
                     "property-undeclared",
                     f"{d.node}:{d.symbol}",
                     f"Property '{d.symbol}' on {d.node} is no longer declared in its binding "
-                    f"in {ctx.new_spec}",
+                    f"in {ctx.new_spec}" + also,
                     Severity.BREAKING,
                     Confidence.HIGH if hit else Confidence.MEDIUM,
                     f"Remove it or move to its replacement (binding: {d.binding}). Zephyr "
                     f"aborts the target configure on it.",
                     ev,
                     heuristics=() if hit else ("devicetree.diag-unlocated",),
+                    introduced=not pre,
                 )
             elif d.kind == "dt-error":
                 add(
                     "dt-error",
                     d.message[:80],
-                    "Devicetree error at the target",
+                    "Devicetree error at the target" + also,
                     Severity.BREAKING,
                     Confidence.HIGH,
                     "Fix the error shown in the evidence.",
                     (tool_output("target configure", ctx.runner.redact(d.message)),),
+                    introduced=not pre,
                 )
 
         # Nodes the app references.

@@ -13,7 +13,7 @@ from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact, project_path, project_roots
-from zmig.diagnostics import Diagnostic, app_relative
+from zmig.diagnostics import Diagnostic, app_relative, preexisting
 from zmig.findings import (
     JSON,
     Category,
@@ -140,6 +140,7 @@ class KconfigAnalyzer:
         diags: dict[str, Diagnostic] = {
             d.symbol: d for d in ctx.new_raw_facts.diagnostics if d.kind.startswith("kconfig")
         }
+        source_diags = ctx.old_facts.diagnostics
         findings: list[Finding] = []
         handled: set[str] = set()
 
@@ -154,6 +155,7 @@ class KconfigAnalyzer:
             old: Any = None,
             new: Any = None,
             heuristics: tuple[str, ...] = (),
+            introduced: bool = True,
         ) -> None:
             findings.append(
                 Finding(
@@ -170,6 +172,7 @@ class KconfigAnalyzer:
                     old=old,
                     new=new,
                     heuristics=heuristics,
+                    introduced_by_migration=introduced,
                 )
             )
 
@@ -219,6 +222,30 @@ class KconfigAnalyzer:
                     heuristics=tuple(sorted({f"kconfig.rename.{c[2]}" for c in cands})),
                 )
                 continue
+            # The source configure printing the same diagnostic makes it a condition of
+            # the app, not of the migration (docs/DESIGN-P1.md §2.3).
+            pre = d is not None and preexisting(d, source_diags)
+            if d is not None and d.kind == "kconfig-not-taken" and pre:
+                # Never took effect, so nothing the app relies on changes: info, unlike
+                # §2.3's pre-existing defects (AUDIT.md F1, the settings sample's
+                # CONFIG_STDOUT_CONSOLE on native_sim).
+                add(
+                    "value-not-taken",
+                    sym,
+                    f"CONFIG_{sym}={value} has no effect (it gets {d.got}); already not taken "
+                    f"at {ctx.old_spec}",
+                    Severity.INFO,
+                    Confidence.HIGH,
+                    f"The source configure printed the same warning, so the migration doesn't "
+                    f"change it. Drop the assignment, or meet its dependencies: "
+                    f"{d.deps or 'see the evidence'}.",
+                    ev + dev,
+                    old=ov.get(sym),
+                    new={"assigned": value, "got": d.got, "unsatisfied": d.deps},
+                    heuristics=("kconfig.preexisting-diagnostic",),
+                    introduced=False,
+                )
+                continue
             if d is not None and d.kind == "kconfig-not-taken":
                 add(
                     "value-not-taken",
@@ -238,11 +265,15 @@ class KconfigAnalyzer:
                 add(
                     "not-configurable",
                     sym,
-                    f"CONFIG_{sym} can no longer be set directly in {ctx.new_spec}",
+                    f"CONFIG_{sym} can no longer be set directly in {ctx.new_spec}"
+                    if not pre
+                    else f"CONFIG_{sym} can't be set directly (pre-existing: the source "
+                    f"configure printed the same error)",
                     Severity.BREAKING,
                     Confidence.HIGH,
                     "It now gets its value from other symbols; enable those instead.",
                     ev + dev,
+                    introduced=not pre,
                 )
                 continue
             if norm_value(value) == norm_value(ov.get(sym)) and norm_value(value) != norm_value(

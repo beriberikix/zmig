@@ -498,3 +498,115 @@ def test_dtc_assigned_phandles_are_not_node_changes() -> None:
     assert _dts_view(old) == _dts_view(new)
     new["raw_values"]["gpios"] = "<&gpioa 6 0>"
     assert _dts_view(old) != _dts_view(new)
+
+
+def _kconfig_ctx(old_log: str, new_log: str, assign: str = "STDOUT_CONSOLE") -> Any:
+    """A ScanContext stand-in for KconfigAnalyzer: one assignment in prj.conf, the symbol
+    defined at both refs and unset in both .configs, and each configure's log."""
+    from zmig.diagnostics import parse_log
+    from zmig.usage import Loc
+
+    sym = {"depends": "!NATIVE_APPLICATION", "selects": [], "implies": [], "defaults": []}
+    return SimpleNamespace(
+        old_config={},
+        new_config={},
+        old_kconfig={assign: sym},
+        new_kconfig={assign: sym},
+        old_facts=parse_log(old_log),
+        new_raw_facts=parse_log(new_log),
+        usage=SimpleNamespace(
+            kconfig_set={assign: [(Loc("prj.conf", 1, f"CONFIG_{assign}=y"), "y")]},
+            kconfig_read={},
+        ),
+        old_spec="v4.1.0",
+        new_spec="v4.2.0",
+        scope=("s",),
+        salvage=(),
+        is_app=True,
+        runner=SimpleNamespace(redact=lambda s: s),
+    )
+
+
+def test_value_not_taken_at_both_refs_is_not_a_migration_finding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AUDIT.md F1/§5.2: samples/subsys/settings sets CONFIG_STDOUT_CONSOLE=y, which
+    native_sim never honours; v4.1.0 printed the same warning as v4.2.0."""
+    from tests.test_diagnostics import STDOUT_CONSOLE_LOG
+    from zmig.analyzers.kconfig import KconfigAnalyzer
+    from zmig.findings import Severity
+
+    monkeypatch.setattr(KconfigAnalyzer, "_promote_dependencies", staticmethod(lambda *a: None))
+    old, new = STDOUT_CONSOLE_LOG.format(line=156), STDOUT_CONSOLE_LOG.format(line=160)
+
+    (f,) = KconfigAnalyzer().analyze(_kconfig_ctx(old, new)).findings
+    assert f.kind == "value-not-taken" and f.subject == "CONFIG_STDOUT_CONSOLE"
+    assert f.severity is Severity.INFO
+    assert "already" in f.title and "v4.1.0" in f.title
+    assert "kconfig.preexisting-diagnostic" in f.heuristics
+    assert not f.introduced_by_migration
+
+    # New at the target: still breaking, and the same finding ID either way.
+    (g,) = KconfigAnalyzer().analyze(_kconfig_ctx("", new)).findings
+    assert g.kind == "value-not-taken" and g.severity is Severity.BREAKING
+    assert g.id == f.id
+
+
+def test_preexisting_promptless_keeps_its_severity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A fatal Kconfig error at both refs is a defect, not a no-op: per DESIGN-P1 §2.3 it
+    keeps its severity and is marked pre-existing (only value-not-taken drops to info)."""
+    from zmig.analyzers.kconfig import KconfigAnalyzer
+    from zmig.findings import Severity
+
+    monkeypatch.setattr(KconfigAnalyzer, "_promote_dependencies", staticmethod(lambda *a: None))
+    log = (
+        "error: FOO (defined at drivers/Kconfig:{}) is assigned in a configuration file, "
+        "but is not directly user-configurable (has no prompt).\n"
+    )
+    (f,) = KconfigAnalyzer().analyze(_kconfig_ctx(log.format(1), log.format(2), "FOO")).findings
+    assert f.kind == "not-configurable" and f.severity is Severity.BREAKING
+    assert not f.introduced_by_migration and "pre-existing" in f.title
+    (g,) = KconfigAnalyzer().analyze(_kconfig_ctx("", log.format(2), "FOO")).findings
+    assert g.introduced_by_migration and "pre-existing" not in g.title
+
+
+def test_preexisting_devicetree_errors_keep_their_severity(tmp_path: Path) -> None:
+    """DESIGN-P1 §2.3 for the devicetree configure errors: same error at both refs ->
+    pre-existing, severity unchanged."""
+    from zmig.analyzers.devicetree import DevicetreeAnalyzer
+    from zmig.diagnostics import parse_log
+    from zmig.findings import Severity
+
+    undeclared = (
+        "devicetree error: 'sjw' appears in /can in /b{}/zephyr/zephyr.dts.pre, but is not "
+        "declared in 'properties:' in /z/dts/bindings/can/zephyr,native-linux-can.yaml\n"
+        "devicetree error: /ws{}/zephyr/dts/common/x.dtsi:3 (column 1): parse error\n"
+    )
+
+    def run(old_log: str) -> list[Any]:
+        ctx = SimpleNamespace(
+            old_edt={"nodes": {}, "chosen": {}},
+            new_edt={"nodes": {}, "chosen": {}},
+            old_facts=parse_log(old_log),
+            new_raw_facts=parse_log(undeclared.format(2, 2)),
+            new_raw=SimpleNamespace(src=tmp_path),
+            usage=SimpleNamespace(
+                app=tmp_path, dt_nodes=[], dt_props_set=[], dt_props_read=[], dt_compats={}
+            ),
+            build_files=set(),
+            new_spec="v4.2.0",
+            scope=("s",),
+            runner=SimpleNamespace(redact=lambda s: s),
+        )
+        return [
+            f
+            for f in DevicetreeAnalyzer().analyze(ctx).findings  # type: ignore[arg-type]
+            if f.kind in ("property-undeclared", "dt-error")
+        ]
+
+    pre = run(undeclared.format(1, 1))
+    assert len(pre) == 2
+    for f in pre:
+        assert f.severity is Severity.BREAKING
+        assert not f.introduced_by_migration and "pre-existing" in f.title
+    assert all(f.introduced_by_migration for f in run(""))

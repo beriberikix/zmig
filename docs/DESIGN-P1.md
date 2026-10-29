@@ -66,6 +66,7 @@ nothing below is hard-coded unless §10 says so.
 - **Diff findings** (something changed between refs) are `true` by construction.
 - **Condition findings** (a check that can be evaluated on a single build: cross-image consistency, slot-size requirements, partition overlaps) are evaluated on **both** builds. Present in the target and absent in the source means `true`. Present in both and **unchanged** means `false`, and the title says "pre-existing". Present in both but different (e.g. a mismatch that grew) means `true`, with both states in old/new.
 - **Severity is not lowered** for pre-existing problems, as you specified.
+- **Configure diagnostics are condition findings too** (2026-10-29, AUDIT.md F1): a Kconfig or devicetree diagnostic the source configure printed identically (same symbol, node and values; "defined at" lines and build paths ignored, `diagnostics.preexisting()`) is pre-existing. Fatal ones (`not-configurable`, `property-undeclared`, `dt-error`) keep their severity per the rule above. **One exception:** a pre-existing `value-not-taken` ("assigned y but got n" at both refs) is `info`, because the assignment never took effect and nothing the app relies on changes; it is not a defect the way an image disagreement is.
 - **Reports:** Markdown separates "Introduced by this migration" from "Pre-existing"; top-5 prefers introduced.
 
 ### 2.4 Provenance and remedy on every hazard finding
