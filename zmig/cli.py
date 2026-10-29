@@ -130,6 +130,23 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--to", dest="to_ref", required=True)
     _scan_args(scan)
 
+    doctor = sub.add_parser(
+        "doctor",
+        parents=[common],
+        help="check the host tools and the toolchain a board needs",
+        description="Checks git, CMake, Ninja, dtc, the host GCC (32-bit for native_sim), "
+        "Python and Zephyr's build packages, and a Zephyr SDK with the board's toolchain. "
+        "Exit 0 if no check failed, else 1.",
+    )
+    doctor.add_argument("--board", help="the board you will scan (e.g. nucleo_h563zi)")
+    doctor.add_argument("--sdk", type=Path, help="the Zephyr SDK you will pass to zmig scan")
+    doctor.add_argument(
+        "--ref",
+        default="HEAD",
+        help="Zephyr ref to read the board's yaml and SDK_VERSION from (default: the "
+        "cached mirror's HEAD)",
+    )
+
     watch = sub.add_parser(
         "watch",
         parents=[common],
@@ -622,7 +639,19 @@ def main(argv: list[str] | None = None) -> int:
     runner = Runner(
         log_dir=log_dir, redactions={str(cache.root): "$ZMIG_CACHE", str(Path.home()): "~"}
     )
+    if os.environ.get("PYTHONPATH"):
+        print(
+            "zmig: warning: PYTHONPATH is set; zmig removes it from the builds and tools it "
+            "runs. If zmig itself fails to import, run `env -u PYTHONPATH zmig ...`.",
+            file=sys.stderr,
+        )
     try:
+        if args.command == "doctor":
+            from zmig.doctor import format_checks, run_checks
+
+            checks = run_checks(args.board, args.sdk, args.ref, cache)
+            print(format_checks(checks))
+            return EXIT_ERROR if any(c.status == "FAIL" for c in checks) else EXIT_OK
         if args.command == "scan":
             return cmd_scan(args, cache, runner)
         if args.command == "plan":

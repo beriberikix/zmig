@@ -13,7 +13,10 @@ evidence (a file and line, or an artifact diff), and a suggested action. Output 
 zmig never modifies your tree: it clones its own copy of Zephyr into a cache and builds
 copies of your app there.
 
-## 5-minute quickstart
+## Quickstart
+
+**Time:** the first run clones a Zephyr mirror of about 1 GB into `~/.cache/zmig`, which
+takes about 20 minutes on a slow link. After that, a scan takes about 5 minutes.
 
 **Prerequisites:** Linux, Python 3.12+, git ≥ 2.38, CMake, Ninja, `dtc`, and a host GCC
 with 32-bit multilib (for `native_sim`; e.g. `apt install gcc-multilib`). Other boards
@@ -29,6 +32,21 @@ uv pip install --python .venv/bin/python -e '.[zephyr]'
 The `zephyr` extra installs the Python packages Zephyr's own build scripts import
 (pyelftools, PyYAML, pykwalify, …, reuse for `west spdx`), because zmig runs `west build`
 with its own interpreter.
+
+**0. Check the machine**
+
+```sh
+zmig doctor --board native_sim_64     # or the board you will scan, and --sdk <dir>
+```
+
+This checks git (≥ 2.38), CMake, Ninja, `dtc`, the host GCC (32-bit for `native_sim`), the
+Python packages, and a Zephyr SDK with the board's toolchain. Each failed check says what
+to install. The SDK check reads the board's architecture from the cached Zephyr mirror, so
+it can only match the board after the first `scan` or `plan`.
+
+If `PYTHONPATH` is set (ROS sets it, for example), zmig warns and removes it from every
+command it runs. If zmig itself then fails to import, run it as
+`env -u PYTHONPATH zmig …`.
 
 **1. Plan: what happens to your workspace and patches?**
 
@@ -47,8 +65,8 @@ unrecorded changes; and a suggested upgrade path through LTS releases for large 
 zmig scan --app path/to/app --board native_sim_64 --from v3.6.0 --to v3.7.0 --out out/scan
 ```
 
-The first run clones Zephyr (~1 GB) into `~/.cache/zmig`; later runs reuse it and every
-build. Add `--module <name>` for each west module your app needs, `--fast` for a
+The first run clones Zephyr (~1 GB, about 20 minutes on a slow link) into `~/.cache/zmig`;
+later runs reuse it and every build. Add `--module <name>` for each west module your app needs, `--fast` for a
 configure-only comparison, and `--to-board` if you know the target board name.
 
 **3. Read the results**

@@ -162,7 +162,9 @@ class Runner:
         args = [str(a) for a in argv]
         inv_id = f"cmd-{len(self.invocations) + 1:03d}"
         full_env = dict(os.environ)
-        for k in unset_env:
+        # PYTHONPATH from another environment (e.g. ROS) makes west, Zephyr's scripts and
+        # kconfiglib import the wrong packages; nothing zmig runs needs it.
+        for k in (*unset_env, "PYTHONPATH"):
             full_env.pop(k, None)
         full_env.update(env or {})
         log.info("$ %s%s", " ".join(args), f"  (in {cwd})" if cwd else "")
@@ -198,7 +200,7 @@ class Runner:
             env_lines = "".join(f"  {k}={v}\n" for k, v in sorted((env or {}).items()))
             log_path.write_text(
                 f"argv: {args}\ncwd: {cwd}\nenv overrides:\n{env_lines}"
-                f"unset: {list(unset_env)}\nexit: {proc.returncode}\n"
+                f"unset: {sorted({*unset_env, 'PYTHONPATH'})}\nexit: {proc.returncode}\n"
                 f"duration_s: {duration:.3f}\n"
                 f"--- stdout ---\n{proc.stdout}\n--- stderr ---\n{proc.stderr}"
             )
