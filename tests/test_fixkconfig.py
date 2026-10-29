@@ -15,8 +15,12 @@ import pytest
 
 from zmig.cli import main
 from zmig.fixkconfig import (
+    REMOVE_KIND,
     Assignment,
+    FilePlan,
+    apply_plan,
     classify,
+    comment_out,
     drop_conflicts,
     parse_conf,
     plan_edits,
@@ -139,7 +143,8 @@ def test_alias_default_is_kconfig_evidence_but_a_folded_menu_condition_is_not() 
         {"CAN_AUTO_BUS_OFF_RECOVERY": can_child, "CAN": CPP},
         {"CAN": CPP},
     )
-    assert q.category == "needs-human" and q.new_symbol is None
+    # No Kconfig replacement and no guide entry: the remove category, never a rename to CAN.
+    assert q.category == "remove" and q.new_symbol is None
 
 
 def test_type_mismatch_unresolved_deps_and_no_prompt_block_the_rename() -> None:
@@ -260,3 +265,92 @@ def test_apply_refuses_a_dirty_tree(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert main(argv) == 2
     assert "is dirty" in capsys.readouterr().err
     assert (app / "prj.conf").read_text() == "CONFIG_CPLUSPLUS=n\n"
+
+
+# --- remove with no replacement ---------------------------------------------------------
+
+PINMUX = {**CPP, "prompt": "Pinmux driver", "locations": ["drivers/pinmux/Kconfig:9"]}
+
+
+def test_removed_with_no_replacement_and_no_guide_mention_is_removed() -> None:
+    """ZMK's planck_rev6_defconfig:10 CONFIG_PINMUX=y: menuconfig PINMUX at v3.2
+    (drivers/pinmux/Kconfig:9), gone at v3.5, no Kconfig replacement, no guide entry."""
+    p = _classify(_a("PINMUX"), {"PINMUX": PINMUX}, {"CPP": CPP})
+    assert (p.category, p.evidence_kind, p.new_symbol) == ("remove", REMOVE_KIND, None)
+    assert p.note == "# zmig: CONFIG_PINMUX removed in v2: no replacement evidenced"
+    assert any("no migration-guide entry mentions it" in r for r in p.reasons)
+
+
+def test_a_guide_mention_keeps_a_removed_symbol_for_a_human() -> None:
+    """The guide can name a replacement outside Kconfig (ZMK's SSD1306_REVERSE_MODE became
+    the devicetree property inversion-on): then "no replacement evidenced" isn't true."""
+    entry = _entry("CONFIG_SSD1306_REVERSE_MODE was removed; use the inversion-on property.")
+    old = {"SSD1306_REVERSE_MODE": {**CPP, "locations": ["drivers/display/Kconfig.ssd1306:30"]}}
+    p = _classify(_a("SSD1306_REVERSE_MODE"), old, {"CPP": CPP}, [entry])
+    assert p.category == "needs-human"
+    assert any("may name a replacement outside Kconfig" in r for r in p.reasons)
+    # A guide rename keeps it for a human too (DEBUG_INFO on ARM, CAN_AUTO_BUS_OFF_RECOVERY).
+    ren = _entry(
+        "Renamed CONFIG_DEBUG_INFO to CONFIG_X86_DEBUG_INFO.", (("DEBUG_INFO", "X86_DEBUG_INFO"),)
+    )
+    assert (
+        _classify(_a("DEBUG_INFO"), {"DEBUG_INFO": DEBUG_INFO}, {"CPP": CPP}, [ren]).category
+        == "needs-human"
+    )
+
+
+def test_comment_out_keeps_comments_and_values_and_is_idempotent() -> None:
+    note = "# zmig: CONFIG_PINMUX removed in v3.5: no replacement evidenced"
+    text = (
+        "CONFIG_PINCTRL=y\r\n"
+        "# enable pinmux\r\n"
+        "  CONFIG_PINMUX=y  # old driver\r\n"
+        "# CONFIG_PINMUX is not set\r\n"
+        "CONFIG_GPIO=y"
+    )
+    out = comment_out(text, {3: ("PINMUX", note), 4: ("PINMUX", note)})
+    assert out == (
+        "CONFIG_PINCTRL=y\r\n"
+        "# enable pinmux\r\n"
+        f"  {note}\r\n"
+        "  # CONFIG_PINMUX=y  # old driver\r\n"
+        f"{note}\r\n"
+        "# # CONFIG_PINMUX is not set\r\n"
+        "CONFIG_GPIO=y"
+    )
+    assert [s for _, _, s, _ in parse_conf(out)] == ["PINCTRL", "GPIO"]  # no longer assigned
+    assert comment_out(out, {3: ("PINMUX", note)}) == out  # line 3 is now the note: untouched
+
+
+def test_plan_edits_separates_the_remove_kind(tmp_path: Path) -> None:
+    f = tmp_path / "planck_rev6_defconfig"
+    f.write_text("# enable pinmux\nCONFIG_PINMUX=y\nCONFIG_CPLUSPLUS=y\n")
+    rm = _classify(
+        Assignment(
+            "b/planck_rev6_defconfig", f, 2, "CONFIG_PINMUX=y", "CONFIG_", "PINMUX", "y", "app"
+        ),
+        {"PINMUX": PINMUX},
+        {"CPP": CPP},
+    )
+    rn = _classify(
+        Assignment(
+            "b/planck_rev6_defconfig",
+            f,
+            3,
+            "CONFIG_CPLUSPLUS=y",
+            "CONFIG_",
+            "CPLUSPLUS",
+            "y",
+            "app",
+        ),
+        {"CPLUSPLUS": CPLUSPLUS, "CPP": CPP},
+        {"CPP": CPP},
+    )
+    removes = plan_edits([rm, rn], REMOVE_KIND)
+    renames = plan_edits([rm, rn], "deprecation select")
+    assert removes[f].edits == {2: ("PINMUX", rm.note)} and renames[f].edits == {
+        3: ("CPLUSPLUS", "CPP")
+    }
+    after = apply_plan(apply_plan(f.read_text(), renames[f]), removes[f])
+    assert after == f"# enable pinmux\n{rm.note}\n# CONFIG_PINMUX=y\nCONFIG_CPP=y\n"
+    assert apply_plan("x\n", FilePlan(f, "p", REMOVE_KIND, {})) == "x\n"

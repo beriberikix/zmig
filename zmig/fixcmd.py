@@ -17,13 +17,14 @@ from zmig.cache import Cache
 from zmig.errors import UsageError
 from zmig.findings import Report, Severity
 from zmig.fixkconfig import (
+    REMOVE_KIND,
     Assignment,
     Proposal,
+    apply_plan,
     classify,
     drop_conflicts,
     parse_conf,
     plan_edits,
-    rewrite,
     unified_diff,
 )
 from zmig.report import render
@@ -33,7 +34,8 @@ from zmig.snapshots import kconfig_symbols, kconfig_try
 from zmig.tools import Runner
 
 EXIT_INTRODUCED = 3
-KINDS = ("deprecation select", "alias")
+KINDS = ("deprecation select", "alias", REMOVE_KIND)
+RENAME_KINDS = KINDS[:2]
 
 
 def _git(runner: Runner, root: Path, *args: str, check: bool = True) -> str:
@@ -176,7 +178,11 @@ def format_plan(props: list[Proposal], col: Collected, header: str) -> str:
                 f"Fix: rename ({k}), Kconfig evidence",
                 [p for p in props if p.category == "rename" and p.evidence_kind == k],
             )
-            for k in KINDS
+            for k in RENAME_KINDS
+        ),
+        (
+            f"Fix: remove ({REMOVE_KIND}): comment out with a note",
+            [p for p in props if p.category == "remove"],
         ),
         ("Needs a human (not edited)", [p for p in props if p.category == "needs-human"]),
         (
@@ -286,14 +292,22 @@ def cmd_fix(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
             continue
         body = []
         for fp in files.values():
-            fp.file.write_text(rewrite(fp.file.read_text(), fp.edits))
+            fp.file.write_text(apply_plan(fp.file.read_text(), fp))
             _git(runner, root, "add", "--", fp.path)
             for line, (old, new) in sorted(fp.edits.items()):
-                body.append(f"- {fp.path}:{line}: CONFIG_{old} -> CONFIG_{new}")
+                removing = kind == REMOVE_KIND
+                body.append(
+                    f"- {fp.path}:{line}: CONFIG_{old} commented out ({REMOVE_KIND})"
+                    if removing
+                    else f"- {fp.path}:{line}: CONFIG_{old} -> CONFIG_{new}"
+                )
                 if fp.file.is_relative_to(app):
-                    edits.append((fp.file.relative_to(app).as_posix(), line, new))
+                    edits.append(
+                        (fp.file.relative_to(app).as_posix(), line, old if removing else new)
+                    )
+        what = "remove" if kind == REMOVE_KIND else "rename"
         msg = (
-            f"zmig fix kconfig: rename ({kind})\n\n"
+            f"zmig fix kconfig: {what} ({kind})\n\n"
             + "\n".join(body)
             + (
                 f"\n\nKconfig evidence from {ctx.old_spec} and {ctx.new_spec}; see `zmig fix "

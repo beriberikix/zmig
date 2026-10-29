@@ -64,8 +64,9 @@ The conf-level changes this bump needed were deletions and an addition, not rena
   replacement is reported as **needs-human** and not edited (`classify` in
   `zmig/fixkconfig.py`; `plan_edits` only takes `rename`).
 - I read "auto-apply only with Kconfig-level evidence" as covering every edit. That was my
-  interpretation, not something the review said, and I didn't flag the deviation. Per
-  this round's instruction ("no new fixers"), it stays unimplemented.
+  interpretation, not something the review said, and I didn't flag the deviation. It
+  stayed unimplemented that round ("no new fixers"), and was implemented in the next one
+  (below).
 
 **Evidence: what the existing runs did with PINMUX and the other removed-symbol
 overrides.**
@@ -193,4 +194,92 @@ Comparing reports by finding id, 59 → 59 findings, one changed:
 | Before | After |
 |---|---|
 | breaking `read-symbol-removed` CONFIG_PINMUX, citing `boards/arm/{mikoto,nrfmicro,puchi_ble}/CMakeLists.txt:2` (other boards, not in this build) | breaking `symbol-removed` "CONFIG_PINMUX, set in boards/arm/planck/planck_rev6_defconfig, no longer exists", at `planck_rev6_defconfig:10`, the line the maintainers deleted |
+
+## Remove with no replacement (implemented, as approved)
+
+**Rule** (`classify` in `zmig/fixkconfig.py`). A removed-symbol assignment is in the
+`remove` category when all of these hold:
+
+- the symbol is absent from the target's Kconfig tree of the image that reads it;
+- no Kconfig-level replacement is evidenced in the source tree;
+- the migration guide names no rename for it;
+- **and no migration-guide entry mentions it at all.**
+
+**Narrowing, flagged when it was made:** the last condition goes beyond the approval. A
+guide entry can name a replacement outside Kconfig: ZMK's `SSD1306_REVERSE_MODE` became
+the devicetree property `inversion-on`. In that case "no replacement evidenced" would be
+false, and commenting the line out would drop behaviour silently. Such lines stay
+**needs-human**.
+
+**Edit** (`comment_out`):
+
+- the line is kept whole after `# `, including its own trailing comment;
+- the note `# zmig: CONFIG_X removed in <target ref>: no replacement evidenced` goes above
+  it;
+- comments above the line are kept;
+- `# CONFIG_X is not set` becomes `# # CONFIG_X is not set`, so Kconfig no longer reads it;
+- a second run finds nothing to do.
+
+**Safety:**
+
+- the remove category is its own commit: `zmig fix kconfig: remove (no replacement
+  evidenced)`;
+- dry run by default; `--apply` refuses a dirty tree and works on a new branch;
+- after `--apply`, the target is rebuilt and the analyzers rerun, and findings are split
+  into revealed and introduced. A new finding counts as introduced if it cites an edited
+  line, is about a written symbol, or appears when nothing was hidden before.
+
+**Tests:**
+
+- `tests/test_fixkconfig.py`: the rule, the guide-mention case, comment-out (comments,
+  values, CRLF, `is not set`, idempotence) and the separate edit kind;
+- `tests/test_fix_apply.py`: `--apply` with the scan stubbed out, so no build is needed.
+  It covers the branch, the commit and its message, the committed file, revealed versus
+  introduced, exit 3 only for introduced, and that a dry run edits nothing;
+- `tests/test_fix_fixture.py` (`-m build`, cached): unchanged, still passes.
+
+**ZMK re-run** (tuned project), on the cached planck configuration with
+`GIT_ALLOW_PROTOCOL=file`: exit 0, 34 s, dry run. The scratch tree is unchanged
+(`b8846cf6`, clean).
+
+```
+Fix: remove (no replacement evidenced): comment out with a note [1]
+  app/boards/arm/planck/planck_rev6_defconfig:10  CONFIG_PINMUX=y
+      CONFIG_PINMUX is not defined in the tgt@339570e2393b Kconfig tree of app
+      no replacement is evidenced in the src@1ae0eb5ce8ad Kconfig tree
+      no migration-guide entry mentions it
+```
+
+**Next to the maintainers' `802881b6`.** The P3 side covers all of ZMK's fragments: the
+static sweep, with zmig's real `comment_out` and note. dz60rgb wasn't a scanned build.
+PINMUX's guide check is from the planck run, and it's the same symbol.
+
+| File | P3 dry-run diff | Maintainers (`802881b6`) |
+|---|---|---|
+| `dz60rgb_rev1_defconfig:9` | `-CONFIG_PINMUX=y`<br>`+# zmig: CONFIG_PINMUX removed in tgt@339570e2393b: no replacement evidenced`<br>`+# CONFIG_PINMUX=y`<br>(keeps `# enable pinmux`) | `-# enable pinmux`<br>`-CONFIG_PINMUX=y`<br>`-` (blank line) |
+| `planck_rev6_defconfig:10` | the same | `-` (blank line)<br>`-# enable pinmux`<br>`-CONFIG_PINMUX=y` |
+| `ferris_rev02_defconfig` | nothing (no assignment of a removed symbol) | `# enable PINMUX` → `# enable PINCTRL` (comment only) |
+
+- **Same lines:** both removed-symbol assignments the maintainers removed, and no others.
+- **Style difference:** the maintainers deleted each line with its comment and a blank
+  line. P3 comments the line out, adds its note, and keeps the comment.
+- **The maintainers changed one line P3 doesn't touch:** ferris's comment.
+
+### The 37 symbols the sweep didn't judge, and why
+
+The sweep can only judge a symbol that is in one of the Kconfig trees it has: the four
+existing builds, corne and planck at both refs. These 37 are in neither source tree nor
+target tree:
+
+- **26 `BOARD_*` symbols** (`BOARD_ADV360PRO_LEFT`, `BOARD_GLOVE80_LH`, …). Each is
+  defined only when its own board is built; a nice_nano or planck build doesn't define
+  them.
+- **7 `CLOCK_STM32_*` symbols** in `ferris_rev02_defconfig` (an STM32F0 board). They exist
+  only in an STM32F0 board's tree, or are gone already at v3.2. Neither scanned build can
+  tell which.
+- **4 `CUSTOM_WIDGET_*` symbols** of one shield that wasn't built.
+
+Judging them would need a build of each of those boards at both refs. That wasn't done:
+no network work this session, and those builds aren't cached. The maintainers changed
+none of the 37 in this bump.
 

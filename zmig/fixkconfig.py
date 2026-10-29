@@ -35,7 +35,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 Symbols = dict[str, dict[str, Any]]
-Category = Literal["rename", "needs-human", "deps-unmet"]
+Category = Literal["rename", "remove", "needs-human", "deps-unmet"]
+REMOVE_KIND = "no replacement evidenced"
 
 # `CONFIG_FOO=value  # comment` and `# CONFIG_FOO is not set` (which assigns n).
 _SET = re.compile(r"^(?P<lead>\s*)(?P<prefix>SB_CONFIG_|CONFIG_)(?P<sym>\w+)(?P<rest>\s*=.*)$")
@@ -70,8 +71,10 @@ class Proposal:
     assignment: Assignment
     category: Category
     new_symbol: str | None = None
-    evidence_kind: str = ""  # rename only: "deprecation select" or "alias"
+    # rename: "deprecation select" or "alias"; remove: REMOVE_KIND
+    evidence_kind: str = ""
     reasons: tuple[str, ...] = ()
+    note: str = ""  # remove only: the annotation written above the commented-out line
 
     def to_json(self) -> dict[str, Any]:
         a = self.assignment
@@ -115,6 +118,29 @@ def rewrite(text: str, edits: dict[int, tuple[str, str]]) -> str:
             continue
         lines[n - 1] = body[: m.start("sym")] + new + body[m.end("sym") :] + line[len(body) :]
     return "".join(lines)
+
+
+def comment_out(text: str, edits: dict[int, tuple[str, str]]) -> str:
+    """Comment out each edited line (line -> (symbol, note)) and put the note above it.
+    The line itself is kept whole after `# `, with its own trailing comment; comments
+    above it stay. A line whose symbol isn't the expected one is left alone."""
+    lines = text.splitlines(keepends=True)
+    for n, (sym, note) in sorted(edits.items(), reverse=True):
+        if not 1 <= n <= len(lines):
+            continue
+        line = lines[n - 1]
+        body = line.rstrip("\r\n")
+        m = _UNSET.match(body) or _SET.match(body)
+        if m is None or m["sym"] != sym:
+            continue
+        eol = line[len(body) :] or "\n"
+        lead = body[: len(body) - len(body.lstrip())]
+        lines[n - 1 : n] = [lead + note + eol, lead + "# " + body.lstrip() + line[len(body) :]]
+    return "".join(lines)
+
+
+def apply_plan(text: str, fp: FilePlan) -> str:
+    return comment_out(text, fp.edits) if fp.kind == REMOVE_KIND else rewrite(text, fp.edits)
 
 
 def _default_names(defaults: Iterable[str], sym: str) -> bool:
@@ -205,7 +231,20 @@ def classify(
         if not guide_named:
             reasons.append(f"no replacement is evidenced in the {old_spec} Kconfig tree")
         reasons.extend(_value_changes(entries, sym, *guide_named))
-        return Proposal(a, "needs-human", reasons=tuple(reasons))
+        mentioned = guide_hits(entries, sym)
+        if guide_named or mentioned:
+            # The guide may name a replacement outside Kconfig (a devicetree property, an
+            # API), so "no replacement evidenced" wouldn't be true.
+            reasons.extend(
+                f"not removed: the {e.version} migration guide mentions it ({e.id}); it may "
+                "name a replacement outside Kconfig"
+                for e in mentioned
+                if not guide_named
+            )
+            return Proposal(a, "needs-human", reasons=tuple(reasons))
+        reasons.append("no migration-guide entry mentions it")
+        note = f"# zmig: {a.prefix}{sym} removed in {new_spec}: {REMOVE_KIND}"
+        return Proposal(a, "remove", None, REMOVE_KIND, tuple(reasons), note)
     present = [(n, k, w) for n, k, w in cands if n in new]
     if len(present) != 1:
         found = ", ".join(f"{a.prefix}{n} ({w})" for n, _, w in cands)
@@ -270,6 +309,8 @@ def _same(a: str, b: str) -> bool:
 class FilePlan:
     file: Path
     path: str
+    kind: str = ""
+    # rename: line -> (old symbol, new symbol); remove: line -> (symbol, note)
     edits: dict[int, tuple[str, str]] = field(default_factory=dict)
 
 
@@ -281,16 +322,18 @@ def plan_edits(props: Iterable[Proposal], kind: str) -> dict[Path, FilePlan]:
     for p in props:
         a = p.assignment
         key = (a.file, a.line)
-        ok = p.category == "rename" and p.evidence_kind == kind and p.new_symbol
-        by_line.setdefault(key, set()).add(
-            (a.symbol, p.new_symbol) if ok and p.new_symbol else None
-        )
+        if kind == REMOVE_KIND:
+            edit = (a.symbol, p.note) if p.category == "remove" else None
+        else:
+            ok = p.category == "rename" and p.evidence_kind == kind and p.new_symbol
+            edit = (a.symbol, p.new_symbol) if ok and p.new_symbol else None
+        by_line.setdefault(key, set()).add(edit)
         paths[a.file] = a.path
     out: dict[Path, FilePlan] = {}
     for (f, line), edits in sorted(by_line.items()):
         only = next(iter(edits))
         if len(edits) == 1 and only is not None:
-            out.setdefault(f, FilePlan(f, paths[f])).edits[line] = only
+            out.setdefault(f, FilePlan(f, paths[f], kind)).edits[line] = only
     return out
 
 
@@ -298,7 +341,7 @@ def unified_diff(plans: Iterable[FilePlan]) -> str:
     out: list[str] = []
     for fp in plans:
         before = fp.file.read_text()
-        after = rewrite(before, fp.edits)
+        after = apply_plan(before, fp)
         out.extend(
             difflib.unified_diff(
                 before.splitlines(keepends=True),
