@@ -289,6 +289,7 @@ _W_INCLUDED = re.compile(r"^(?:In file included|\s+) from (?P<file>[^\s:]+):(?P<
 _W_FUNCTION = re.compile(r"^(?P<file>[^\s:]+): In (?:function|member function) '[^']*':$")
 _W_NOTE = re.compile(r"^(?P<file>[^\s:]+):(?P<line>\d+):(?:\d+:)? note: (?P<msg>.*)$")
 _W_EXCERPT = re.compile(r"^\s+\d*\s*\|")
+_DEFINED_AT = re.compile(r"\(defined\s+at\s+[^)]*\)")
 
 
 @dataclass(frozen=True)
@@ -313,7 +314,12 @@ class BuildWarning:
                 s = s.replace(prefix, token)
             return " ".join(s.split())
 
-        return (self.source, norm(self.file), norm(self.message))
+        message = self.message
+        if self.source == "kconfig":
+            # Kconfig names definitions inline: "(defined at lib/libc/Kconfig:156)" moved
+            # to :160 between v4.1 and v4.2 with the warning unchanged.
+            message = _DEFINED_AT.sub(lambda m: re.sub(r":\d+\b", "", m[0]), message)
+        return (self.source, norm(self.file), norm(message))
 
 
 def compiler_sites(lines: list[str], i: int) -> tuple[tuple[str, int], ...]:

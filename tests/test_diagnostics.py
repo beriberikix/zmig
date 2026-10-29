@@ -153,3 +153,17 @@ def test_required_property_missing_names_property_node_and_binding() -> None:
     assert d.kind == "dt-error"
     assert (d.symbol, d.node) == ("phy-handle", "/soc/ethernet@40028000")
     assert d.binding == "/z/dts/bindings/ethernet/st,stm32-ethernet.yaml"
+
+
+def test_kconfig_warning_identity_ignores_moved_definitions() -> None:
+    """The buildlog analyzer reported the settings sample's STDOUT_CONSOLE warning as new at
+    v4.2.0 plus "1 warning resolved": only lib/libc/Kconfig:156 -> :160 differed (the F1
+    class of AUDIT.md, in BuildWarning.key)."""
+    from zmig.diagnostics import parse_warnings
+
+    (old,) = parse_warnings(STDOUT_CONSOLE_LOG.format(line=156))
+    (new,) = parse_warnings(STDOUT_CONSOLE_LOG.format(line=160))
+    assert old.source == "kconfig"
+    assert old.key({}) == new.key({})
+    other = STDOUT_CONSOLE_LOG.format(line=156).replace("got the\nvalue 'n'", "got the\nvalue 'm'")
+    assert parse_warnings(other)[0].key({}) != new.key({})
