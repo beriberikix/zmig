@@ -197,3 +197,62 @@ def test_dry_run_edits_nothing(
     assert "Fix: remove (no replacement evidenced): comment out with a note [1]" in out
     assert "+# zmig: CONFIG_PINMUX removed in v3.5: no replacement evidenced" in out
     assert f.read_text() == before and _git(project, "branch", "--show-current").strip() == "main"
+
+
+def test_kconfig_overrides_of_removed_symbols_are_listed_never_edited() -> None:
+    """ZMK's five orphaned overrides, from the target build's own Kconfig warnings (the
+    scan's kconfig-override-orphaned findings; the real messages, home directory replaced).
+    Every location the warning names is listed, mapped back to the app."""
+    import json
+
+    from zmig.findings import Report as _R
+
+    msgs = json.loads((Path(__file__).parent / "fixtures/zmk-overrides/messages.json").read_text())
+    copy = Path(
+        "/home/user/.cache/zmig/workspaces/339570e2393b108bf8f9241018ecaf5615c25469/apps/c81d0237f8e705d7/app"
+    )
+    fs = [
+        Finding(
+            Category.BUILD,
+            "kconfig-override-orphaned",
+            sym,
+            sym,
+            Severity.BREAKING,
+            Confidence.HIGH,
+            "act",
+            "buildlog",
+            ("s",),
+            (),
+            None,
+            {"message": m},
+        )
+        for sym, m in sorted(msgs.items())
+    ]
+    # The warning names copy c81d…, from a build reused from an earlier run; this run's
+    # copy is another one (regression: no location was mapped back to the app).
+    build = SimpleNamespace(
+        workspace=SimpleNamespace(root=copy.parents[2]),
+        src=copy.parent.parent / "6b9e9f511eba0965" / "app",
+    )
+    got = {
+        o.symbol: o
+        for o in fixcmd.overrides(_R("scan", "0", {}, {}, findings=fs), Path("/x/app"), [build])
+    }
+    assert sorted(got) == [
+        "CONFIG_BT_LL_SW_LLCP_IMPL",
+        "CONFIG_LV_Z_DPI",
+        "CONFIG_LV_Z_MEM_POOL_MAX_SIZE",
+        "CONFIG_LV_Z_MEM_POOL_MIN_SIZE",
+        "CONFIG_SSD1306_REVERSE_MODE",
+    ]
+    assert got["CONFIG_LV_Z_DPI"].locations[0] == "boards/shields/corne/Kconfig.defconfig:34"
+    assert len(got["CONFIG_SSD1306_REVERSE_MODE"].locations) == 22
+    assert len(got["CONFIG_LV_Z_DPI"].locations) == 21
+    assert got["CONFIG_BT_LL_SW_LLCP_IMPL"].locations == ("Kconfig:175",)
+    assert got["CONFIG_LV_Z_MEM_POOL_MIN_SIZE"].locations == ("src/display/Kconfig:32",)
+    assert all(not loc.startswith("/") for o in got.values() for loc in o.locations)
+    text = fixcmd.format_plan([], fixcmd.Collected([], []), "h", list(got.values()))
+    assert (
+        "Needs a human: Kconfig-file overrides of symbols the target removed [5 symbol(s)" in text
+    )
+    assert "Nothing to fix" not in text

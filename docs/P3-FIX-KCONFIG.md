@@ -283,3 +283,33 @@ Judging them would need a build of each of those boards at both refs. That wasn'
 no network work this session, and those builds aren't cached. The maintainers changed
 none of the 37 in this bump.
 
+## Kconfig-file overrides of removed symbols (needs a human, never edited)
+
+`zmig fix kconfig` lists them from the scan's `kconfig-override-orphaned` findings. Their
+locations are taken from the target build's own Kconfig warning ("defined at …"), not
+from the sources, and mapped back to the app. Re-run on the cached ZMK planck
+configuration (tuned project), network off:
+
+```
+Needs a human: Kconfig-file overrides of symbols the target removed [5 symbol(s), 46 location(s)] (never edited)
+  CONFIG_BT_LL_SW_LLCP_IMPL: 1 location(s)       Kconfig:175
+  CONFIG_SSD1306_REVERSE_MODE: 22 location(s)    boards/shields/corne/Kconfig.defconfig:24, …
+  CONFIG_LV_Z_DPI: 21 location(s)                boards/shields/corne/Kconfig.defconfig:34, …
+  CONFIG_LV_Z_MEM_POOL_MIN_SIZE: 1 location(s)   src/display/Kconfig:32
+  CONFIG_LV_Z_MEM_POOL_MAX_SIZE: 1 location(s)   src/display/Kconfig:35
+```
+
+**A bug found on the way, and fixed.** The warning came from a target build reused from
+an earlier run, which was built from another copy of the app (`apps/c81d…/app`).
+Locations were mapped only against this run's copies, so the first run printed absolute
+cache paths.
+
+- `scan.from_copy` now maps any `<workspace>/apps/<tree hash>/<app name>/` path back to
+  the app.
+- The same rule fixes `ScanContext.config_files`, which would otherwise drop fragments a
+  reused build's log names.
+- There's a regression test for each: `tests/test_fix_apply.py` and
+  `tests/test_config_index.py`.
+
+Whether they could ever be auto-fixed: [DESIGN-KCONFIG-OVERRIDES.md](DESIGN-KCONFIG-OVERRIDES.md).
+

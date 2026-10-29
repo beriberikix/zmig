@@ -29,7 +29,7 @@ from zmig.fixkconfig import (
 )
 from zmig.report import render
 from zmig.report.human import target_build
-from zmig.scan import ScanContext
+from zmig.scan import ScanContext, from_copy
 from zmig.snapshots import kconfig_symbols, kconfig_try
 from zmig.tools import Runner
 
@@ -164,7 +164,50 @@ def propose(ctx: ScanContext, col: Collected) -> list[Proposal]:
     return drop_conflicts(props)
 
 
-def format_plan(props: list[Proposal], col: Collected, header: str) -> str:
+@dataclass(frozen=True)
+class Override:
+    """A Kconfig-file override of a symbol the target no longer defines, from the target
+    build's own Kconfig warning (the scan's `kconfig-override-orphaned` finding). Never
+    edited: see docs/DESIGN-KCONFIG-OVERRIDES.md."""
+
+    symbol: str
+    locations: tuple[str, ...]  # app-relative path:line, every one the build names
+    message: str
+
+    def to_json(self) -> dict[str, Any]:
+        return {"symbol": self.symbol, "locations": list(self.locations), "message": self.message}
+
+
+_DEFINED_AT = re.compile(r"defined at ([^)]*)\)")
+
+
+def overrides(report: Report, app: Path, builds: list[Any]) -> list[Override]:
+    """Every location of each orphaned override, from the warning's "defined at" list
+    (the finding's evidence keeps only the first few), mapped from any built copy of the
+    app back to the app (`from_copy`: the warning can come from a build reused from an
+    earlier run, built from another copy)."""
+    out = []
+    for f in report.findings:
+        if f.kind != "kconfig-override-orphaned":
+            continue
+        msg = (f.new or {}).get("message", "") if isinstance(f.new, dict) else ""
+        locs: list[str] = []
+        for m in _DEFINED_AT.finditer(msg):
+            for loc in m[1].split(", "):
+                path, _, line = loc.rpartition(":")
+                real = from_copy(Path(path), app, builds)
+                rel = real.relative_to(app).as_posix() if real is not None else path
+                if f"{rel}:{line}" not in locs:
+                    locs.append(f"{rel}:{line}")
+        if not locs:
+            locs = [f"{e['path']}:{e['line']}" for e in f.evidence if e.get("type") == "file_line"]
+        out.append(Override(f.subject, tuple(locs), msg.split(" (defined at")[0]))
+    return out
+
+
+def format_plan(
+    props: list[Proposal], col: Collected, header: str, ovr: list[Override] | None = None
+) -> str:
     files = sorted({a.path for a, _ in col.assignments})
     lines = [
         header,
@@ -201,11 +244,21 @@ def format_plan(props: list[Proposal], col: Collected, header: str) -> str:
             lines.append(f"  {a.path}:{a.line}{img}  {a.text}{arrow}")
             lines.extend(f"      {r}" for r in p.reasons)
         lines.append("")
+    if ovr:
+        n = sum(len(o.locations) for o in ovr)
+        lines.append(
+            f"Needs a human: Kconfig-file overrides of symbols the target removed [{len(ovr)} "
+            f"symbol(s), {n} location(s)] (never edited)"
+        )
+        for o in ovr:
+            lines.append(f"  {o.symbol}: {len(o.locations)} location(s)")
+            lines.extend(f"      {loc}" for loc in o.locations)
+        lines.append("")
     if col.outside:
         lines.append(f"Outside the project, never edited [{len(col.outside)}]")
         lines.extend(f"  {f}" for f in col.outside)
         lines.append("")
-    if not props:
+    if not props and not ovr:
         lines.append("Nothing to fix: every assignment is defined at the target.")
     return "\n".join(lines)
 
@@ -268,12 +321,19 @@ def cmd_fix(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     col = collect(ctx, app, root, args.sysbuild)
     props = propose(ctx, col)
     mode = "apply" if args.apply else "dry run; --apply commits these on a new branch"
-    print(format_plan(props, col, f"zmig fix kconfig: {ctx.old_spec} -> {ctx.new_spec} ({mode})"))
+    builds = [b for n in ("old", "new_raw", "new") if (b := getattr(ctx, n, None)) is not None]
+    ovr = overrides(before, app, builds)
+    header = f"zmig fix kconfig: {ctx.old_spec} -> {ctx.new_spec} ({mode})"
+    print(format_plan(props, col, header, ovr))
     plans = {k: plan_edits(props, k) for k in KINDS}
     diff = "".join(unified_diff(p.values()) for p in plans.values() if p)
     if diff:
         print(diff)
-    result: dict[str, Any] = {"proposals": [p.to_json() for p in props], "outside": col.outside}
+    result: dict[str, Any] = {
+        "proposals": [p.to_json() for p in props],
+        "overrides": [o.to_json() for o in ovr],
+        "outside": col.outside,
+    }
     if args.out:
         args.out.mkdir(parents=True, exist_ok=True)
         (args.out / "before").mkdir(exist_ok=True)

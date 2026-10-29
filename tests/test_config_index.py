@@ -20,7 +20,7 @@ def _build(tmp: Path, name: str) -> SimpleNamespace:
     workspace (Zephyr and modules) and the build directory."""
     ws = tmp / name / "ws"
     return SimpleNamespace(
-        src=ws / "apps" / "abc" / "app",
+        src=ws / "apps" / "6b9e9f511eba0965" / "app",
         workspace=SimpleNamespace(root=ws),
         dir=tmp / name / "build",
     )
@@ -48,6 +48,9 @@ def test_defconfig_assignments_come_from_the_build_log(tmp_path: Path) -> None:
         (APP / "prj.conf").resolve(),
         extra.resolve(),
     ]
+    # A build reused from an earlier run names that run's copy (another tree hash).
+    reused = f"Merged configuration '{new.workspace.root}/apps/c81d0237f8e705d7/app/prj.conf'"
+    assert user_files(fragments_named(reused), APP, [old, new]) == [(APP / "prj.conf").resolve()]  # type: ignore[list-item]
     u = usage_scan(APP, conf_files=files)
     ((loc, value),) = u.kconfig_set["PINMUX"]
     assert (loc.path, loc.line, loc.text, value) == (

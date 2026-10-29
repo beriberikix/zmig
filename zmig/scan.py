@@ -246,18 +246,32 @@ def fragments_named(log: str) -> list[str]:
     return _FRAGMENT.findall(log)
 
 
+def from_copy(p: Path, app: Path, builds: list[BuildContext]) -> Path | None:
+    """`p` in the user's app, if `p` is inside a built copy of it: any
+    `<workspace>/apps/<tree hash>/<app name>/` (buildctx.app_source), including the copy of
+    an earlier run whose build was reused from the cache. None otherwise."""
+    for b in builds:
+        try:
+            rel = p.relative_to(b.workspace.root.resolve() / "apps")
+        except ValueError:
+            continue
+        parts = rel.parts
+        if len(parts) >= 3 and re.fullmatch(r"[0-9a-f]{16}", parts[0]) and parts[1] == app.name:
+            return app.joinpath(*parts[2:])
+    return None
+
+
 def user_files(named: list[str], app: Path, builds: list[BuildContext]) -> list[Path]:
-    """The user's real files among fragment paths from build logs. A path inside the copy
-    of the app that was built maps back to the app; paths inside zmig's workspaces (Zephyr,
-    modules) or build directories (generated files) are dropped; anything else is a user
-    file passed by path (e.g. EXTRA_CONF_FILE outside the app). Missing files are dropped;
-    order and duplicates are kept once, first seen."""
-    copies = [b.src.resolve() for b in builds]
+    """The user's real files among fragment paths from build logs. A path inside a built
+    copy of the app maps back to the app (`from_copy`); paths inside zmig's workspaces
+    (Zephyr, modules) or build directories (generated files) are dropped; anything else is
+    a user file passed by path (e.g. EXTRA_CONF_FILE outside the app). Missing files are
+    dropped; order and duplicates are kept once, first seen."""
     skip = [r for b in builds for r in (b.workspace.root.resolve(), b.dir.resolve())]
     out: dict[Path, None] = {}
     for raw in named:
         p = Path(raw).resolve()
-        real = next((app / p.relative_to(c) for c in copies if p.is_relative_to(c)), None)
+        real = from_copy(p, app, builds)
         if real is None:
             if any(p.is_relative_to(r) for r in skip):
                 continue
