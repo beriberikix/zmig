@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 # Bump when what a parse records changes (invalidates the per-build snapshots).
-API_VERSION = 13
+API_VERSION = 14
 
 # GCC options clang rejects or that don't matter for parsing (prefix match).
 GCC_ONLY = (
@@ -114,6 +114,48 @@ def resource_dir() -> str | None:
     return None
 
 
+_CXX_SUFFIXES = (".cpp", ".cc", ".cxx", ".c++", ".C")
+# Flags that choose the toolchain's multilib (and so its C++ include directories).
+_MULTILIB = (
+    "-mcpu=", "-march=", "-mabi=", "-mfloat-abi=", "-mfpu=", "-mthumb", "-marm",
+    "-mlittle-endian", "-mbig-endian", "--sysroot=", "-specs=", "-m32", "-m64",
+)  # fmt: skip
+# compiler + multilib flags -> its C++ include directories, in search order.
+CXX_INCLUDE_DIRS: dict[str, list[str]] = {}
+
+
+def cxx_include_dirs(compiler: str, flags: list[str]) -> list[str]:
+    """The `#include <...>` search directories the build's own compiler uses for C++
+    (`-E -x c++ -v`), so libclang finds the toolchain's libstdc++ headers (regression:
+    OpenDeck's C++ TUs failed on <array>, <cstddef>, ... - DOGFOOD-5 §6). Infrastructure,
+    not analysis: the directories are recorded in the report."""
+    multilib = [f for f in flags if f.startswith(_MULTILIB)]
+    key = " ".join([compiler, *multilib])
+    if key not in CXX_INCLUDE_DIRS:
+        try:
+            proc = subprocess.run(
+                [compiler, *multilib, "-E", "-x", "c++", "-v", "-"],
+                input="",
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            text = proc.stderr
+        except (OSError, subprocess.TimeoutExpired):
+            text = ""
+        dirs: list[str] = []
+        inside = False
+        for line in text.splitlines():
+            if line.startswith("#include <...> search starts here:"):
+                inside = True
+            elif line.startswith("End of search list."):
+                break
+            elif inside and line.startswith(" "):
+                dirs.append(os.path.normpath(line.strip()))
+        CXX_INCLUDE_DIRS[key] = dirs
+    return CXX_INCLUDE_DIRS[key]
+
+
 def clang_args(command: str, file: str) -> tuple[list[str], str | None, list[str]]:
     """(clang arguments, target triple, dropped options) for a compile_commands command."""
     args = shlex.split(command)
@@ -138,6 +180,12 @@ def clang_args(command: str, file: str) -> tuple[list[str], str | None, list[str
     t = triple(compiler, rest)
     pre = [f"--target={t}"] if t else []
     rd = resource_dir()
+    if file.endswith(_CXX_SUFFIXES):
+        for d in cxx_include_dirs(compiler, rest):
+            # clang brings its own builtin headers (stddef.h, ...); GCC's would clash.
+            if rd and re.search(r"/lib/gcc/[^/]+/[^/]+/include(-fixed)?$", d):
+                continue
+            pre += ["-isystem", d]
     if rd:
         pre += ["-resource-dir", rd]
     else:

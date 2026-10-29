@@ -81,6 +81,10 @@ def _ran(statuses: list[AnalyzerStatus], analyzer: str) -> str | None:
     )
 
 
+def mostly_uninterpreted(c: dict[str, int]) -> bool:
+    return c.get("tus", 0) > 0 and 2 * c.get("not_interpreted", 0) > c["tus"]
+
+
 def upgrade_path(
     shared: dict[str, Any],
     findings: list[Finding],
@@ -193,6 +197,12 @@ def upgrade_path(
     confidence = min(judged, key=RANK.__getitem__, default="low")
     if capped:
         confidence = "low"
+    # Most of an image's project code not interpreted by the API diff: nothing about its
+    # source compatibility is established (regression: OpenDeck's C++, 49 of 51 TUs).
+    coverage = dict(shared.get("api_coverage", {}))
+    blind = sorted(i for i, c in coverage.items() if mostly_uninterpreted(c))
+    if blind:
+        confidence = "low"
     if target_status != "ok":
         # Categories then rest on configure-time data and whatever the failed build left;
         # "direct-ok" must not read as established (regression: bms-firmware's native_sim
@@ -212,6 +222,12 @@ def upgrade_path(
         if name == "wire":
             basis.append("wire: clean means only that no allowlisted item changed")
     basis += resolved
+    for i in blind:
+        c = coverage[i]
+        basis.append(
+            f"api: {c['not_interpreted']} of {c['tus']} project TU(s) of {i} not interpreted; "
+            "confidence capped at low"
+        )
     if target_status != "ok":
         basis.append(
             f"the target {target_status.replace('-', ' ')}: the categories come from "
@@ -237,6 +253,7 @@ def upgrade_path(
         "verdict": verdict,
         "unchecked": unchecked,
         "confidence": confidence,
+        **({"api_coverage": coverage} if coverage else {}),
         "categories": cats,
         "remedies": remedies,
         "assumptions": assumptions,
@@ -255,6 +272,8 @@ def invariant_violations(report: JSON) -> list[str]:
        and the verdict isn't direct-ok (a hazard elsewhere still decides needs-changes or
        blocked: §8 precedence);
     4. a pre-existing breaking finding in a deployment category caps confidence at low.
+    5. an image whose project TUs the API diff mostly didn't interpret: api is partial
+       for it, and confidence is low.
     """
     up = report.get("upgrade_path")
     if not up:
@@ -300,4 +319,21 @@ def invariant_violations(report: JSON) -> list[str]:
     ]
     if pre and up["confidence"] != "low":
         out.append(f"pre-existing breaking {pre} but confidence {up['confidence']}")
+    for image, c in (up.get("api_coverage") or {}).items():
+        if not mostly_uninterpreted(c):
+            continue
+        # "api@<image>" in a sysbuild build; plain "api" for a single-image app.
+        names = {f"api@{image}", *(("api",) if image == "app" else ())}
+        name = next((s["name"] for s in statuses if s["name"] in names), f"api@{image}")
+        st = next((s["status"] for s in statuses if s["name"] in names), None)
+        if st not in ("partial", "skipped", "error"):
+            out.append(
+                f"{c['not_interpreted']}/{c['tus']} TUs of {image} not interpreted "
+                f"but {name} is {st}"
+            )
+        if up["confidence"] != "low":
+            out.append(
+                f"{c['not_interpreted']}/{c['tus']} TUs of {image} not interpreted but "
+                f"confidence {up['confidence']}"
+            )
     return out

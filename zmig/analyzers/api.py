@@ -146,6 +146,15 @@ class ApiAnalyzer:
             )
         ctx.shared.setdefault("environment", {})["libclang"] = version
         src, tgt, gaps = self._parse_both(ctx, version)
+        # The C++ include directories asked of the build's compilers (apidiff), recorded so
+        # a reader can see what libclang was given.
+        from zmig.apidiff import CXX_INCLUDE_DIRS
+
+        if CXX_INCLUDE_DIRS:
+            ctx.shared.setdefault("environment", {})["cxx_include_dirs"] = {
+                ctx.runner.redact(k): [ctx.runner.redact(d) for d in v]
+                for k, v in sorted(CXX_INCLUDE_DIRS.items())
+            }
         not_checked += gaps
         errs = [sum(1 for t in tus if t["errors"]) for tus in (src, tgt)]
         stats = parse_stats(ctx.shared, ctx.image)
@@ -269,6 +278,15 @@ class ApiAnalyzer:
         # app's record showed MCUboot's 0/0 counts, DOGFOOD-5 M20).
         record_parse_stats(ctx.shared, ctx.image, stats)
         todo_all = {rel: tgt_entries[rel] for rel in src_entries if rel in tgt_entries}
+        # Project TUs whose API use couldn't be compared: no target compile command, or a
+        # parse with errors at either side. The verdict's confidence reflects it.
+        uninterpreted = (set(src_entries) - set(todo_all)) | {
+            t["file"] for t in (*src, *tgt) if t["errors"]
+        }
+        ctx.shared.setdefault("api_coverage", {})[ctx.image] = {
+            "tus": len(src_entries),
+            "not_interpreted": len(uninterpreted),
+        }
         for rel in sorted(set(src_entries) - set(todo_all)):
             gaps.append(
                 NotChecked(

@@ -108,3 +108,48 @@ def test_m20_parse_coverage_counts_are_per_image() -> None:
     assert parse_stats(shared, "app")["parsed"] == 51
     assert parse_stats(shared, "mcuboot")["parsed"] == 0
     assert parse_stats(shared, "opendeck_bootloader") == {}
+
+
+def test_cxx_include_dirs_from_the_build_compiler(tmp_path: Path) -> None:
+    """Infrastructure fix (DOGFOOD-5 §6): 49 of OpenDeck's 51 C++ TUs failed on <array>,
+    <cstddef>, ... because libclang didn't know the toolchain's libstdc++ directories.
+    They now come from the build's own compiler (`-E -x c++ -v`)."""
+    import shutil
+
+    pytest.importorskip("clang.cindex")
+    from zmig.apidiff import cxx_include_dirs, parse
+
+    cxx = shutil.which("g++") or shutil.which("c++")
+    if cxx is None:
+        pytest.skip("no host C++ compiler")
+    dirs = cxx_include_dirs(cxx, [])
+    assert any("c++" in d for d in dirs), dirs
+    src = tmp_path / "m.cpp"
+    src.write_text("#include <array>\n#include <cstddef>\nstd::array<int, 2> a{};\n")
+    r = parse(str(src), f"{cxx} -std=c++17 -c {src}", {}, lambda f: "m.cpp", str(tmp_path))
+    assert r.errors == [], r.errors
+
+
+def test_mostly_uninterpreted_api_means_partial_and_low_confidence() -> None:
+    """OpenDeck's app: 49 of 51 TUs not interpreted. The api check must be partial for
+    that image and the verdict's confidence low."""
+    from zmig.verdict import invariant_violations, upgrade_path
+
+    r = report()
+    up = r["upgrade_path"]
+    up["api_coverage"] = {"app": {"tus": 51, "not_interpreted": 49}}
+    assert next(a for a in r["analyzers"] if a["name"] == "api@app")["status"] == "partial"
+    assert up["confidence"] == "low"
+    assert not [v for v in invariant_violations(r) if "not interpreted" in v]
+    up["confidence"] = "medium"
+    assert any("not interpreted but confidence medium" in v for v in invariant_violations(r))
+    for a in r["analyzers"]:
+        if a["name"] == "api@app":
+            a["status"] = "ok"
+    assert any("api is ok" in v or "api@app is ok" in v for v in invariant_violations(r))
+    # The verdict caps it and says why.
+    up2 = upgrade_path({"api_coverage": {"app": {"tus": 51, "not_interpreted": 49}}}, [], [])
+    assert up2["confidence"] == "low"
+    assert any("49 of 51 project TU(s) of app not interpreted" in b for b in up2["basis"])
+    up3 = upgrade_path({"api_coverage": {"app": {"tus": 51, "not_interpreted": 2}}}, [], [])
+    assert not any("not interpreted" in b for b in up3["basis"])
