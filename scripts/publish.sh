@@ -94,7 +94,7 @@ SECRETS = [
 ]
 SECRETS = [(k, re.compile(r)) for k, r in SECRETS]
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
-HOME = re.compile(r"(?:/home/|/Users/|[A-Za-z]:\\\\?Users\\\\?)[^/\\\s\"'`),:;]+")
+HOME = re.compile(r"(?:/home/|/Users/|[A-Za-z]:\\\\?Users\\\\?)[A-Za-z0-9._@+-]+")
 INTERNAL = re.compile(
     r"\b(?:[a-z0-9-]+\.)+(?:internal|corp|lan|local|intranet)\b(?![.\w])"
     r"|\b(?:10\.\d{1,3}|192\.168|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}\b",
