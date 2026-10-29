@@ -1,0 +1,184 @@
+# Every scored zmig evaluation configuration (docs/EVALUATION.md), with its inputs pinned to
+# public commits and its invocation exactly as scored. eval/run.py reads this file.
+#
+# Placeholders in app/cmake_args/from/to: {src:NAME} is the checkout of [sources.NAME].
+# sdk names a directory under ~/.cache/zmig/sdks (zephyr-sdk-<sdk>).
+
+# --- Sources -------------------------------------------------------------------------------
+# kind "git": a project checked out at `sha` (shallow), with `submodules` initialized.
+# `dir` overrides the checkout's directory name (default: the repository's).
+# kind "zephyr-fork": a Zephyr fork commit, checked out from a scratch repository that borrows
+# zmig's Zephyr mirror objects, so the fork's history connects to upstream (DOGFOOD-1).
+
+[sources.golioth]
+kind = "git"
+url = "https://github.com/golioth/golioth-firmware-sdk"
+sha = "1fc16f4afec5e7ed2fa7bcfd9735ba1651bde0e1"
+submodules = ["external/libcoap", "external/zcbor"]
+
+[sources.bms-firmware]
+kind = "git"
+url = "https://github.com/LibreSolar/bms-firmware"
+sha = "77c6206b92399028af6a5ca893afecc87236ee7f"
+
+[sources.thingset-zephyr-sdk]
+kind = "git"
+url = "https://github.com/ThingSet/thingset-zephyr-sdk"
+sha = "48740769cea0d9666fc9132cd8923f9ce2c088f9"
+
+[sources.thingset-node-c]
+kind = "git"
+url = "https://github.com/ThingSet/thingset-node-c"
+sha = "68c7544830df2ba23f67e31bad91e124377827a3"
+
+[sources.cannectivity]
+kind = "git"
+url = "https://github.com/CANnectivity/cannectivity"
+sha = "80612eec6d3f3dd1e7ca6ae0096a79e834cdad2b"  # tag v1.1.0
+
+[sources.zmk]
+kind = "git"
+url = "https://github.com/zmkfirmware/zmk"
+sha = "b8846cf6355c5d7ae52a191988054b532a264f0c"  # parent of the v3.5 bump series
+
+[sources.zmk-zephyr-from]
+kind = "zephyr-fork"
+dir = "zephyr-from"  # the scored run's directory name (it is in finding IDs)
+url = "https://github.com/zmkfirmware/zephyr"
+sha = "1ae0eb5ce8adafcec993e6fb8f4eeb6f818a7772"  # v3.2.0 + 34 fork commits
+
+[sources.zmk-zephyr-to]
+kind = "zephyr-fork"
+dir = "zephyr-to"  # the scored run's directory name (it is in finding IDs)
+url = "https://github.com/zmkfirmware/zephyr"
+sha = "339570e2393b108bf8f9241018ecaf5615c25469"  # v3.5.0 + 21 fork commits
+
+# --- Configurations ------------------------------------------------------------------------
+# One per EVALUATION.md row. `oracle` is where its items are; `scored` says which run the
+# baseline in eval/baselines/<name>.json was taken from.
+
+[configs.golioth-B]
+oracle = "docs/oracles/golioth.md"
+scored = "DOGFOOD-6 (zmig aa95a10)"
+app = "{src:golioth}/examples/zephyr/hello"
+board = "nucleo_h563zi/stm32h563xx"
+from = "v4.1.0"
+to = "v4.2.0"
+sdk = "0.16.8"
+modules = ["hal_stm32", "cmsis", "cmsis_6", "mbedtls", "zcbor"]
+cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}"]
+
+[configs.golioth-B-rak]
+oracle = "docs/oracles/golioth-configs.md"
+scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+app = "{src:golioth}/examples/zephyr/hello"
+board = "rak5010/nrf52840"
+from = "v4.1.0"
+to = "v4.2.0"
+sdk = "0.16.8"
+modules = ["hal_nordic", "cmsis", "cmsis_6", "mbedtls", "zcbor"]
+cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}"]
+
+[configs.golioth-B-esp]
+oracle = "docs/oracles/golioth-configs.md"
+scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+app = "{src:golioth}/examples/zephyr/hello"
+board = "nrf52840dk/nrf52840"
+from = "v4.1.0"
+to = "v4.2.0"
+sdk = "0.16.8"
+modules = ["hal_nordic", "cmsis", "cmsis_6", "mbedtls", "zcbor"]
+cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}", "-DSHIELD=golioth_esp_at"]
+
+[configs.golioth-B-native]
+oracle = "docs/oracles/golioth-configs.md"
+scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+app = "{src:golioth}/examples/zephyr/hello"
+board = "native_sim"
+from = "v4.1.0"
+to = "v4.2.0"
+modules = ["mbedtls", "zcbor"]
+cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}"]
+
+[configs.bms-A1]
+oracle = "docs/oracles/bms-firmware.md"
+scored = "DOGFOOD-6 (zmig aa95a10)"
+app = "{src:bms-firmware}/app"
+board = "bms_16s100_sc"
+from = "4ebecae78ad969f2801e1dfcf453dc9dd2b288d3"
+to = "636ad05950bb35792fdc214b3f5fb3e106254f38"
+sdk = "0.16.8"
+modules = ["cmsis", "hal_stm32", "zcbor"]
+cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:bms-firmware};{src:thingset-zephyr-sdk};{src:thingset-node-c}"]
+
+[configs.bms-A1-native]
+oracle = "docs/oracles/bms-firmware-configs.md"
+scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+app = "{src:bms-firmware}/app"
+board = "native_sim"
+from = "4ebecae78ad969f2801e1dfcf453dc9dd2b288d3"
+to = "636ad05950bb35792fdc214b3f5fb3e106254f38"
+modules = ["tinycrypt", "zcbor"]
+cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:bms-firmware};{src:thingset-zephyr-sdk};{src:thingset-node-c}"]
+
+[configs.bms-A1-oled]
+oracle = "docs/oracles/bms-firmware-configs.md"
+scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+app = "{src:bms-firmware}/app"
+board = "bms_8s50_ic@0.2"
+from = "4ebecae78ad969f2801e1dfcf453dc9dd2b288d3"
+to = "636ad05950bb35792fdc214b3f5fb3e106254f38"
+sdk = "0.16.8"
+modules = ["cmsis", "hal_stm32", "zcbor"]
+cmake_args = [
+    "-DZEPHYR_EXTRA_MODULES={src:bms-firmware};{src:thingset-zephyr-sdk};{src:thingset-node-c}",
+    "-DEXTRA_CONF_FILE=oled.conf",
+    "-DSHIELD=uext_oled",
+]
+
+[configs.cannectivity-C1]
+oracle = "docs/oracles/cannectivity.md"
+scored = "DOGFOOD-6 (zmig aa95a10)"
+app = "{src:cannectivity}/app"
+board = "usb2canfdv1"
+from = "7823374e872145b5bd018bfe447839eb36042611"
+to = "30de5e8a2ceef99177c6c96785a8888b978154f0"
+sdk = "0.16.8"
+modules = ["cmsis", "hal_stm32"]
+cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:cannectivity}", "-DFILE_SUFFIX=usbd_next"]
+
+[configs.cannectivity-C2]
+oracle = "docs/oracles/cannectivity-c2.md"
+scored = "DOGFOOD-6 (zmig aa95a10)"
+app = "{src:cannectivity}/app"
+board = "candlelight"
+from = "7823374e872145b5bd018bfe447839eb36042611"
+to = "30de5e8a2ceef99177c6c96785a8888b978154f0"
+sdk = "0.16.8"
+modules = ["cmsis", "hal_stm32"]
+cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:cannectivity}"]
+
+# ZMK is scored as one item set over both builds (corne ∪ niceview).
+[configs.zmk-corne]
+oracle = "docs/DOGFOOD-2-baseline.md §1"
+scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+group = "zmk"
+app = "{src:zmk}/app"
+board = "nice_nano_v2"
+from = "{src:zmk-zephyr-from}"
+to = "{src:zmk-zephyr-to}"
+sdk = "0.16.8"
+modules = ["hal_nordic", "cmsis", "tinycrypt", "lvgl"]
+cmake_args = ["-DSHIELD=corne_left"]
+
+[configs.zmk-niceview]
+oracle = "docs/DOGFOOD-2-baseline.md §1"
+scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+group = "zmk"
+app = "{src:zmk}/app"
+board = "nice_nano_v2"
+from = "{src:zmk-zephyr-from}"
+to = "{src:zmk-zephyr-to}"
+sdk = "0.16.8"
+modules = ["hal_nordic", "cmsis", "tinycrypt", "lvgl"]
+cmake_args = ["-DSHIELD=corne_left nice_view_adapter nice_view"]

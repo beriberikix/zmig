@@ -1,0 +1,190 @@
+{
+ "config": "golioth-B-rak",
+ "scored": "DOGFOOD-3 P2 (zmig 6f0bf46)",
+ "schema_version": "1.2",
+ "verdict": "blocked",
+ "findings": [
+  {
+   "id": "API-FIELD-CHANGED-7f272bfe",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "field-changed",
+   "title": "Field net_mgmt_event_callback.<anonymous>.event_mask, which your code uses, changed: unsigned int at bit offset 0 → unsigned long long at bit offset 0"
+  },
+  {
+   "id": "API-MACRO-CHANGED-d2fc7345",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "macro-changed",
+   "title": "Macro NET_EVENT_IPV4_ADDR_ADD, which your code uses, changed: (unsigned long, 4 bytes) = 3758358529 → (unsigned long long, 8 bytes) = 16154411863377969153"
+  },
+  {
+   "id": "API-TYPEDEF-CHANGED-f63e4c00",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "typedef-changed",
+   "title": "Typedef net_mgmt_event_handler_t, which your code uses, changed: void (*)(struct net_mgmt_event_callback *, unsigned int, struct net_if *) → void (*)(struct net_mgmt_event_callback *, unsigned long long, struct net_if *)"
+  },
+  {
+   "id": "BUILD-FOOTPRINT-d77cfbac",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "footprint",
+   "title": "ROM 276279 → 281681 bytes (+5402), RAM 85702 → 85114 bytes (-588)"
+  },
+  {
+   "id": "BUILD-NEW-WARNING-60ef13a4",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "new-warning",
+   "title": "New compiler warning at v4.2.0: assignment to 'net_mgmt_event_handler_t' {aka 'void (*)(struct net_mgmt_event_callback *, long long unsigned int, struct net_if *)'} from in"
+  },
+  {
+   "id": "BUILD-NEW-WARNING-e1303537",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "new-warning",
+   "title": "New compiler warning at v4.2.0: conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1'"
+  },
+  {
+   "id": "DEVICETREE-OTHER-NODES-a0c521e0",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "other-nodes",
+   "title": "27 nodes your app doesn't reference changed, disappeared or appeared; 8 more nodes only changed binding"
+  },
+  {
+   "id": "GUIDE-COVERAGE-a220fc16",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "coverage",
+   "title": "Read 160 entries from 2 documents; 2 touch your app"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-16b503d8",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.2 migration guide (Ethernet): ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecate (only in files this build doesn't use: socs/native.conf, socs/native_64.conf)"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-c20dd67e",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.2 migration guide (Modem): Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU."
+  },
+  {
+   "id": "IMAGES-IMAGES-SUMMARY-19d5cad9",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "images-summary",
+   "title": "1 image at v4.2.0: hello (app, 125 compiled files changed)"
+  },
+  {
+   "id": "KCONFIG-DEFAULT-CHANGED-8397c765",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "default-changed",
+   "title": "7 Kconfig symbols: other symbols resolve to a different value in v4.2.0"
+  },
+  {
+   "id": "KCONFIG-NEWLY-SET-f40862b9",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "newly-set",
+   "title": "36 Kconfig symbols: symbols are newly enabled or set in v4.2.0"
+  },
+  {
+   "id": "KCONFIG-NO-LONGER-SET-8f5933aa",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "no-longer-set",
+   "title": "19 Kconfig symbols: symbols set before are absent in v4.2.0"
+  },
+  {
+   "id": "KCONFIG-SALVAGED-5f54f9eb",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "salvaged",
+   "title": "The target configure failed; zmig disabled 1 line in a copy of your app to compare the rest"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-DEPRECATED-17c46380",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "symbol-deprecated",
+   "title": "CONFIG_ETH_NATIVE_POSIX is deprecated in v4.2.0 (only in files this build doesn't use: socs/native.conf, socs/native_64.conf)"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-REMOVED-8108c136",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "symbol-removed",
+   "title": "CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE, set in boards/rak5010_nrf52840.conf, no longer exists in v4.2.0"
+  },
+  {
+   "id": "LAYOUT-PARTITION-MOVED-e2bcc29c",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "partition-moved",
+   "title": "Partition slot1_partition moved and resized: 0x83000+0x75000 at v4.1.0 → 0x82000+0x76000 at v4.2.0 [role: unknown]"
+  },
+  {
+   "id": "LAYOUT-PARTITION-RESIZED-d87bfe01",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "partition-resized",
+   "title": "Partition slot0_partition resized: 0xc000+0x77000 at v4.1.0 → 0xc000+0x76000 at v4.2.0 [role: code]"
+  },
+  {
+   "id": "SBOM-HEADER-CHANGED-91b8a52a",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "header-changed",
+   "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits)"
+  },
+  {
+   "id": "SBOM-HEADER-CHANGED-d9d45a0c",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "header-changed",
+   "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+195/-37 lines in 14 commits)"
+  },
+  {
+   "id": "SBOM-MODULE-REPINNED-7533b9df",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module mbedtls moves from 4952e1328529 to 85440ef5fffa; 31 files compiled into hello changed (31 modified, 0 added, 0 removed)"
+  },
+  {
+   "id": "SBOM-MODULE-REPINNED-fb46d824",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module hal-nordic moves from 37ca068d7b01 to 9587b1dcb83d; 4 files compiled into hello changed (4 modified, 0 added, 0 removed)"
+  },
+  {
+   "id": "SBOM-ZEPHYR-SOURCES-4a4e2936",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "zephyr-sources",
+   "title": "Zephyr files compiled: 257 → 262 (7 added, 2 removed, 90 changed); 299 upstream commits touch the files the target compiles"
+  },
+  {
+   "id": "STORAGE-BACKEND-OPTIONS-CHANGED-4599cc73",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "backend-options-changed",
+   "title": "Storage backend settings options changed: CONFIG_SETTINGS_ZMS_LOAD_SUBTREE_PATH unset → n, CONFIG_SETTINGS_ZMS_NO_LL_DELETE unset → n"
+  },
+  {
+   "id": "STORAGE-IMPLEMENTATION-CHANGED-d78e651c",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "implementation-changed",
+   "title": "2 compiled storage backend files changed; their on-media definitions didn't"
+  }
+ ]
+}

@@ -1,0 +1,127 @@
+{
+ "config": "cannectivity-C1",
+ "scored": "DOGFOOD-6 (zmig aa95a10)",
+ "schema_version": "1.4",
+ "verdict": "direct-ok",
+ "findings": [
+  {
+   "id": "API-CALLBACK-TYPE-CHANGED-4b10a6e3",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "callback-type-changed",
+   "title": "Callbacks your code provides no longer match the type Zephyr expects at 30de5e8a2ceef99177c6c96785a8888b978154f0: const state_execution"
+  },
+  {
+   "id": "API-FUNCTION-REMOVED-32468a0d",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "function-removed",
+   "title": "Function smf_set_handled, which your code uses, no longer exists in 30de5e8a2ceef99177c6c96785a8888b978154f0"
+  },
+  {
+   "id": "BUILD-NEW-WARNING-14baac28",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "new-warning",
+   "title": "New compiler warning at 30de5e8a2ceef99177c6c96785a8888b978154f0: initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'"
+  },
+  {
+   "id": "BUILD-NEW-WARNING-7d28dbc8",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "new-warning",
+   "title": "New compiler warning at 30de5e8a2ceef99177c6c96785a8888b978154f0: implicit declaration of function 'smf_set_handled'"
+  },
+  {
+   "id": "BUILD-TARGET-BUILD-FAILED-1f6e0e51",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "target-build-failed",
+   "title": "The target build fails: 2 errors (linker)"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-39be8ba9",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&zephyr_udc0 (/soc/usb@40005c00) changed: clocks, maximum-speed"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-99e15d68",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&fdcan1 (/soc/can@40006400) changed: clocks, interrupt-names, interrupts, reg, reg-names (only in files this build doesn't use: boards/nucleo_h723zg_stm32h723xx.overlay)"
+  },
+  {
+   "id": "DEVICETREE-OTHER-NODES-e5f97556",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "other-nodes",
+   "title": "27 nodes your app doesn't reference changed, disappeared or appeared; 1 more node only changed binding"
+  },
+  {
+   "id": "GUIDE-COVERAGE-bfc7e33a",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "coverage",
+   "title": "Read 160 entries from 2 documents; 1 touch your app"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-0681292e",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.2 migration guide (State Machine Framework): smf_set_handled has been removed. [smf_set_handled]"
+  },
+  {
+   "id": "IMAGES-IMAGES-SUMMARY-5ed1593c",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "images-summary",
+   "title": "1 image at 30de5e8a2ceef99177c6c96785a8888b978154f0: app (app)"
+  },
+  {
+   "id": "KCONFIG-DEFAULT-CHANGED-f9a038a7",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "default-changed",
+   "title": "5 Kconfig symbols: other symbols resolve to a different value in 30de5e8a2ceef99177c6c96785a8888b978154f0"
+  },
+  {
+   "id": "KCONFIG-NEWLY-SET-61304388",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "newly-set",
+   "title": "30 Kconfig symbols: symbols are newly enabled or set in 30de5e8a2ceef99177c6c96785a8888b978154f0"
+  },
+  {
+   "id": "KCONFIG-NO-LONGER-SET-e0f7083c",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "no-longer-set",
+   "title": "16 Kconfig symbols: symbols set before are absent in 30de5e8a2ceef99177c6c96785a8888b978154f0"
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-3dd1719c",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module hal_stm32, which the build uses, moves from 55043bcc35ff to 1e753266ddfb"
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-3facacf6",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module cmsis, which the build uses, moves from d1b8b20b6278 to 512cc7e895e8"
+  },
+  {
+   "id": "MANIFEST-MODULE-REQUIRED-f4a43627",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "module-required",
+   "title": "The target build needs module cmsis_6, which the build's module set doesn't include"
+  }
+ ]
+}

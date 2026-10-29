@@ -1,0 +1,141 @@
+{
+ "config": "bms-A1-native",
+ "scored": "DOGFOOD-3 P2 (zmig 6f0bf46)",
+ "schema_version": "1.2",
+ "verdict": "direct-ok",
+ "findings": [
+  {
+   "id": "API-DEVICE-MISSING-69d84431",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "device-missing",
+   "title": "Your code takes the device for /uart_1 (chosen thingset,serial), which has no device at 636ad05950bb35792fdc214b3f5fb3e106254f38 (status 'disabled', was 'okay')"
+  },
+  {
+   "id": "BUILD-TARGET-BUILD-FAILED-64aab1f7",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "target-build-failed",
+   "title": "The target build fails: 1 error (compiler)"
+  },
+  {
+   "id": "DEVICETREE-OTHER-NODES-837b7dec",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "other-nodes",
+   "title": "7 nodes your app doesn't reference changed, disappeared or appeared; 15 more nodes only changed binding"
+  },
+  {
+   "id": "GUIDE-COVERAGE-b0739777",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "coverage",
+   "title": "Read 282 entries from 4 documents; 4 touch your app"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-082e0937",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.2 migration guide (Serial): CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE has been deprecated."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-162be544",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.1 migration guide (Bluetooth Audio): The following Kconfig options are not longer automatically enabled by the LE Audio Kconfig options and may need to be enabled manually : CONFIG_BT_GATT_CLIENT C"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-370ec4e4",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.1 migration guide (Networking): The CONFIG_NET_L2_OPENTHREAD symbol no longer implies the CONFIG_NVS Kconfig option. (only in files this build doesn't use: boards/bms_16s100_sc.conf, boards/bms_16s100_sc_esp32c3.conf, boards/bms_c1.conf)"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-d4a054d5",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.2 migration guide (Architectures): Moved CONFIG_SRAM_VECTOR_TABLE from zephyr/Kconfig.zephyr to zephyr/arch/Kconfig and added dependency to CONFIG_XIP, CONFIG_ARCH_HAS_VECTOR_TABLE_RELOCATION and"
+  },
+  {
+   "id": "IMAGES-IMAGES-SUMMARY-521cd22e",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "images-summary",
+   "title": "1 image at 636ad05950bb35792fdc214b3f5fb3e106254f38: app (app)"
+  },
+  {
+   "id": "KCONFIG-DEFAULT-CHANGED-5f4f5676",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "default-changed",
+   "title": "11 Kconfig symbols: other symbols resolve to a different value in 636ad05950bb35792fdc214b3f5fb3e106254f38"
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-CHANGED-3c231f14",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "dependency-changed",
+   "title": "CONFIG_UART_NATIVE_POSIX, which your configuration of CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE relies on, changed from y to n in 636ad05950bb35792fdc214b3f5fb3e106254f38"
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-CHANGED-3d44a4c1",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "dependency-changed",
+   "title": "CONFIG_DT_HAS_ZEPHYR_NATIVE_POSIX_UART_ENABLED, which your configuration of CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE relies on, changed from y to unset in 636ad05950bb35792fdc214b3f5fb3e106254f38"
+  },
+  {
+   "id": "KCONFIG-NEWLY-SET-b2659769",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "newly-set",
+   "title": "68 Kconfig symbols: symbols are newly enabled or set in 636ad05950bb35792fdc214b3f5fb3e106254f38"
+  },
+  {
+   "id": "KCONFIG-NO-LONGER-SET-54521f30",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "no-longer-set",
+   "title": "22 Kconfig symbols: symbols set before are absent in 636ad05950bb35792fdc214b3f5fb3e106254f38"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-DEPRECATED-41cb296f",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "symbol-deprecated",
+   "title": "CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE is deprecated in 636ad05950bb35792fdc214b3f5fb3e106254f38"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-DEPRECATED-cd199449",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "symbol-deprecated",
+   "title": "CONFIG_NATIVE_UART_0_ON_STDINOUT is deprecated in 636ad05950bb35792fdc214b3f5fb3e106254f38"
+  },
+  {
+   "id": "KCONFIG-VALUE-NOT-TAKEN-48a2e9d2",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "value-not-taken",
+   "title": "CONFIG_LOG_BACKEND_NATIVE_POSIX=y no longer takes effect in 636ad05950bb35792fdc214b3f5fb3e106254f38 (it gets n)"
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-3ad8ba2b",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module zcbor, which the build uses, moves from 47f34dd7f528 to 9b07780aca6f"
+  },
+  {
+   "id": "MANIFEST-MODULE-REQUIRED-559fd34e",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "module-required",
+   "title": "The target build needs module mbedtls, which the build's module set doesn't include"
+  }
+ ]
+}

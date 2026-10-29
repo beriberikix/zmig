@@ -1,0 +1,183 @@
+{
+ "config": "bms-A1",
+ "scored": "DOGFOOD-6 (zmig aa95a10)",
+ "schema_version": "1.4",
+ "verdict": "unknown",
+ "findings": [
+  {
+   "id": "BUILD-FOOTPRINT-6fe8fd7d",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "footprint",
+   "title": "ROM 78915 → 78956 bytes (+41), RAM 20194 → 19763 bytes (-431)"
+  },
+  {
+   "id": "DEVICETREE-OTHER-NODES-26699038",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "other-nodes",
+   "title": "31 nodes your app doesn't reference changed, disappeared or appeared; 66 more nodes only changed binding"
+  },
+  {
+   "id": "GUIDE-COVERAGE-6fbdf096",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "coverage",
+   "title": "Read 282 entries from 4 documents; 4 touch your app"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-5832f2a0",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.2 migration guide (Architectures): Moved CONFIG_SRAM_VECTOR_TABLE from zephyr/Kconfig.zephyr to zephyr/arch/Kconfig and added dependency to CONFIG_XIP, CONFIG_ARCH_HAS_VECTOR_TABLE_RELOCATION and"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-6f4ffbd3",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.1 migration guide (Bluetooth Audio): The following Kconfig options are not longer automatically enabled by the LE Audio Kconfig options and may need to be enabled manually : CONFIG_BT_GATT_CLIENT C"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-77a28ac6",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.1 migration guide (Networking): The CONFIG_NET_L2_OPENTHREAD symbol no longer implies the CONFIG_NVS Kconfig option."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-df7ff923",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.2 migration guide (Serial): CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE has been deprecated. (only in files this build doesn't use: boards/native_sim.conf)"
+  },
+  {
+   "id": "IMAGES-IMAGES-SUMMARY-c8f02bc0",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "images-summary",
+   "title": "1 image at 636ad05950bb: app (app, 63 compiled files changed)"
+  },
+  {
+   "id": "KCONFIG-DEFAULT-CHANGED-0454cdd5",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "default-changed",
+   "title": "5 Kconfig symbols: other symbols resolve to a different value in 636ad05950bb"
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-EXPRESSION-CHANGED-65b2c1ec",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "dependency-expression-changed",
+   "title": "1 Kconfig symbol your build sets or reads changed their depends/selects/implies in 636ad05950bb"
+  },
+  {
+   "id": "KCONFIG-NEWLY-SET-f0715008",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "newly-set",
+   "title": "23 Kconfig symbols: symbols are newly enabled or set in 636ad05950bb"
+  },
+  {
+   "id": "KCONFIG-NO-LONGER-SET-0ce28fda",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "no-longer-set",
+   "title": "20 Kconfig symbols: symbols set before are absent in 636ad05950bb"
+  },
+  {
+   "id": "MANIFEST-MODULE-REQUIRED-cd65f61b",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "module-required",
+   "title": "The target build needs module cmsis_6, which the build's module set doesn't include"
+  },
+  {
+   "id": "SBOM-HEADER-CHANGED-1d8e95fa",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "header-changed",
+   "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits) (only in files this build doesn't compile)"
+  },
+  {
+   "id": "SBOM-HEADER-CHANGED-35fcf306",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "header-changed",
+   "title": "<zephyr/drivers/gpio.h>, which your code includes, changed upstream (+116/-40 lines in 7 commits); none of the declarations your code uses from it changed"
+  },
+  {
+   "id": "SBOM-HEADER-CHANGED-4d1c5020",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "header-changed",
+   "title": "<zephyr/device.h>, which your code includes, changed upstream (+244/-74 lines in 17 commits); none of the declarations your code uses from it changed"
+  },
+  {
+   "id": "SBOM-HEADER-CHANGED-9e29743c",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "header-changed",
+   "title": "<zephyr/drivers/hwinfo.h>, which your code includes, changed upstream (+4/-0 lines in 2 commits); none of the declarations your code uses from it changed"
+  },
+  {
+   "id": "SBOM-HEADER-CHANGED-a8b6ec35",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "header-changed",
+   "title": "<zephyr/sys/crc.h>, which your code includes, changed upstream (+33/-2 lines in 2 commits); none of the declarations your code uses from it changed"
+  },
+  {
+   "id": "SBOM-HEADER-CHANGED-dc5c9129",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "header-changed",
+   "title": "<zephyr/display/cfb.h>, which your code includes, changed upstream (+12/-1 lines in 2 commits) (only in files this build doesn't compile)"
+  },
+  {
+   "id": "SBOM-HEADER-CHANGED-e608c20f",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "header-changed",
+   "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+453/-101 lines in 28 commits); none of the declarations your code uses from it changed"
+  },
+  {
+   "id": "SBOM-MODULE-REPINNED-0830921e",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module zcbor moves from 47f34dd7f528 to 9b07780aca6f; 1 file compiled into app changed (0 modified, 1 added, 0 removed)"
+  },
+  {
+   "id": "SBOM-MODULE-REPINNED-6d022fe7",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module hal-stm32 moves from 019d8255333f to 1e753266ddfb; 2 files compiled into app changed (0 modified, 0 added, 2 removed)"
+  },
+  {
+   "id": "SBOM-ZEPHYR-SOURCES-e36dd695",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "zephyr-sources",
+   "title": "Zephyr files compiled: 121 → 132 (15 added, 4 removed, 63 changed); 333 upstream commits touch the files the target compiles"
+  },
+  {
+   "id": "STORAGE-BACKEND-OPTIONS-CHANGED-0d58225c",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "backend-options-changed",
+   "title": "Storage backend nvs options changed: CONFIG_NVS_INIT_BAD_MEMORY_REGION unset → n"
+  },
+  {
+   "id": "STORAGE-IMPLEMENTATION-CHANGED-21b1bbf5",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "implementation-changed",
+   "title": "1 compiled storage backend files changed; their on-media definitions didn't"
+  }
+ ]
+}

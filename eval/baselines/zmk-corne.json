@@ -1,0 +1,547 @@
+{
+ "config": "zmk-corne",
+ "scored": "DOGFOOD-3 P2 (zmig 6f0bf46)",
+ "schema_version": "1.2",
+ "verdict": "unknown",
+ "findings": [
+  {
+   "id": "API-CALLBACK-TYPE-CHANGED-c363f00f",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "callback-type-changed",
+   "title": "Callbacks your code provides no longer match the type Zephyr expects at zephyr-to@339570e2393b: int (*)(void)"
+  },
+  {
+   "id": "API-ENUM-CHANGED-1caaeabf",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "enum-changed",
+   "title": "Enum constant SENSOR_CHAN_GAUGE_VOLTAGE, which your code uses, changed: = 39 → = 40"
+  },
+  {
+   "id": "API-ENUM-CHANGED-357124a0",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "enum-changed",
+   "title": "Enum constant SENSOR_CHAN_ALL, which your code uses, changed: = 57 → = 58"
+  },
+  {
+   "id": "API-ENUM-CHANGED-7f1fd970",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "enum-changed",
+   "title": "Enum constant SENSOR_CHAN_GAUGE_STATE_OF_CHARGE, which your code uses, changed: = 44 → = 45"
+  },
+  {
+   "id": "API-SYSCALLS-NOT-GENERATED-47f7b545",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "syscalls-not-generated",
+   "title": "include/drivers/behavior.h declares system calls (behavior_get_binding, behavior_keymap_binding_convert_central_state_dependent_params, behavior_get_locality, behavior_keymap_binding_pressed, ...) that zephyr-to@339570e2393b no longer generates; files including it fail on the missing syscalls/behavior.h"
+  },
+  {
+   "id": "API-SYSCALLS-NOT-GENERATED-ca8024d7",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "syscalls-not-generated",
+   "title": "include/drivers/ext_power.h declares system calls (ext_power_enable, ext_power_disable, ext_power_get) that zephyr-to@339570e2393b no longer generates; files including it fail on the missing syscalls/ext_power.h"
+  },
+  {
+   "id": "BUILD-KCONFIG-NAME-COLLISION-7c2cfcbc",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "kconfig-name-collision",
+   "title": "CONFIG_MAX17048 is defined by the app (module/drivers/sensor/max17048/Kconfig:6) and, from zephyr-to@339570e2393b on, by Zephyr (drivers/fuel_gauge/max17048/Kconfig:7); the two definitions form a dependency loop"
+  },
+  {
+   "id": "BUILD-KCONFIG-OVERRIDE-ORPHANED-06da6565",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "kconfig-override-orphaned",
+   "title": "The app overrides CONFIG_SSD1306_REVERSE_MODE (boards/shields/corne/Kconfig.defconfig:24, boards/shields/elephant42/Kconfig.defconfig:27, boards/shields/jorne/Kconfig.defconfig:25 (+41)), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure"
+  },
+  {
+   "id": "BUILD-KCONFIG-OVERRIDE-ORPHANED-4440a398",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "kconfig-override-orphaned",
+   "title": "The app overrides CONFIG_BT_LL_SW_LLCP_IMPL (Kconfig:175), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure"
+  },
+  {
+   "id": "BUILD-KCONFIG-OVERRIDE-ORPHANED-8baa1c47",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "kconfig-override-orphaned",
+   "title": "The app overrides CONFIG_LV_Z_MEM_POOL_MAX_SIZE (src/display/Kconfig:35), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure"
+  },
+  {
+   "id": "BUILD-KCONFIG-OVERRIDE-ORPHANED-c4fb7621",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "kconfig-override-orphaned",
+   "title": "The app overrides CONFIG_LV_Z_MEM_POOL_MIN_SIZE (src/display/Kconfig:32), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure"
+  },
+  {
+   "id": "BUILD-KCONFIG-OVERRIDE-ORPHANED-c7ef6f3a",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "kconfig-override-orphaned",
+   "title": "The app overrides CONFIG_LV_Z_DPI (boards/shields/corne/Kconfig.defconfig:34, boards/shields/elephant42/Kconfig.defconfig:37, boards/shields/jorne/Kconfig.defconfig:35 (+39)), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure"
+  },
+  {
+   "id": "BUILD-NEW-WARNING-adbded30",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "new-warning",
+   "title": "New compiler warning at zephyr-to@339570e2393b: initialization of 'int (*)(void)' from incompatible pointer type 'int (*)(const struct device *)'"
+  },
+  {
+   "id": "BUILD-TARGET-BUILD-FAILED-f5607720",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "target-build-failed",
+   "title": "The target build fails (after salvage): 24 errors (compiler)"
+  },
+  {
+   "id": "BUILD-WARNINGS-RESOLVED-50d7d868",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "warnings-resolved",
+   "title": "Warnings from zephyr-from@1ae0eb5ce8ad that no longer appear: 1"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-03da51f8",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&spi3 (/soc/spi@4002f000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-15df8189",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&i2c1 (/soc/i2c@40004000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-2f3d616b",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&flash0 (/soc/flash-controller@4001e000/flash@0): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-4243406a",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&uart0 (/soc/uart@40002000): binding defaults changed, not set in the DTS: cts-pull-up, rx-pull-up, zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-47b1527c",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&pro_micro_i2c/ssd1306@3c (/soc/i2c@40003000/ssd1306@3c): binding defaults changed, not set in the DTS: inversion-on, ready-time-ms, zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-4e184bc9",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&spi3/ws2812@0 (/soc/spi@4002f000/ws2812@0): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-4f3d4759",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&pinctrl (/pin-controller): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-54bbf762",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&spi0 (/soc/spi@40003000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-6566fa3a",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&adc (/soc/adc@40007000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-7660af44",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&oled (/soc/i2c@40003000/ssd1306@3c): binding defaults changed, not set in the DTS: inversion-on, ready-time-ms, zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-93057812",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&kscan0 (/kscan): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-9bdb3828",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&pro_micro_i2c (/soc/i2c@40003000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-9d507064",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&gpiote (/soc/gpiote@40006000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-a5c959da",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&pro_micro_serial (/soc/uart@40002000): binding defaults changed, not set in the DTS: cts-pull-up, rx-pull-up, zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-a6aae3b6",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&usbd (/soc/usbd@40027000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-a9a49d33",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&spi2 (/soc/spi@40023000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-ae15dd5f",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&qspi (/soc/qspi@40029000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-c51d6b7b",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "/kscan (/kscan): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-c8fff941",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&usbd/cdc_acm_uart (/soc/usbd@40027000/cdc_acm_uart): binding defaults changed, not set in the DTS: rx-fifo-size, tx-fifo-size, zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-d5034afa",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&pwm0 (/soc/pwm@4001c000): binding defaults changed, not set in the DTS: ch0-inverted, ch1-inverted, ch2-inverted, ch3-inverted, zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-e28998a4",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&spi1 (/soc/spi@40004000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-e82fcbdc",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&gpio1 (/soc/gpio@50000300): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-f5b2c8d6",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&qdec0 (/soc/qdec@40012000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-f7857cf2",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&i2c0 (/soc/i2c@40003000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-f83689ef",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&gpio0 (/soc/gpio@50000000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+  },
+  {
+   "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-0ceecc53",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-properties-new_props",
+   "title": "&i2c1 (/soc/i2c@40004000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+  },
+  {
+   "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-32e860df",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-properties-new_props",
+   "title": "&spi0 (/soc/spi@40003000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+  },
+  {
+   "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-40ffd210",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-properties-new_props",
+   "title": "&spi1 (/soc/spi@40004000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+  },
+  {
+   "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-4bf5e3fc",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-properties-new_props",
+   "title": "&spi2 (/soc/spi@40023000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+  },
+  {
+   "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-88925c31",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-properties-new_props",
+   "title": "&i2c0 (/soc/i2c@40003000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+  },
+  {
+   "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-9a7df621",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-properties-new_props",
+   "title": "&spi3 (/soc/spi@4002f000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+  },
+  {
+   "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-ba3f246b",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-properties-new_props",
+   "title": "&pro_micro_i2c (/soc/i2c@40003000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+  },
+  {
+   "id": "DEVICETREE-OTHER-NODES-1fe2419b",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "other-nodes",
+   "title": "16 nodes your app doesn't reference changed, disappeared or appeared; 33 more nodes only changed binding"
+  },
+  {
+   "id": "GUIDE-COVERAGE-34fba795",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "coverage",
+   "title": "Read 71 entries from 4 documents; 12 touch your app"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-04e4cb9c",
+   "severity": "risky",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Recommended Changes): Device drivers should now be restricted to PRE_KERNEL_1, PRE_KERNEL_2 and POST_KERNEL initialization levels. [SYS_INIT]"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-106b2d8e",
+   "severity": "risky",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.3 release notes (Deprecated in this release): Deprecated <fcntl.h>, <sys/stat.h> header files in the minimal libc in favour of <zephyr/posix/fcntl.h> and <zephyr/posix/sys/stat.h>."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-14a743b0",
+   "severity": "risky",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Recommended Changes): Random API header <zephyr/random/rand32.h> is deprecated in favor of <zephyr/random/random.h>."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-213c7c7b",
+   "severity": "risky",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.3 release notes (Deprecated in this release): SPI DT spi_is_ready function has been deprecated in favor of spi_is_ready_dt."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-2c28c79f",
+   "severity": "risky",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Recommended Changes): Note that these changes do not apply to initialization levels used in the context of the init.h API, e.g."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-39073cd9",
+   "severity": "risky",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Recommended Changes): Device drivers should now be restricted to PRE_KERNEL_1, PRE_KERNEL_2 and POST_KERNEL initialization levels."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-3f730cc9",
+   "severity": "risky",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.3 release notes (Deprecated in this release): Deprecated <fcntl.h>, <sys/stat.h> header files in the minimal libc in favour of <zephyr/posix/fcntl.h> and <zephyr/posix/sys/stat.h>."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-5af82dd3",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Kernel): CONTAINER_OF now performs type checking, this was very commonly misused to obtain user structure from k_work pointers without passing from k_work_delayable."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-9754923b",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Power Management): Multiple platforms no longer support powering the system off using pm_state_force."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-9f30bf3e",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Device Drivers and Device Tree): The ti,bq274xx driver was using incorrect units for capacity and power channels, these have been fixed and scaled by x1000 factor from the previous implementati (only in files this build doesn't use: boards/arm/corneish_zen/corneish_zen_v1_left.dts, boards/arm/corneish_zen/corneish_zen_v1_right.dts)"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-a7776724",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (C Library): When using Picolibc, the default is 16kB with CONFIG_MMU or ARCH_POSIX, 2kB with CONFIG_USERSPACE and CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-b3668791",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Device Drivers and Device Tree): The configuration options for the SSD1306 display driver can now be provided via the Devicetree binding solomon,ssd1306fb."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-c190a045",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Device Drivers and Device Tree): STM32 Ethernet driver was misusing hwinfo_get_device_id to generate last 3 bytes of mac address, resulting in a high risk of collision when using SoCs from the "
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-e6c9b721",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Kernel): CONTAINER_OF now performs type checking, this was very commonly misused to obtain user structure from k_work pointers without passing from k_work_delayable."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-f4027fe3",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Kernel): CONTAINER_OF now performs type checking, this was very commonly misused to obtain user structure from k_work pointers without passing from k_work_delayable."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-f6e35e8e",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "3.4 release notes (Deprecated in this release): On nRF51 and nRF52-based boards, the behavior of the reset reason being provided to sys_reboot and being set in the GPREGRET register has been dropped."
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-fca177c5",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "3.5 migration guide (Device Drivers and Device Tree): GPIO drivers not implementing IRQ related operations must now provide NULL to the relevant operations: pin_interrupt_configure, manage_callback, get_pending_int"
+  },
+  {
+   "id": "IMAGES-IMAGES-SUMMARY-6d29427c",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "images-summary",
+   "title": "1 image at zephyr-to@339570e2393b: app (app)"
+  },
+  {
+   "id": "KCONFIG-DEFAULT-CHANGED-52fc981b",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "default-changed",
+   "title": "10 Kconfig symbols: other symbols resolve to a different value in zephyr-to@339570e2393b"
+  },
+  {
+   "id": "KCONFIG-NEWLY-SET-f23e9e57",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "newly-set",
+   "title": "154 Kconfig symbols: symbols are newly enabled or set in zephyr-to@339570e2393b"
+  },
+  {
+   "id": "KCONFIG-NO-LONGER-SET-523a72f1",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "no-longer-set",
+   "title": "48 Kconfig symbols: symbols set before are absent in zephyr-to@339570e2393b"
+  },
+  {
+   "id": "KCONFIG-READ-SYMBOL-REMOVED-3f9ca014",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "read-symbol-removed",
+   "title": "Your code reads CONFIG_PINMUX, which no longer exists in zephyr-to@339570e2393b"
+  },
+  {
+   "id": "KCONFIG-SALVAGED-850c8b24",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "salvaged",
+   "title": "The target configure failed; zmig disabled 102 lines in a copy of your app to compare the rest"
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-37a938ba",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module lvgl, which the build uses, moves from 70a7849726be to 8a6a2d1d29d1"
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-74dd89d6",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module hal_nordic, which the build uses, moves from 249199ec5a5c to d054a315eb88"
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-810b0bba",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module cmsis, which the build uses, moves from 093de61c2a7d to 5a00331455dd"
+  },
+  {
+   "id": "STORAGE-BACKEND-OPTIONS-CHANGED-a4fbe3a1",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "backend-options-changed",
+   "title": "Storage backend settings options changed: CONFIG_SETTINGS_NVS_NAME_CACHE unset → n"
+  },
+  {
+   "id": "WIRE-ALLOWLIST-ENTRY-NOT-FOUND-d895b4f9",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "allowlist-entry-not-found",
+   "title": "3 allowlist entries not found at the compared refs: WIRE-SMP-ORIGINAL (CONFIG_MCUMGR_SMP_SUPPORT_ORIGINAL_PROTOCOL not defined at zephyr-from@1ae0eb5ce8ad); WIRE-SMP-NETBUF (CONFIG_MCUMGR_TRANSPORT_NETBUF_SIZE not defined at zephyr-from@1ae0eb5ce8ad); WIRE-SMP-BT-REASSEMBLY (CONFIG_MCUMGR_TRANSPORT_BT_REASSEMBLY not defined at zephyr-from@1ae0eb5ce8ad)"
+  }
+ ]
+}
