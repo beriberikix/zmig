@@ -557,6 +557,8 @@ def _kconfig_ctx(old_log: str, new_log: str, assign: str = "STDOUT_CONSOLE") -> 
         new_kconfig={assign: sym},
         old_facts=parse_log(old_log),
         new_raw_facts=parse_log(new_log),
+        old=SimpleNamespace(src=Path("/app")),
+        build_files=None,
         usage=SimpleNamespace(
             kconfig_set={assign: [(Loc("prj.conf", 1, f"CONFIG_{assign}=y"), "y")]},
             kconfig_read={},
@@ -780,3 +782,66 @@ def test_devicetree_binding_checks_for_read_properties_and_required_errors(
     assert "phy-handle" in err.title and "/soc/ethernet@40028000" in err.title
     assert "Add 'phy-handle'" in err.action
     assert err.new["property"] == "phy-handle"
+
+
+def test_dependency_expression_changes_are_one_info_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AUDIT.md §6 item 5, as info: on echo_server v4.1.0 -> v4.2.0, 18 app-referenced
+    symbols changed depends/selects/implies, mostly SoC lists and symbols set only in
+    overlays the build doesn't use; any change that takes effect in this build already
+    shows as a value change. One finding lists the ones this build's inputs use, and
+    value findings name the expression change in their action."""
+    from zmig.analyzers.kconfig import KconfigAnalyzer
+    from zmig.diagnostics import parse_log
+    from zmig.findings import Severity
+    from zmig.usage import Loc
+
+    monkeypatch.setattr(KconfigAnalyzer, "_promote_dependencies", staticmethod(lambda *a: None))
+
+    def sym(depends: str, selects: tuple[str, ...] = ()) -> dict[str, Any]:
+        return {"depends": depends, "selects": list(selects), "implies": [], "defaults": []}
+
+    ok = {"POSIX_API": sym("!NATIVE_LIBC", ("POSIX_BASE",)), "NET_TCP": sym("NET_IPV4"),
+          "OPENTHREAD_DEBUG": sym("NET_L2_OPENTHREAD"), "LOG": sym(""), "PM": sym("A || B")}  # fmt: skip
+    nk = {"POSIX_API": sym("!NATIVE_LIBC", ("POSIX_BASE", "POSIX_MESSAGE_PASSING")),
+          "NET_TCP": sym("NET_IPV4 || NET_IPV6"), "OPENTHREAD_DEBUG": sym("OPENTHREAD && 0"),
+          "LOG": sym(""), "PM": sym("A || B || C")}  # fmt: skip
+    app = tmp_path / "app"
+    ctx = SimpleNamespace(
+        old_config={"POSIX_API": "y", "NET_TCP": "y", "LOG": "y"},
+        new_config={"POSIX_API": "y", "NET_TCP": "n", "LOG": "y"},
+        old_kconfig=ok,
+        new_kconfig=nk,
+        old_facts=parse_log(f"Merged configuration '{app}/prj.conf'\n"),
+        new_raw_facts=parse_log(""),
+        old=SimpleNamespace(src=app),
+        build_files={"src/main.c"},
+        usage=SimpleNamespace(
+            kconfig_set={
+                "POSIX_API": [(Loc("prj.conf", 8, "CONFIG_POSIX_API=y"), "y")],
+                "NET_TCP": [(Loc("prj.conf", 9, "CONFIG_NET_TCP=y"), "y")],
+                # Only in an overlay this build doesn't apply.
+                "OPENTHREAD_DEBUG": [(Loc("overlay-ot.conf", 3, "CONFIG_OPENTHREAD_DEBUG=y"), "y")],
+                "LOG": [(Loc("prj.conf", 1, "CONFIG_LOG=y"), "y")],
+            },
+            # Read only in a file this build doesn't compile.
+            kconfig_read={"PM": [Loc("src/pm.c", 4, "#ifdef CONFIG_PM")]},
+        ),
+        old_spec="v4.1.0",
+        new_spec="v4.2.0",
+        scope=("s",),
+        salvage=(),
+        is_app=True,
+        runner=SimpleNamespace(redact=lambda s: s),
+    )
+    found = KconfigAnalyzer().analyze(ctx).findings  # type: ignore[arg-type]
+    (agg,) = [f for f in found if f.kind == "dependency-expression-changed"]
+    assert agg.severity is Severity.INFO and agg.subject == "dependency-expressions"
+    assert sorted(agg.new) == ["NET_TCP", "POSIX_API"]
+    assert agg.new["NET_TCP"] == {"depends": ["NET_IPV4", "NET_IPV4 || NET_IPV6"]}
+    assert agg.new["POSIX_API"] == {
+        "selects": [["POSIX_BASE"], ["POSIX_BASE", "POSIX_MESSAGE_PASSING"]]
+    }
+    (vnt,) = [f for f in found if f.kind == "value-not-taken"]
+    assert "NET_IPV4 || NET_IPV6" in vnt.action and "NET_IPV4" in vnt.action

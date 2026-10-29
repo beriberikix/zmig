@@ -105,6 +105,35 @@ def references(info: dict[str, Any], known: Symbols) -> dict[str, str]:
     return {s: how for s, how in out.items() if s in known}
 
 
+EXPRESSIONS = ("depends", "selects", "implies")
+
+
+def expression_changes(old: dict[str, Any], new: dict[str, Any]) -> dict[str, list[Any]]:
+    """{"depends"|"selects"|"implies": [old, new]} for those that differ between one
+    symbol's definitions at the two refs."""
+    return {k: [old.get(k), new.get(k)] for k in EXPRESSIONS if old.get(k) != new.get(k)}
+
+
+def expression_note(old: Symbols, new: Symbols, sym: str, spec: str) -> str:
+    """ " Its definition changed in <spec>: ..." for a finding's action, or "" (AUDIT.md
+    §6 item 5: the value findings say why)."""
+    if sym not in old or sym not in new:
+        return ""
+    ch = expression_changes(old[sym], new[sym])
+    if not ch:
+        return ""
+
+    def show(v: Any) -> str:
+        return (", ".join(v) if isinstance(v, list) else v) or "nothing"
+
+    how = {"depends": "depends on", "selects": "selects", "implies": "implies"}
+    return (
+        f" Its definition changed in {spec}: "
+        + "; ".join(f"{how[k]} {show(o)} -> {show(n)}" for k, (o, n) in ch.items())
+        + "."
+    )
+
+
 def dependency_chains(
     roots: dict[str, Any], changed: set[str], old: Symbols
 ) -> dict[str, list[tuple[str, str, str]]]:
@@ -255,7 +284,8 @@ class KconfigAnalyzer:
                     Severity.BREAKING,
                     Confidence.HIGH,
                     f"New or changed dependencies are unmet: {d.deps or 'see the evidence'}. "
-                    f"Enable them, or drop the assignment if the feature moved.",
+                    f"Enable them, or drop the assignment if the feature moved."
+                    + expression_note(ok, nk, sym, ctx.new_spec),
                     ev + dev,
                     old=ov.get(sym),
                     new={"assigned": value, "got": d.got, "unsatisfied": d.deps},
@@ -286,7 +316,8 @@ class KconfigAnalyzer:
                     f"{ctx.new_spec} (it is {nv.get(sym, 'n')})",
                     Severity.BREAKING,
                     Confidence.HIGH,
-                    f"Check the dependencies of CONFIG_{sym}: {nk[sym]['depends']}.",
+                    f"Check the dependencies of CONFIG_{sym}: {nk[sym]['depends']}."
+                    + expression_note(ok, nk, sym, ctx.new_spec),
                     (*ev, diff_ev(sym)),
                     old=ov.get(sym),
                     new=nv.get(sym),
@@ -339,7 +370,8 @@ class KconfigAnalyzer:
                     f"to {nv.get(sym, 'n')}",
                     Severity.RISKY,
                     Confidence.HIGH,
-                    "Check the code paths that depend on it.",
+                    "Check the code paths that depend on it."
+                    + expression_note(ok, nk, sym, ctx.new_spec),
                     (*locs, diff_ev(sym)),
                     old=ov.get(sym),
                     new=nv.get(sym),
@@ -377,6 +409,7 @@ class KconfigAnalyzer:
                     (),
                     new=items,
                 )
+        findings += self._expression_changes(ctx)
         if ctx.salvage and ctx.is_app:
             findings.append(
                 Finding(
@@ -399,6 +432,48 @@ class KconfigAnalyzer:
                 )
             )
         return AnalyzerResult(findings)
+
+    @staticmethod
+    def _expression_changes(ctx: ScanContext) -> list[Finding]:
+        """One info finding for the depends/selects/implies changes of symbols this build's
+        inputs set (applied fragments) or read (compiled files). Any that took effect in
+        this build is also a value change, reported on its own; the rest matter for other
+        boards and configurations (AUDIT.md §6 item 5: as risky, echo_server would get 18,
+        mostly SoC lists and overlays the build doesn't apply)."""
+        ok, nk = ctx.old_kconfig, ctx.new_kconfig
+        applied = set(app_relative(ctx.old_facts.configs, ctx.old.src))
+        built = ctx.build_files
+        used: dict[str, list[Loc]] = {}
+        for sym, assigns in ctx.usage.kconfig_set.items():
+            if locs := [loc for loc, _ in assigns if loc.path in applied]:
+                used[sym] = locs
+        for sym, locs in ctx.usage.kconfig_read.items():
+            if keep := [loc for loc in locs if built is None or loc.path in built]:
+                used.setdefault(sym, keep)
+        changes = {
+            sym: ch
+            for sym in sorted(used)
+            if sym in ok and sym in nk and (ch := expression_changes(ok[sym], nk[sym]))
+        }
+        if not changes:
+            return []
+        return [
+            Finding(
+                category=Category.KCONFIG,
+                kind="dependency-expression-changed",
+                subject="dependency-expressions",
+                title=f"{plural(len(changes), 'Kconfig symbol')} your build sets or reads "
+                f"changed their depends/selects/implies in {ctx.new_spec}",
+                severity=Severity.INFO,
+                confidence=Confidence.HIGH,
+                action="Value changes they caused in this build are reported as their own "
+                "findings; the new expressions can matter for other boards or configurations.",
+                analyzer=KconfigAnalyzer.name,
+                scope=ctx.scope,
+                evidence=_locs([used[s][0] for s in changes][:10]),
+                new=changes,
+            )
+        ]
 
     @staticmethod
     def _promote_dependencies(
@@ -447,7 +522,8 @@ class KconfigAnalyzer:
                 f"from {ov.get(x, 'unset')} to {nv.get(x, 'unset')} in {ctx.new_spec}",
                 Severity.RISKY,
                 Confidence.MEDIUM,
-                f"{text}. Check that CONFIG_{root} still does what your app expects.",
+                f"{text}. Check that CONFIG_{root} still does what your app expects."
+                + expression_note(ok, ctx.new_kconfig, root, ctx.new_spec),
                 (*roots[root], tool_output("Kconfig at the source", text), diff_ev(x)),
                 old=ov.get(x),
                 new={"value": nv.get(x), "chain": [list(link) for link in chain]},
