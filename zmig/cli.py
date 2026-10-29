@@ -130,6 +130,24 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--to", dest="to_ref", required=True)
     _scan_args(scan)
 
+    fix = sub.add_parser(
+        "fix",
+        parents=[common],
+        help="rename Kconfig assignments the target removed, where Kconfig says what "
+        "replaced them (dry run unless --apply)",
+        description="Scans like `zmig scan`, then classifies each assignment in the "
+        "project's own Kconfig fragments. Only renames with Kconfig-level evidence, a "
+        "matching type and dependencies that resolve at the target are applied. --apply "
+        "refuses a dirty tree, commits each evidence kind on a new branch, rebuilds the "
+        "target and reruns the analyzers. Exit 3 if the fix introduced a finding.",
+    )
+    fix.add_argument("what", choices=["kconfig"])
+    fix.add_argument("--from", dest="from_ref", required=True)
+    fix.add_argument("--to", dest="to_ref", required=True)
+    _scan_args(fix)
+    fix.add_argument("--apply", action="store_true", help="commit the fixes on a new branch")
+    fix.add_argument("--branch", help="branch for --apply (default: zmig/fix-kconfig-<to>)")
+
     doctor = sub.add_parser(
         "doctor",
         parents=[common],
@@ -239,10 +257,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     watch.add_argument("--today", default=None, help=argparse.SUPPRESS)
 
-    for name, what in (
-        ("fix", "codemods"),
-        ("verify", "post-migration verification"),
-    ):
+    for name, what in (("verify", "post-migration verification"),):
         s = sub.add_parser(name, parents=[common], help=f"{what} (not in the MVP)")
         s.add_argument("rest", nargs=argparse.REMAINDER)
     return p
@@ -358,7 +373,13 @@ def cmd_scan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     return EXIT_OK
 
 
-def scan_report(args: argparse.Namespace, cache: Cache, runner: Runner) -> Report:
+def scan_report(
+    args: argparse.Namespace,
+    cache: Cache,
+    runner: Runner,
+    keep: list[ScanContext] | None = None,
+) -> Report:
+    """The scan's report; `keep` receives its ScanContext (for `zmig fix`)."""
     for tool in ("git", "cmake", "ninja", "dtc"):
         find_tool(tool)
     check_zephyr_python()
@@ -514,6 +535,8 @@ def scan_report(args: argparse.Namespace, cache: Cache, runner: Runner) -> Repor
     report.upgrade_path = upgrade_path(
         ctx.shared, report.findings, report.analyzers, salvage.effective.status
     )
+    if keep is not None:
+        keep.append(ctx)
     return report
 
 
@@ -646,6 +669,10 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
     try:
+        if args.command == "fix":
+            from zmig.fixcmd import cmd_fix
+
+            return cmd_fix(args, cache, runner)
         if args.command == "doctor":
             from zmig.doctor import format_checks, run_checks
 

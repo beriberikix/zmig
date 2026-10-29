@@ -16,7 +16,7 @@ def test_plan_rejects_non_workspace(tmp_path: Path, capsys: pytest.CaptureFixtur
 
 
 def test_out_of_scope_commands(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["fix", "--cache-dir", str(tmp_path)]) == 1
+    assert main(["verify", "--cache-dir", str(tmp_path)]) == 1
     assert "outside the MVP" in capsys.readouterr().err
 
 
