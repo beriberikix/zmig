@@ -78,6 +78,14 @@ arrive with their worktrees (row 1), so "at the two refs" costs nothing extra.
 6. The same scan again with the network off and `GIT_NO_LAZY_FETCH=1`: does it still work
    from the cache?
 
+**Requirement (review, 2026-10-29).** With lazy fetches disabled
+(`GIT_NO_LAZY_FETCH=1`), a missing blob must **never** produce a silently shorter result.
+Every analyzer or step that hits a missing object records a `not_checked` entry. The entry
+names the analyzer, the object or path, and "blob not in the partial clone". Whatever
+depends on it is reported as not checked, not as clean. A test runs a scan against a
+blobless mirror with lazy fetches off and asserts that every git failure in the logs has
+a matching `not_checked` entry.
+
 **Accept only if all of these hold:**
 
 - `report.json` findings are identical between A and B for every run, compared by id,
