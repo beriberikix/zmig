@@ -613,6 +613,13 @@
             },
             "excerpt": {
               "type": "string"
+            },
+            "log": {
+              "type": "string"
+            },
+            "log_line": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         }

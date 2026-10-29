@@ -112,8 +112,16 @@ def doc_entry(doc: str, line: int, ref: str, entry_id: str, text: str | None = N
     return ev
 
 
-def tool_output(invocation: str, excerpt: str) -> JSON:
-    return {"type": "tool_output", "invocation": invocation, "excerpt": excerpt}
+def tool_output(
+    invocation: str, excerpt: str, log: str | None = None, log_line: int | None = None
+) -> JSON:
+    """A tool's own message; `log` and `log_line` say where in zmig's logs it appears."""
+    ev: JSON = {"type": "tool_output", "invocation": invocation, "excerpt": excerpt}
+    if log is not None:
+        ev["log"] = log
+        if log_line is not None:
+            ev["log_line"] = log_line
+    return ev
 
 
 def plural(n: int, word: str, suffix: str = "s") -> str:

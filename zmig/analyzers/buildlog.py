@@ -408,6 +408,26 @@ class BuildlogAnalyzer:
             )
 
     @staticmethod
+    def _warning_evidence(ctx: ScanContext, message: str, logs: list[Path]) -> JSON:
+        """Kconfig's own warning, with the log and line it is in: the target configure's
+        log, or the salvaged build's (later salvage rounds find the rest)."""
+        first = message.strip().splitlines()[0].strip() if message.strip() else ""
+        for log in logs:
+            if not first or not log.is_file():
+                continue
+            for i, line in enumerate(log.read_text(errors="replace").splitlines(), 1):
+                if first in line:
+                    return tool_output(
+                        "target configure (Kconfig)",
+                        ctx.runner.redact(message),
+                        ctx.runner.redact(str(log)),
+                        i,
+                    )
+        return tool_output(
+            "target configure (Kconfig, a salvage round)", ctx.runner.redact(message)
+        )
+
+    @staticmethod
     def _size(ctx: ScanContext, add: Add) -> None:
         o = footprint(ctx.old_img.artifact(Artifact.ELF))
         n = footprint(ctx.new_img.artifact(Artifact.ELF))
@@ -497,6 +517,16 @@ class BuildlogAnalyzer:
                 old_syms = kconfig_symbols(ctx.old_img, ctx.old.workspace, ctx.runner)
             except ArtifactMissing:
                 old_syms = None
+        # Where each message is: the first configure, each salvage round, the final build.
+        logs = list(
+            dict.fromkeys(
+                [
+                    raw.log,
+                    *(Path(e.log) for e in ctx.salvage if e.log),
+                    *([ctx.new_img.log] if ctx.new_img is not raw else []),
+                ]
+            )
+        )
         for d in diags:
             if d.kind not in ("kconfig-definition", "kconfig-loop") or (d.kind, d.symbol) in seen:
                 continue
@@ -504,13 +534,17 @@ class BuildlogAnalyzer:
             mine = [x for x in d.locations if rel(x.rpartition(":")[0])]
             if not mine:
                 continue
-            ev = tuple(
-                file_line(
-                    rel(x.rpartition(":")[0])[0],
-                    int(x.rpartition(":")[2]),
-                    f"{'choice' if 'choice' in d.message else 'config'} {d.symbol}",
-                )
-                for x in mine[:6]
+            warning = self._warning_evidence(ctx, d.message, logs)
+            ev = (
+                *(
+                    file_line(
+                        rel(x.rpartition(":")[0])[0],
+                        int(x.rpartition(":")[2]),
+                        f"{'choice' if 'choice' in d.message else 'config'} {d.symbol}",
+                    )
+                    for x in mine[:6]
+                ),
+                warning,
             )
             where = ", ".join(
                 f"{rel(x.rpartition(':')[0])[0]}:{x.rpartition(':')[2]}" for x in mine[:3]

@@ -697,9 +697,18 @@ class SalvageEdit:
     line: int
     text: str  # the original line
     reason: str  # the diagnostic message that caused it
+    log: str = ""  # the configure log the message is in (the salvage round's build)
 
     def to_json(self) -> dict[str, object]:
-        return {"file": self.file, "line": self.line, "text": self.text, "reason": self.reason}
+        out: dict[str, object] = {
+            "file": self.file,
+            "line": self.line,
+            "text": self.text,
+            "reason": self.reason,
+        }
+        if self.log:
+            out["log"] = self.log
+        return out
 
 
 @dataclass(frozen=True)
@@ -855,9 +864,15 @@ def build_with_salvage(
         # files of the app copy that build used (prj.conf, sysbuild/<image>.conf, ...).
         edits = []
         for img in current.images:
-            edits += locate_salvage_edits(img.log.read_text(), current.src)
+            edits += [
+                replace(e, log=str(img.log))
+                for e in locate_salvage_edits(img.log.read_text(), current.src)
+            ]
         if not current.images:
-            edits = locate_salvage_edits(current.log.read_text(), current.src)
+            edits = [
+                replace(e, log=str(current.log))
+                for e in locate_salvage_edits(current.log.read_text(), current.src)
+            ]
         new_edits = [
             e for e in edits if (e.file, e.line) not in {(a.file, a.line) for a in all_edits}
         ]
