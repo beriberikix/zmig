@@ -166,6 +166,19 @@ def diagnose(
     return list(needs.values())
 
 
+def needed_at_source(
+    log: str,
+    zephyr: Path,
+    manifest: dict[str, ProjectInfo],
+    active: set[str],
+    added: list[str],
+) -> list[str]:
+    """Of the modules zmig added to the target build, those the source build's own log
+    shows it needs too: missing at both refs, so a gap in the scan's module set rather than
+    something the migration requires (AUDIT.md §5.2 run 1, littlefs)."""
+    return [n.module for n in diagnose(log, zephyr, manifest, active) if n.module in added]
+
+
 @dataclass(frozen=True)
 class ModuleChange:
     module: str

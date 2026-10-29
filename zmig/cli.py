@@ -14,6 +14,7 @@ from pathlib import Path
 from zmig import __version__, analyzers
 from zmig.boards import alias_tables, map_board
 from zmig.buildctx import (
+    BuildContext,
     BuildMode,
     BuildSpec,
     SalvageResult,
@@ -28,7 +29,7 @@ from zmig.errors import UsageError, ZmigError
 from zmig.findings import Category, Confidence, Finding, NotChecked, Report, Severity, plural
 from zmig.forks import DEFAULT_METHODS, compare_tree, guess_version_tag
 from zmig.manifest import load_manifest, scan_user_workspace
-from zmig.modulecheck import ModuleNeed, diagnose
+from zmig.modulecheck import ModuleNeed, diagnose, needed_at_source
 from zmig.plan import PlanContext
 from zmig.refs import ResolvedRef, resolve_ref
 from zmig.report import render
@@ -451,6 +452,22 @@ def scan_report(
         log.warning("  %s with %s: %s", args.to_ref, ", ".join(added), salvage.effective.status)
     else:
         first_contexts = []
+    # The same module missing at the source is a gap in the scan's module set, not a
+    # migration requirement: build the source with it too, so both sides compare like for
+    # like (AUDIT.md §5.2 run 1: littlefs, missing at v4.1.0 and v4.2.0).
+    at_source = _source_also_needs(old, old_ws, runner, added)
+    first_old = []
+    if at_source:
+        log.warning(
+            "the source build needs module(s) %s too; rebuilding it with them added",
+            ", ".join(at_source),
+        )
+        old_ws = materialize(
+            old_r, cache, runner, [*args.modules, *at_source], shallow=args.shallow
+        )
+        first_old = [old.to_json()]
+        old = build(old_ws, spec(args.board), cache, runner)
+        log.warning("  %s with %s: %s", args.from_ref, ", ".join(at_source), old.status)
     # Tool messages quote absolute paths of the built app copies; report them as <app>.
     runner.redactions[str(app.resolve())] = "<app>"
     for built in (old, salvage.original, salvage.salvaged):
@@ -458,7 +475,8 @@ def scan_report(
             runner.redactions[str(built.src)] = "<app>"
 
     contexts = [
-        old.to_json(),
+        *({**c, "superseded_by_module_recovery": at_source} for c in first_old),
+        {**old.to_json(), **({"modules_added": at_source} if at_source else {})},
         *({**c, "superseded_by_module_recovery": list(added)} for c in first_contexts),
         {**salvage.original.to_json(), **({"modules_added": list(added)} if added else {})},
     ]
@@ -503,6 +521,7 @@ def scan_report(
         wire_allowlist=args.wire_allowlist.expanduser().resolve() if args.wire_allowlist else None,
         module_needs=tuple(needs),
         modules_added=tuple(added),
+        modules_at_source=tuple(at_source),
     )
     report.findings, report.analyzers, report.not_checked = analyzers.run_build_analyzers(
         selected, ctx
@@ -564,6 +583,18 @@ def _missing_modules(
     active = {m.name for m in ws.modules(runner)}
     needs = diagnose(text, ws.zephyr, load_manifest(ws.root), active)
     return needs, [n.module for n in needs]
+
+
+def _source_also_needs(
+    old: BuildContext, ws: RefWorkspace, runner: Runner, added: list[str]
+) -> list[str]:
+    """Of the modules zmig added to the target, those the failed source build needs too."""
+    if not added or old.status == "ok":
+        return []
+    logs = [old.log, *(i.log for i in old.images)]
+    text = "\n".join(p.read_text() for p in dict.fromkeys(logs) if p.is_file())
+    active = {m.name for m in ws.modules(runner)}
+    return needed_at_source(text, ws.zephyr, load_manifest(ws.root), active, added)
 
 
 def _resolve_plan_from(

@@ -653,3 +653,45 @@ def test_preexisting_devicetree_errors_keep_their_severity(tmp_path: Path) -> No
         assert f.severity is Severity.BREAKING
         assert not f.introduced_by_migration and "pre-existing" in f.title
     assert all(f.introduced_by_migration for f in run(""))
+
+
+def test_module_required_at_both_refs_is_preexisting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AUDIT.md §5.2 run 1: the settings sample built without littlefs fails at v4.1.0 and
+    v4.2.0 alike; "the target build needs module littlefs" was breaking/act-now."""
+    from zmig.analyzers import modules
+    from zmig.findings import Severity
+    from zmig.modulecheck import ModuleNeed
+
+    monkeypatch.setattr(modules, "load_manifest", lambda root: {})
+    monkeypatch.setattr(modules, "manifest_changes", lambda *a: [])
+    monkeypatch.setattr(modules, "user_manifest", lambda app: None)
+    ws = SimpleNamespace(zephyr=tmp_path / "zephyr", root=tmp_path, modules=lambda runner: [])
+    need = ModuleNeed("littlefs", "a Kconfig dependency on ZEPHYR_LITTLEFS_MODULE is unmet")
+
+    def run(at_source: tuple[str, ...]) -> Any:
+        ctx = SimpleNamespace(
+            module_needs=(need,),
+            modules_added=("littlefs",),
+            modules_at_source=at_source,
+            old=SimpleNamespace(workspace=ws, spec=SimpleNamespace(app=tmp_path)),
+            new=SimpleNamespace(workspace=ws),
+            old_img=SimpleNamespace(has=lambda a: False),
+            new_img=SimpleNamespace(has=lambda a: False),
+            runner=SimpleNamespace(redact=lambda s: s),
+            old_spec="v4.1.0",
+            new_spec="v4.2.0",
+            scope=("s",),
+        )
+        (f,) = modules.ModulesAnalyzer().analyze(ctx).findings  # type: ignore[arg-type]
+        return f
+
+    pre = run(("littlefs",))
+    assert pre.kind == "module-required" and pre.severity is Severity.INFO
+    assert not pre.introduced_by_migration and "already required at v4.1.0" in pre.title
+    assert pre.new["required_at_source"] is True
+    new = run(())
+    assert new.severity is Severity.BREAKING and new.introduced_by_migration
+    assert new.new["required_at_source"] is False
+    assert new.id == pre.id

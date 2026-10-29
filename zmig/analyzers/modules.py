@@ -34,7 +34,8 @@ class ModulesAnalyzer:
         findings: list[Finding] = []
 
         def add(kind: str, subject: str, title: str, sev: Severity, action: str,
-                ev: tuple[JSON, ...], old: object = None, new: object = None) -> None:  # fmt: skip
+                ev: tuple[JSON, ...], old: object = None, new: object = None,
+                introduced: bool = True) -> None:  # fmt: skip
             findings.append(
                 Finding(
                     category=Category.MANIFEST,
@@ -49,12 +50,16 @@ class ModulesAnalyzer:
                     evidence=ev,
                     old=old,
                     new=new,
+                    introduced_by_migration=introduced,
                 )
             )
 
         zephyr = str(ctx.new.workspace.zephyr) + "/"
         for need in ctx.module_needs:
             added = need.module in ctx.modules_added
+            # Needed at both refs: the scan's module set lacked it, the migration didn't
+            # change anything (AUDIT.md §5.2 run 1; docs/DESIGN-P1.md §2.3).
+            at_source = need.module in ctx.modules_at_source
             site = need.site.replace(zephyr, "zephyr/")
             ev: list[JSON] = [
                 tool_output(
@@ -79,9 +84,15 @@ class ModulesAnalyzer:
                 "module-required",
                 need.module,
                 f"The target build needs module {need.module}, which the build's module set "
-                f"doesn't include",
-                Severity.BREAKING,
+                f"doesn't include" + (f"; already required at {ctx.old_spec}" if at_source else ""),
+                Severity.INFO if at_source else Severity.BREAKING,
                 (
+                    f"The source build failed without {need.module} too, so zmig added it at "
+                    f"both versions. If your workspace has it, pass --module {need.module}. "
+                    if at_source
+                    else ""
+                )
+                + (
                     f"Add {need.module} to your manifest{in_manifest} and run `west update`."
                     if in_manifest
                     else f"Add {need.module} to your workspace (the name-allowlist or project "
@@ -102,7 +113,9 @@ class ModulesAnalyzer:
                     "declared": need.declared,
                     "alternatives": list(need.alternatives),
                     "added_by_zmig": added,
+                    "required_at_source": at_source,
                 },
+                introduced=not at_source,
             )
 
         used = [m.name for m in ctx.old.workspace.modules(ctx.runner)]

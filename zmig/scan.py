@@ -61,6 +61,8 @@ class ScanContext:
     # zmig added to rebuild the target so the analysis could continue.
     module_needs: tuple[ModuleNeed, ...] = ()
     modules_added: tuple[str, ...] = ()
+    # Of those, the ones the source build needed too; zmig added them there as well.
+    modules_at_source: tuple[str, ...] = ()
     # Caches shared by the contexts of all images of one scan.
     shared: dict[str, Any] = field(default_factory=dict)
 
