@@ -12,6 +12,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -27,6 +28,7 @@ from zmig.tools import Runner, find_tool
 from zmig.workspace import Module, RefWorkspace, west_argv
 
 # Bump when the build recipe changes in a way that invalidates cached builds.
+log_ = logging.getLogger("zmig")  # `log` is the build log path in build()
 RECIPE_VERSION = 12
 
 BuildMode = Literal["full", "fast"]
@@ -205,9 +207,18 @@ def python_environment() -> dict[str, str]:
 
 
 def build_key(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> str:
+    return _key_of(key_inputs(ws, spec, modules))
+
+
+def _key_of(material: dict[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def key_inputs(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> dict[str, Any]:
+    """Everything the build key is made of (and nothing else)."""
     from zmig import __version__
 
-    material = {
+    return {
         "recipe": RECIPE_VERSION,
         "zmig": __version__,
         "python": python_environment(),
@@ -220,7 +231,64 @@ def build_key(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> str:
         "cmake_args": list(spec.cmake_args),
         "sdk": sdk_identity(spec.sdk),
     }
-    return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def _flat(d: Any, prefix: str = "") -> dict[str, str]:
+    if isinstance(d, dict):
+        out: dict[str, str] = {}
+        for k, v in d.items():
+            out.update(_flat(v, f"{prefix}.{k}" if prefix else k))
+        return out
+    return {prefix: json.dumps(d, sort_keys=True)}
+
+
+_INPUT_NAMES = {
+    "python.executable": "interpreter",
+    "python.prefix": "venv",
+    "python.version": "Python version",
+    "python.packages": "package digest",
+    "zmig": "zmig version",
+    "recipe": "build recipe",
+    "app": "app tree",
+    "sdk": "SDK",
+}
+
+
+def miss_reason(builds: Path, app: Path, inputs: dict[str, Any]) -> str:
+    """Why a build key wasn't in the cache: the inputs that differ from the closest cached
+    build of the same app (the fewest differences), from the inputs each cache marker
+    records. Debugging only; it doesn't affect the key."""
+    want = _flat(inputs)
+    best: tuple[int, list[str]] | None = None
+    for marker in builds.glob("*.json"):
+        try:
+            meta = json.loads(marker.read_text())
+        except (OSError, ValueError):
+            continue
+        old = meta.get("key_inputs")
+        if not old or str(Path(meta.get("spec", {}).get("app", "")).resolve()) != str(
+            app.resolve()
+        ):
+            continue
+        have = _flat(old)
+        # One name per input; the Python environment's parts are named separately.
+        diff = sorted(
+            {
+                k if k.startswith("python.") else k.split(".")[0]
+                for k in set(want) | set(have)
+                if want.get(k) != have.get(k)
+            }
+        )
+        if best is None or len(diff) < best[0]:
+            best = (len(diff), diff)
+    if best is None:
+        return (
+            "no earlier build of this app with recorded key inputs (built before zmig "
+            "recorded them, or never)"
+        )
+    if not best[1]:
+        return "the closest cached build has the same inputs but no usable build directory"
+    return ", ".join(f"{_INPUT_NAMES.get(k, k)} changed" for k in best[1])
 
 
 def app_source(ws: RefWorkspace, spec: BuildSpec) -> Path:
@@ -372,17 +440,27 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
     A plain build is the one-image case of the same steps.
     """
     modules = ws.modules(runner)
-    key = build_key(ws, spec, modules)
+    inputs = key_inputs(ws, spec, modules)
+    key = _key_of(inputs)
     src = app_source(ws, spec)
     bdir = cache.builds / key
     marker = cache.builds / f"{key}.json"
     log = cache.builds / f"{key}.log"
     if marker.is_file() and bdir.is_dir():
         meta = json.loads(marker.read_text())
+        if "key_inputs" not in meta:  # recorded from now on, for miss_reason
+            marker.write_text(json.dumps({**meta, "key_inputs": inputs}, indent=2))
         runner.redactions.setdefault(str(bdir), f"$BUILD[{key}]")
         images = tuple(_image_from_json(x, bdir, spec, ws) for x in meta["images"])
         return BuildContext(ws, spec, key, bdir, meta["status"], log, src, images)
 
+    log_.warning(
+        "  build %s for %s at %s not in the cache; rebuilt because: %s",
+        key,
+        spec.board,
+        ws.resolved.ref.label,
+        miss_reason(cache.builds, spec.app, inputs),
+    )
     shutil.rmtree(bdir, ignore_errors=True)
     src.parent.mkdir(parents=True, exist_ok=True)
     _copy_app(spec.app.resolve(), src)
@@ -561,6 +639,7 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
                 },
                 "ref": ws.resolved.ref.to_json(),
                 "images": [{**i.to_json(), "dir": str(i.dir), "log": str(i.log)} for i in built],
+                "key_inputs": inputs,
             },
             indent=2,
         )
