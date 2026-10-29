@@ -199,3 +199,74 @@ No crashes: both runs exited 0, and invariants pass.
 | L5 | A failed target configure blinds Kconfig and devicetree for that image | K1 unreachable; D1 and D2 seen only through other images |
 | L6 | Project modules (`zlibs`) are taken from the scanned tree for both refs | M1's bump isn't analyzed |
 | L7 | Multi-image builds: findings come from whichever images built | D1 and D2 are partials reported on the bootloader image |
+
+## 10. After the fixes (second column; **not a clean measurement**)
+
+Made after seeing these results, at zmig `c7aac37`:
+
+| Commit | Fix |
+|---|---|
+| `ffd6660` | plan `--patch-method` (git-apply / git-am / 3way), absorbed detection, patch file and hunk named in the action |
+| `1344f72` | M17–M20 |
+| `c7aac37` | C++ include directories from the build's compiler (infrastructure); API-coverage confidence cap |
+
+Both runs used the same patched checkouts, tree and board as the baseline:
+
+- **plan:** `--patch-method git-apply --patch-dir <tree>/zephyr/patch`, because
+  OpenDeck's build tool applies its patches with plain `git apply`
+  (`paradajz/zenv@c7ca4fb scripts/patch.sh:80,84`);
+- **scan:** as before.
+
+**Every item whose result changed because of a fix is marked †, meaning not clean.** The
+clean column stays the baseline.
+
+### Scan items
+
+| Item | Baseline | After fixes | Why it changed |
+|---|---|---|---|
+| D1 Ethernet labels | partly (b) | **partly (c) †** | M18: the configure finding now says "app image: devicetree error: … undefined node label 'eth_rxd0_pc4'", the right cause. But it has no project file:line (the overlay the maintainers changed), so it stays partly |
+| D2 ADC properties | partly (b) | **missed †** | M19: the bootloader's `&adc1`/`&adc2` findings, D2's only partial, are now info. The bootloader has no ADC device, so they were harmless |
+| K1, C1, M1 | missed | missed | unchanged: the target app never reaches Kconfig |
+
+### Patch items
+
+| Item | Baseline | After fixes |
+|---|---|---|
+| P5 `esp32_eth_enable_rmii_output_clock` | partly (b) | **caught †**: conflicts, hunk `eth_esp32.c:709` |
+| P7 `kconfig_dt_node_prop_len` | partly (b) | **caught †**: conflicts, hunk `kconfigfunctions.py:663` |
+| P8 `esp32_eth_pass_multicast_frames` | partly (b) | **caught †**: "upstreamed": "Drop the project's patch …: upstream already absorbed the change" |
+| P1–P4, P6, P9 | caught | caught |
+
+In the default mode (no `--patch-method`), P5, P7 and P8 show "(fails under git-apply;
+applies under 3way)", and the verdict is the stricter one.
+
+### Side by side
+
+| | Baseline (clean) | After fixes † |
+|---|---|---|
+| Scan strict / lenient | 0/5 / 2/5 | 0/5 / **1/5** |
+| Scan precision | 11/22 (50%) | **11/11 (100%)**: the 7 false macro findings (M17) and 4 no-device node findings (M19) are gone or info |
+| Scan actionable | 0 | 0 |
+| Plan strict / lenient | 6/9 / 9/9 | **9/9 / 9/9** |
+| Plan precision | 8/15 (53%) | 8/15 (53%): 7 conflicts + P8 confirmed; P3 and 6 unchanged patches flagged for overlap are harmless |
+| Plan actionable | 0 | **8/9**: each conflict or drop action names the patch file the maintainers edited or removed. P3, edited voluntarily, isn't named |
+| C++ TUs parsed with errors (app, source) | 49/51 | **0/51** |
+| API not interpreted (app) | 49/51 | 51/51: no target compile commands, because the target configure fails. Verdict confidence capped at low with that reason |
+| Verdict | needs-changes (low) | needs-changes (low) |
+
+### Regression check on the other held-out projects (zmig `c7aac37`)
+
+| Config | Breaking/risky findings | Verdict | Compared with | Result |
+|---|---|---|---|---|
+| Golioth B | 9, the same set | direct-ok (medium) | `d5/golioth-B` (DOGFOOD-5 watch stability runs) | **no regression**. The typedef finding now also cites `net_connect.c:20`, G1a's handler definition (item c, `477d419`). G1 was already caught, so the numbers are unchanged |
+| CANnectivity C1 | 8, the same set | direct-ok (low) | DOGFOOD-4 §6 | **no regression**. The callback finding cites the run-function definitions (item c; already marked not clean in the C2 correction) |
+| CANnectivity C2 | 8, the same set | direct-ok (low) | `cannectivity-c2-correction-2026-10-28.md` | **no regression** |
+| bms-firmware A1 | 9 (2 breaking, 7 risky): recall 1/1 of 2 items, precision 1/9 | unknown (medium) | DOGFOOD-3 §2–3 (P2 column): 1/1, 1/9, unknown (medium) | **no regression** (its earlier report was lost with the old scratchpad, so it's compared against the recorded numbers) |
+
+API coverage in these runs: every TU interpreted (Golioth `hello` 31/31, CANnectivity
+5/5, bms 19/19). The confidence cap doesn't trigger.
+
+### Still a limitation
+
+The missing detection of mbedtls's `tf-psa-crypto` dependency (L2) is recorded, not
+fixed.
