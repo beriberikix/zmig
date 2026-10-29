@@ -434,20 +434,28 @@ class Document:
     kind: Literal["guide", "notes"]
 
 
-def load_documents(old: BuildContext, new: BuildContext) -> list[Document]:
-    """Guide and release-notes documents for every release crossed by old -> new: from the
-    target tree when it still has them, else from that release's tag."""
+def crossed_releases(old: BuildContext, new: BuildContext) -> list[tuple[int, int]]:
+    """The minor releases old -> new crosses, as (major, minor), oldest first."""
     from zmig.analyzers.hops import ref_version, release_tags
 
     mirror = new.workspace.resolved.mirror
     old_v, _ = ref_version(mirror, old.workspace.resolved.ref.sha)
     new_v, _ = ref_version(mirror, new.workspace.resolved.ref.sha)
-    tags = release_tags(mirror)
-    minors = sorted(m for m in tags if old_v < m <= new_v)
+    minors = sorted(m for m in release_tags(mirror) if old_v < m <= new_v)
     if new_v not in minors and new_v > old_v:
         minors.append(new_v)  # target is a development snapshot of an unreleased version
+    return minors
+
+
+def load_documents(old: BuildContext, new: BuildContext) -> list[Document]:
+    """Guide and release-notes documents for every release crossed by old -> new: from the
+    target tree when it still has them, else from that release's tag."""
+    from zmig.analyzers.hops import release_tags
+
+    mirror = new.workspace.resolved.mirror
+    tags = release_tags(mirror)
     docs = []
-    for minor in minors:
+    for minor in crossed_releases(old, new):
         version = f"{minor[0]}.{minor[1]}"
         sources: tuple[tuple[Literal["guide", "notes"], str], ...] = (
             ("guide", f"migration-guide-{version}.rst"),

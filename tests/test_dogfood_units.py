@@ -370,25 +370,68 @@ def test_findings_only_in_unused_input_files_become_info(tmp_path: Path) -> None
     )
     img = SimpleNamespace(dir=img_dir, log=log)
     b = SimpleNamespace(src=app, workspace=SimpleNamespace(root=tmp_path / "ws"), images=(img,))
-    base = SimpleNamespace(old=b, new=b, new_raw=b)
+    # The source build compiled src/main.c and the header it includes (ninja's records).
+    base = SimpleNamespace(old=b, new=b, new_raw=b, build_files={"src/main.c", "src/app.h"})
 
-    def finding(path: str, sev: Severity = Severity.BREAKING) -> Finding:
-        return Finding(Category.KCONFIG, "symbol-removed", path, "t", sev, Confidence.HIGH, "a",
-                       "kconfig", ("s",), evidence=(file_line(path, 27, "x"),))  # fmt: skip
+    def finding(*paths: str, sev: Severity = Severity.BREAKING) -> Finding:
+        return Finding(Category.KCONFIG, "symbol-removed", paths[0], "t", sev, Confidence.HIGH,
+                       "a", "kconfig", ("s",),
+                       evidence=tuple(file_line(p, 27, "x") for p in paths))  # fmt: skip
 
     rak, used, src = (
         finding("boards/rak5010_nrf52840.conf"),
         finding("app.overlay"),
-        finding("src/main.c", Severity.RISKY),
+        finding("src/main.c", sev=Severity.RISKY),
     )
-    artifact = finding("<v4.1.0 hello>/zephyr/zephyr.dts", Severity.RISKY)
+    artifact = finding("<v4.1.0 hello>/zephyr/zephyr.dts", sev=Severity.RISKY)
     out = outside_build([rak, used, src, artifact], base)  # type: ignore[arg-type]
     assert out[3].severity is Severity.RISKY  # a generated file, never "outside the build"
     assert out[0].severity is Severity.INFO
     assert "only in files this build doesn't use: boards/rak5010_nrf52840.conf" in out[0].title
     assert "outside-build" in out[0].heuristics
     assert out[1].severity is Severity.BREAKING  # applied overlay
-    assert out[2].severity is Severity.RISKY  # sources aren't judged by this rule
+    assert out[2].severity is Severity.RISKY  # a compiled source
+
+
+def test_findings_only_in_uncompiled_sources_become_info(tmp_path: Path) -> None:
+    """AUDIT.md F7/§5.3: echo_server's tunnel.c and vlan.c are only compiled with
+    CONFIG_NET_L2_IPIP / CONFIG_NET_VLAN, yet guide matches on them were breaking."""
+    from zmig.analyzers import outside_build
+    from zmig.findings import Category, Confidence, Finding, Severity, file_line
+
+    log = tmp_path / "log"
+    log.write_text("")
+    (tmp_path / "zephyr").mkdir()
+    (tmp_path / "zephyr" / "zephyr.dts.d").write_text("")
+    img = SimpleNamespace(dir=tmp_path, log=log)
+    b = SimpleNamespace(
+        src=tmp_path / "app", workspace=SimpleNamespace(root=tmp_path), images=(img,)
+    )
+
+    def finding(*paths: str, image: str | None = None) -> Finding:
+        return Finding(Category.GUIDE, "entry-match", paths[0], "t", Severity.BREAKING,
+                       Confidence.MEDIUM, "a", "guide", ("s",), image=image,
+                       evidence=tuple(file_line(p, 12, "x") for p in paths))  # fmt: skip
+
+    unbuilt = finding("src/tunnel.c", "src/vlan.c")
+    header = finding("src/tunnel.h")
+    built = finding("src/echo-server.c")
+    mixed = finding("src/echo-server.c", "src/tunnel.c")
+    other_image = finding("src/tunnel.c", image="mcuboot")
+    base = SimpleNamespace(old=b, new=b, new_raw=b, build_files={"src/echo-server.c"})
+    out = outside_build([unbuilt, header, built, mixed, other_image], base)  # type: ignore[arg-type]
+    assert out[0].severity is Severity.INFO
+    assert "only in files this build doesn't compile: src/tunnel.c, src/vlan.c" in out[0].title
+    assert "outside-build" in out[0].heuristics
+    assert out[0].id == unbuilt.id
+    assert out[1].severity is Severity.INFO  # a header no compiled file includes
+    assert out[2].severity is Severity.BREAKING
+    assert out[3].severity is Severity.BREAKING  # one compiled file is enough
+    assert out[4].severity is Severity.BREAKING  # build_files describes the app image only
+
+    # No ninja records: nothing is judged.
+    base = SimpleNamespace(old=b, new=b, new_raw=b, build_files=None)
+    assert outside_build([unbuilt], base)[0].severity is Severity.BREAKING  # type: ignore[arg-type]
 
 
 DEVICE_ERROR_LOG = """\
@@ -498,3 +541,307 @@ def test_dtc_assigned_phandles_are_not_node_changes() -> None:
     assert _dts_view(old) == _dts_view(new)
     new["raw_values"]["gpios"] = "<&gpioa 6 0>"
     assert _dts_view(old) != _dts_view(new)
+
+
+def _kconfig_ctx(old_log: str, new_log: str, assign: str = "STDOUT_CONSOLE") -> Any:
+    """A ScanContext stand-in for KconfigAnalyzer: one assignment in prj.conf, the symbol
+    defined at both refs and unset in both .configs, and each configure's log."""
+    from zmig.diagnostics import parse_log
+    from zmig.usage import Loc
+
+    sym = {"depends": "!NATIVE_APPLICATION", "selects": [], "implies": [], "defaults": []}
+    return SimpleNamespace(
+        old_config={},
+        new_config={},
+        old_kconfig={assign: sym},
+        new_kconfig={assign: sym},
+        old_facts=parse_log(old_log),
+        new_raw_facts=parse_log(new_log),
+        old=SimpleNamespace(src=Path("/app")),
+        build_files=None,
+        usage=SimpleNamespace(
+            kconfig_set={assign: [(Loc("prj.conf", 1, f"CONFIG_{assign}=y"), "y")]},
+            kconfig_read={},
+        ),
+        old_spec="v4.1.0",
+        new_spec="v4.2.0",
+        scope=("s",),
+        salvage=(),
+        is_app=True,
+        runner=SimpleNamespace(redact=lambda s: s),
+    )
+
+
+def test_value_not_taken_at_both_refs_is_not_a_migration_finding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AUDIT.md F1/§5.2: samples/subsys/settings sets CONFIG_STDOUT_CONSOLE=y, which
+    native_sim never honours; v4.1.0 printed the same warning as v4.2.0."""
+    from tests.test_diagnostics import STDOUT_CONSOLE_LOG
+    from zmig.analyzers.kconfig import KconfigAnalyzer
+    from zmig.findings import Severity
+
+    monkeypatch.setattr(KconfigAnalyzer, "_promote_dependencies", staticmethod(lambda *a: None))
+    old, new = STDOUT_CONSOLE_LOG.format(line=156), STDOUT_CONSOLE_LOG.format(line=160)
+
+    (f,) = KconfigAnalyzer().analyze(_kconfig_ctx(old, new)).findings
+    assert f.kind == "value-not-taken" and f.subject == "CONFIG_STDOUT_CONSOLE"
+    assert f.severity is Severity.INFO
+    assert "already" in f.title and "v4.1.0" in f.title
+    assert "kconfig.preexisting-diagnostic" in f.heuristics
+    assert not f.introduced_by_migration
+
+    # New at the target: still breaking, and the same finding ID either way.
+    (g,) = KconfigAnalyzer().analyze(_kconfig_ctx("", new)).findings
+    assert g.kind == "value-not-taken" and g.severity is Severity.BREAKING
+    assert g.id == f.id
+
+
+def test_preexisting_promptless_keeps_its_severity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A fatal Kconfig error at both refs is a defect, not a no-op: per DESIGN-P1 §2.3 it
+    keeps its severity and is marked pre-existing (only value-not-taken drops to info)."""
+    from zmig.analyzers.kconfig import KconfigAnalyzer
+    from zmig.findings import Severity
+
+    monkeypatch.setattr(KconfigAnalyzer, "_promote_dependencies", staticmethod(lambda *a: None))
+    log = (
+        "error: FOO (defined at drivers/Kconfig:{}) is assigned in a configuration file, "
+        "but is not directly user-configurable (has no prompt).\n"
+    )
+    (f,) = KconfigAnalyzer().analyze(_kconfig_ctx(log.format(1), log.format(2), "FOO")).findings
+    assert f.kind == "not-configurable" and f.severity is Severity.BREAKING
+    assert not f.introduced_by_migration and "pre-existing" in f.title
+    (g,) = KconfigAnalyzer().analyze(_kconfig_ctx("", log.format(2), "FOO")).findings
+    assert g.introduced_by_migration and "pre-existing" not in g.title
+
+
+def test_preexisting_devicetree_errors_keep_their_severity(tmp_path: Path) -> None:
+    """DESIGN-P1 §2.3 for the devicetree configure errors: same error at both refs ->
+    pre-existing, severity unchanged."""
+    from zmig.analyzers.devicetree import DevicetreeAnalyzer
+    from zmig.diagnostics import parse_log
+    from zmig.findings import Severity
+
+    undeclared = (
+        "devicetree error: 'sjw' appears in /can in /b{}/zephyr/zephyr.dts.pre, but is not "
+        "declared in 'properties:' in /z/dts/bindings/can/zephyr,native-linux-can.yaml\n"
+        "devicetree error: /ws{}/zephyr/dts/common/x.dtsi:3 (column 1): parse error\n"
+    )
+
+    def run(old_log: str) -> list[Any]:
+        ctx = SimpleNamespace(
+            old_edt={"nodes": {}, "chosen": {}},
+            new_edt={"nodes": {}, "chosen": {}},
+            old_facts=parse_log(old_log),
+            new_raw_facts=parse_log(undeclared.format(2, 2)),
+            new_raw=SimpleNamespace(src=tmp_path),
+            usage=SimpleNamespace(
+                app=tmp_path, dt_nodes=[], dt_props_set=[], dt_props_read=[], dt_compats={}
+            ),
+            build_files=set(),
+            new_spec="v4.2.0",
+            scope=("s",),
+            runner=SimpleNamespace(redact=lambda s: s),
+        )
+        return [
+            f
+            for f in DevicetreeAnalyzer().analyze(ctx).findings  # type: ignore[arg-type]
+            if f.kind in ("property-undeclared", "dt-error")
+        ]
+
+    pre = run(undeclared.format(1, 1))
+    assert len(pre) == 2
+    for f in pre:
+        assert f.severity is Severity.BREAKING
+        assert not f.introduced_by_migration and "pre-existing" in f.title
+    assert all(f.introduced_by_migration for f in run(""))
+
+
+def test_module_required_at_both_refs_is_preexisting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AUDIT.md §5.2 run 1: the settings sample built without littlefs fails at v4.1.0 and
+    v4.2.0 alike; "the target build needs module littlefs" was breaking/act-now."""
+    from zmig.analyzers import modules
+    from zmig.findings import Severity
+    from zmig.modulecheck import ModuleNeed
+
+    monkeypatch.setattr(modules, "load_manifest", lambda root: {})
+    monkeypatch.setattr(modules, "manifest_changes", lambda *a: [])
+    monkeypatch.setattr(modules, "user_manifest", lambda app: None)
+    ws = SimpleNamespace(zephyr=tmp_path / "zephyr", root=tmp_path, modules=lambda runner: [])
+    need = ModuleNeed("littlefs", "a Kconfig dependency on ZEPHYR_LITTLEFS_MODULE is unmet")
+
+    def run(at_source: tuple[str, ...]) -> Any:
+        ctx = SimpleNamespace(
+            module_needs=(need,),
+            modules_added=("littlefs",),
+            modules_at_source=at_source,
+            old=SimpleNamespace(workspace=ws, spec=SimpleNamespace(app=tmp_path)),
+            new=SimpleNamespace(workspace=ws),
+            old_img=SimpleNamespace(has=lambda a: False),
+            new_img=SimpleNamespace(has=lambda a: False),
+            runner=SimpleNamespace(redact=lambda s: s),
+            old_spec="v4.1.0",
+            new_spec="v4.2.0",
+            scope=("s",),
+        )
+        (f,) = modules.ModulesAnalyzer().analyze(ctx).findings  # type: ignore[arg-type]
+        return f
+
+    pre = run(("littlefs",))
+    assert pre.kind == "module-required" and pre.severity is Severity.INFO
+    assert not pre.introduced_by_migration and "already required at v4.1.0" in pre.title
+    assert pre.new["required_at_source"] is True
+    new = run(())
+    assert new.severity is Severity.BREAKING and new.introduced_by_migration
+    assert new.new["required_at_source"] is False
+    assert new.id == pre.id
+
+
+def test_binding_spec_changes() -> None:
+    from zmig.analyzers.devicetree import spec_changes
+
+    old = {"a": {"type": "int", "required": False, "deprecated": False}}
+    assert spec_changes(old, old, "a") == []
+    assert spec_changes(old, {}, "a") == []  # gone: other findings say so
+    assert spec_changes(old, {"a": {**old["a"], "type": "array"}}, "a") == [
+        ("type", "int", "array")
+    ]
+    assert spec_changes(old, {"a": {**old["a"], "deprecated": True}}, "a") == [
+        ("deprecated", False, True)
+    ]
+    # Still deprecated is not news; newly required doesn't matter to a property that's set.
+    dep = {"a": {**old["a"], "deprecated": True}}
+    assert spec_changes(dep, dep, "a") == []
+    assert spec_changes(old, {"a": {**old["a"], "required": True}}, "a") == []
+
+
+def test_devicetree_binding_checks_for_read_properties_and_required_errors(
+    tmp_path: Path,
+) -> None:
+    """AUDIT.md §6 item 6: binding changes to properties the app's C code reads (type,
+    deprecation), and the cause of a "marked as required" configure error."""
+    from tests.test_diagnostics import REQUIRED_LOG
+    from zmig.analyzers.devicetree import DevicetreeAnalyzer
+    from zmig.diagnostics import parse_log
+    from zmig.findings import Severity
+    from zmig.usage import Loc, NodeRef
+
+    def node(specs: dict[str, Any]) -> dict[str, Any]:
+        return {"name": "can", "labels": ["can0"], "aliases": [], "compats": ["x,can"],
+                "matching_compat": "x,can", "status": "okay", "ord": 5,
+                "binding": "dts/bindings/can/x,can.yaml",
+                "props": {"bitrate": 125000, "sjw": 1}, "raw_props": ["bitrate", "sjw"],
+                "raw_values": {"bitrate": "<0x1e848>", "sjw": "<0x1>"}, "specs": specs}  # fmt: skip
+
+    spec = {"type": "int", "required": False, "deprecated": False}
+    old = {"nodes": {"/can": node({"bitrate": spec, "sjw": spec})}, "chosen": {}}
+    new = {"nodes": {"/can": node({"bitrate": {**spec, "deprecated": True},
+                                   "sjw": {**spec, "type": "array"}})}, "chosen": {}}  # fmt: skip
+    ref = NodeRef("label", "can0")
+    src = Loc("src/main.c", 9, "DT_PROP(DT_NODELABEL(can0), bitrate)")
+    ctx = SimpleNamespace(
+        old_edt=old,
+        new_edt=new,
+        old_facts=parse_log(""),
+        new_raw_facts=parse_log(REQUIRED_LOG),
+        new_raw=SimpleNamespace(src=tmp_path),
+        usage=SimpleNamespace(
+            app=tmp_path,
+            dt_nodes=[(ref, src)],
+            # The overlay sets bitrate too: one finding for it, not two with one ID.
+            dt_props_set=[(ref, "bitrate", Loc("app.overlay", 3, "bitrate = <125000>;"))],
+            dt_props_read=[
+                (ref, "bitrate", src, "DT_PROP"),
+                (ref, "sjw", Loc("src/main.c", 10, "DT_PROP(...)"), "DT_PROP"),
+            ],
+            dt_compats={},
+        ),
+        build_files={"src/main.c"},
+        old_spec="v4.1.0",
+        new_spec="v4.2.0",
+        scope=("s",),
+        runner=SimpleNamespace(redact=lambda s: s),
+    )
+    found = DevicetreeAnalyzer().analyze(ctx).findings  # type: ignore[arg-type]
+    by_kind: dict[str, list[Any]] = {}
+    for f in found:
+        by_kind.setdefault(f.kind, []).append(f)
+    assert len({f.id for f in found}) == len(found)
+
+    (dep,) = by_kind["property-deprecated"]
+    assert dep.subject == "/can:bitrate" and dep.severity is Severity.RISKY
+    (typ,) = by_kind["property-type-changed"]
+    assert typ.subject == "/can:sjw" and typ.severity is Severity.RISKY
+    assert typ.old == "int" and typ.new == "array"
+    assert any(e.get("path") == "src/main.c" for e in typ.evidence)
+
+    (err,) = by_kind["dt-error"]
+    assert err.subject == parse_log(REQUIRED_LOG).diagnostics[0].message[:80]  # ID unchanged
+    assert "phy-handle" in err.title and "/soc/ethernet@40028000" in err.title
+    assert "Add 'phy-handle'" in err.action
+    assert err.new["property"] == "phy-handle"
+
+
+def test_dependency_expression_changes_are_one_info_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AUDIT.md §6 item 5, as info: on echo_server v4.1.0 -> v4.2.0, 18 app-referenced
+    symbols changed depends/selects/implies, mostly SoC lists and symbols set only in
+    overlays the build doesn't use; any change that takes effect in this build already
+    shows as a value change. One finding lists the ones this build's inputs use, and
+    value findings name the expression change in their action."""
+    from zmig.analyzers.kconfig import KconfigAnalyzer
+    from zmig.diagnostics import parse_log
+    from zmig.findings import Severity
+    from zmig.usage import Loc
+
+    monkeypatch.setattr(KconfigAnalyzer, "_promote_dependencies", staticmethod(lambda *a: None))
+
+    def sym(depends: str, selects: tuple[str, ...] = ()) -> dict[str, Any]:
+        return {"depends": depends, "selects": list(selects), "implies": [], "defaults": []}
+
+    ok = {"POSIX_API": sym("!NATIVE_LIBC", ("POSIX_BASE",)), "NET_TCP": sym("NET_IPV4"),
+          "OPENTHREAD_DEBUG": sym("NET_L2_OPENTHREAD"), "LOG": sym(""), "PM": sym("A || B")}  # fmt: skip
+    nk = {"POSIX_API": sym("!NATIVE_LIBC", ("POSIX_BASE", "POSIX_MESSAGE_PASSING")),
+          "NET_TCP": sym("NET_IPV4 || NET_IPV6"), "OPENTHREAD_DEBUG": sym("OPENTHREAD && 0"),
+          "LOG": sym(""), "PM": sym("A || B || C")}  # fmt: skip
+    app = tmp_path / "app"
+    ctx = SimpleNamespace(
+        old_config={"POSIX_API": "y", "NET_TCP": "y", "LOG": "y"},
+        new_config={"POSIX_API": "y", "NET_TCP": "n", "LOG": "y"},
+        old_kconfig=ok,
+        new_kconfig=nk,
+        old_facts=parse_log(f"Merged configuration '{app}/prj.conf'\n"),
+        new_raw_facts=parse_log(""),
+        old=SimpleNamespace(src=app),
+        build_files={"src/main.c"},
+        usage=SimpleNamespace(
+            kconfig_set={
+                "POSIX_API": [(Loc("prj.conf", 8, "CONFIG_POSIX_API=y"), "y")],
+                "NET_TCP": [(Loc("prj.conf", 9, "CONFIG_NET_TCP=y"), "y")],
+                # Only in an overlay this build doesn't apply.
+                "OPENTHREAD_DEBUG": [(Loc("overlay-ot.conf", 3, "CONFIG_OPENTHREAD_DEBUG=y"), "y")],
+                "LOG": [(Loc("prj.conf", 1, "CONFIG_LOG=y"), "y")],
+            },
+            # Read only in a file this build doesn't compile.
+            kconfig_read={"PM": [Loc("src/pm.c", 4, "#ifdef CONFIG_PM")]},
+        ),
+        old_spec="v4.1.0",
+        new_spec="v4.2.0",
+        scope=("s",),
+        salvage=(),
+        is_app=True,
+        runner=SimpleNamespace(redact=lambda s: s),
+    )
+    found = KconfigAnalyzer().analyze(ctx).findings  # type: ignore[arg-type]
+    (agg,) = [f for f in found if f.kind == "dependency-expression-changed"]
+    assert agg.severity is Severity.INFO and agg.subject == "dependency-expressions"
+    assert sorted(agg.new) == ["NET_TCP", "POSIX_API"]
+    assert agg.new["NET_TCP"] == {"depends": ["NET_IPV4", "NET_IPV4 || NET_IPV6"]}
+    assert agg.new["POSIX_API"] == {
+        "selects": [["POSIX_BASE"], ["POSIX_BASE", "POSIX_MESSAGE_PASSING"]]
+    }
+    (vnt,) = [f for f in found if f.kind == "value-not-taken"]
+    assert "NET_IPV4 || NET_IPV6" in vnt.action and "NET_IPV4" in vnt.action

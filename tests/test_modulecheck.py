@@ -167,3 +167,30 @@ def test_select_of_an_absent_module_symbol(tmp_path: Path) -> None:
     (need,) = diagnose(MBEDTLS_LOG, zephyr, manifest, active={"zcbor"})
     assert need.module == "mbedtls"
     assert diagnose(MBEDTLS_LOG, zephyr, manifest, active={"mbedtls"}) == []
+
+
+# The v4.1.0 configure of samples/subsys/settings without littlefs (AUDIT.md §5.2 run 1);
+# v4.2.0 printed the same.
+LITTLEFS_LOG = """\
+warning: FILE_SYSTEM_LITTLEFS (defined at subsys/fs/Kconfig.littlefs:6) was assigned the value 'y'
+but got the value 'n'. Check these unsatisfied dependencies: ZEPHYR_LITTLEFS_MODULE (=n). See
+http://docs.zephyrproject.org/latest/kconfig.html#CONFIG_FILE_SYSTEM_LITTLEFS and/or look up
+FILE_SYSTEM_LITTLEFS in the menuconfig/guiconfig interface.
+
+"""
+
+
+def test_modules_the_source_build_needs_too(tmp_path: Path) -> None:
+    """A module zmig added to the target that the source's own failure names as well is an
+    invocation gap at both refs, not a migration requirement."""
+    from zmig.modulecheck import needed_at_source
+
+    zephyr, manifest = _tree(tmp_path)
+    manifest["littlefs"] = ProjectInfo(
+        "littlefs", "https://x/littlefs", "ed0531d5", "modules/fs/littlefs"
+    )
+    assert needed_at_source(LITTLEFS_LOG, zephyr, manifest, set(), ["littlefs"]) == ["littlefs"]
+    assert needed_at_source(LITTLEFS_LOG, zephyr, manifest, set(), ["cmsis_6"]) == []
+    assert needed_at_source("", zephyr, manifest, set(), ["littlefs"]) == []
+    # Active at the source: the source didn't lack it.
+    assert needed_at_source(LITTLEFS_LOG, zephyr, manifest, {"littlefs"}, ["littlefs"]) == []

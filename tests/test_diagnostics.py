@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from zmig.diagnostics import deprecated_boards, parse_log
@@ -98,3 +99,71 @@ def test_value_not_taken_wrapped() -> None:
         "",
         "QEMU_ICOUNT (=n)",
     )
+
+
+# The same warning from the v4.1.0 and v4.2.0 configures of samples/subsys/settings on
+# native_sim: only the "defined at" line moved (AUDIT.md §5.2).
+STDOUT_CONSOLE_LOG = """\
+warning: STDOUT_CONSOLE (defined at lib/libc/Kconfig:{line}) was assigned the value 'y' but got the
+value 'n'. Check these unsatisfied dependencies: (!(NATIVE_APPLICATION || (NATIVE_LIBRARY &&
+EXTERNAL_LIBC))) (=n). See http://docs.zephyrproject.org/latest/kconfig.html#CONFIG_STDOUT_CONSOLE
+and/or look up STDOUT_CONSOLE in the menuconfig/guiconfig interface.
+
+"""
+
+
+def test_preexisting_diagnostic_ignores_moved_definitions() -> None:
+    from zmig.diagnostics import preexisting
+
+    (src,) = parse_log(STDOUT_CONSOLE_LOG.format(line=156)).diagnostics
+    (tgt,) = parse_log(STDOUT_CONSOLE_LOG.format(line=160)).diagnostics
+    assert preexisting(tgt, [src])
+    other = parse_log(NOT_TAKEN_LOG).diagnostics
+    assert not preexisting(tgt, other)
+    assert not preexisting(tgt, [])
+    # A different outcome for the same symbol is not the same diagnostic.
+    assert not preexisting(tgt, [replace(src, got="m")])
+
+
+def test_preexisting_dt_error_ignores_build_paths() -> None:
+    from zmig.diagnostics import preexisting
+
+    msg = "devicetree error: {}/dts/common/x.dtsi:3 (column 1): parse error: expected ';'"
+    (src,) = parse_log(msg.format("/c/ws-a/zephyr")).diagnostics
+    (tgt,) = parse_log(msg.format("/c/ws-b/zephyr")).diagnostics
+    assert src.kind == "dt-error"
+    assert preexisting(tgt, [src])
+    (other,) = parse_log("devicetree error: something else entirely").diagnostics
+    assert not preexisting(tgt, [other])
+
+
+# edtlib's wording at v3.6.0 and v4.2.0 (paths shortened); the node is dtlib's repr.
+REQUIRED_LOG = (
+    "devicetree error: 'phy-handle' is marked as required in 'properties:' in "
+    "/z/dts/bindings/ethernet/st,stm32-ethernet.yaml, but does not appear in "
+    "<Node /soc/ethernet@40028000 in '/b/zephyr/zephyr.dts.pre'>\n"
+)
+
+
+def test_required_property_missing_names_property_node_and_binding() -> None:
+    """Guide 4.2 "st,stm32-ethernet now requires phy-handle" (AUDIT.md §3 #11): the target
+    configure fails, so there is no target edt.pickle to compare; the error is the only
+    evidence. Kind stays dt-error so finding IDs don't change."""
+    (d,) = parse_log(REQUIRED_LOG).diagnostics
+    assert d.kind == "dt-error"
+    assert (d.symbol, d.node) == ("phy-handle", "/soc/ethernet@40028000")
+    assert d.binding == "/z/dts/bindings/ethernet/st,stm32-ethernet.yaml"
+
+
+def test_kconfig_warning_identity_ignores_moved_definitions() -> None:
+    """The buildlog analyzer reported the settings sample's STDOUT_CONSOLE warning as new at
+    v4.2.0 plus "1 warning resolved": only lib/libc/Kconfig:156 -> :160 differed (the F1
+    class of AUDIT.md, in BuildWarning.key)."""
+    from zmig.diagnostics import parse_warnings
+
+    (old,) = parse_warnings(STDOUT_CONSOLE_LOG.format(line=156))
+    (new,) = parse_warnings(STDOUT_CONSOLE_LOG.format(line=160))
+    assert old.source == "kconfig"
+    assert old.key({}) == new.key({})
+    other = STDOUT_CONSOLE_LOG.format(line=156).replace("got the\nvalue 'n'", "got the\nvalue 'm'")
+    assert parse_warnings(other)[0].key({}) != new.key({})

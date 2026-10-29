@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from zmig.analyzers.kconfig import norm_value, rename_candidates
 from zmig.boards import map_board
 from zmig.buildctx import SALVAGE_TAG, _apply_edits, locate_salvage_edits
@@ -101,3 +103,58 @@ def test_map_board() -> None:
     assert map_board("native_sim_64@2", None, [("t", table)]).target == "native_sim@2/native/64"
     assert map_board("qemu_x86", None, [("t", table)]).how == "same"
     assert map_board("native_sim_64", "x/y", []).target == "x/y"
+
+
+def test_header_changed_needs_api_coverage_to_be_demoted() -> None:
+    """AUDIT.md F8/§5.2: <zephyr/settings/settings.h> changed (+51/-9) but libclang
+    compared every declaration src/main.c uses and found none changed; a byte diff alone
+    is not a risk. Conservative: every including site must be a TU compared cleanly at
+    both refs with no API finding in it."""
+    from zmig.analyzers.sbom import api_covers
+
+    cov = {"tus": 2, "not_interpreted": 0, "clean_tus": ["src/main.c", "src/other.c"]}
+    assert api_covers({"src/main.c"}, cov, set())
+    assert api_covers({"src/main.c", "src/other.c"}, cov, set())
+    assert not api_covers({"src/main.c"}, cov, {"src/main.c"})  # an API finding there
+    assert not api_covers({"src/main.c", "src/bad.c"}, cov, set())  # bad.c had errors
+    assert not api_covers({"src/app.h"}, cov, set())  # included via a project header
+    assert not api_covers({"src/main.c"}, None, set())  # API analyzer didn't run
+    assert not api_covers({"src/main.c"}, {"tus": 1, "not_interpreted": 0}, set())  # old record
+    assert not api_covers(set(), cov, set())
+
+
+def _copies(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Two copies of one app tree in a zmig workspace (apps/<tree hash>/<basename>), and
+    a build directory configured from the first one."""
+    ws = tmp_path / "ws"
+    first, second = (
+        ws / "apps" / "81bec4faf9ea0405" / "app",
+        ws / "apps" / "81bec4faf9ea0405" / "fixture-app",
+    )
+    build = tmp_path / "build"
+    build.mkdir()
+    (build / "CMakeCache.txt").write_text(f"APPLICATION_SOURCE_DIR:PATH={first}\n")
+    return first, second, build
+
+
+def test_build_files_unknown_when_no_record_maps_to_the_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An app always compiles a file of its own: ninja records that map to none mean the
+    mapping failed, not that nothing was compiled."""
+    from types import SimpleNamespace
+
+    from zmig import scan
+
+    first, second, build = _copies(tmp_path)
+    (build / "CMakeCache.txt").write_text("")  # no recorded source dir to follow
+    deps = {"CMakeFiles/app.dir/src/main.c.obj": [f"{first}/src/main.c", "/z/include/k.h"]}
+    monkeypatch.setattr(scan, "build_dependencies", lambda img, runner: deps)
+    fake = SimpleNamespace(
+        old=SimpleNamespace(src=second, workspace=SimpleNamespace(root=tmp_path / "ws")),
+        old_img=SimpleNamespace(dir=build),
+        runner=None,
+    )
+    assert scan.ScanContext.build_files.func(fake) is None  # type: ignore[attr-defined]
+    deps["CMakeFiles/app.dir/src/main.c.obj"].append(f"{second}/src/main.c")
+    assert scan.ScanContext.build_files.func(fake) == {"src/main.c"}  # type: ignore[attr-defined]

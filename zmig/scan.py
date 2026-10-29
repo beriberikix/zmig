@@ -20,7 +20,7 @@ from zmig.boards import BoardMapping
 from zmig.buildctx import BuildContext, ImageContext, SalvageEdit, project_path, project_roots
 from zmig.diagnostics import LogFacts, app_relative, parse_log
 from zmig.findings import Finding
-from zmig.guides import NOTES_SECTION, Document, Entry, load_documents, parse
+from zmig.guides import NOTES_SECTION, Document, Entry, crossed_releases, load_documents, parse
 from zmig.modulecheck import ModuleNeed
 from zmig.snapshots import (
     ConfigValues,
@@ -61,6 +61,8 @@ class ScanContext:
     # zmig added to rebuild the target so the analysis could continue.
     module_needs: tuple[ModuleNeed, ...] = ()
     modules_added: tuple[str, ...] = ()
+    # Of those, the ones the source build needed too; zmig added them there as well.
+    modules_at_source: tuple[str, ...] = ()
     # Caches shared by the contexts of all images of one scan.
     shared: dict[str, Any] = field(default_factory=dict)
 
@@ -157,7 +159,10 @@ class ScanContext:
         if deps is None:
             return None
         roots = project_roots(self.old, self.old_img.dir)
-        return {rel for files in deps.values() for f in files if (rel := project_path(f, roots))}
+        files = {rel for fs in deps.values() for f in fs if (rel := project_path(f, roots))}
+        # An app always compiles a file of its own; none mapping means the paths didn't
+        # (unknown), not that nothing was compiled.
+        return files or None
 
     @cached_property
     def build_use(self) -> BuildUse:
@@ -250,6 +255,16 @@ class ScanContext:
             self.shared["guide_documents"] = load_documents(self.old, self.new)
         docs: list[Document] = self.shared["guide_documents"]
         return docs
+
+    @property
+    def crossed_versions(self) -> list[str]:
+        """The minor releases the scan crosses, as "X.Y"."""
+        if "crossed_versions" not in self.shared:
+            self.shared["crossed_versions"] = [
+                f"{a}.{b}" for a, b in crossed_releases(self.old, self.new)
+            ]
+        versions: list[str] = self.shared["crossed_versions"]
+        return versions
 
     @property
     def guide_entries(self) -> list[tuple[Document, Entry]]:

@@ -10,6 +10,7 @@ They have been stable from v3.6 through v4.4; tests pin them against real logs.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -65,6 +66,11 @@ _CHOICE_DEFAULT = re.compile(
 _LOOP = re.compile(r"Dependency loop\n=+\n(?P<body>.*?)(?:\nCMake Error|\Z)", re.S)
 _LOOP_SYM = re.compile(r"^(?:\.\.\.[a-z ]+? )?(?P<sym>\w+) \(defined at (?P<locs>[^)]*)\)", re.M)
 _DT_ERROR = re.compile(r"^devicetree error: (?P<msg>.*)$", re.M)
+# edtlib, v3.6 through v4.4: a property the binding now requires is missing from a node.
+_DT_REQUIRED = re.compile(
+    r"'(?P<prop>[^']+)' is marked as required in 'properties:' in (?P<binding>\S+), but "
+    r"does not appear in <Node (?P<node>\S+) in"
+)
 _BOARD_INVALID = re.compile(r"No board named '(?P<board>[^']+)' found")
 _OVERLAY = re.compile(r"^-- Found devicetree overlay: (?P<path>.+)$", re.M)
 _MERGED = re.compile(r"^Merged configuration '(?P<path>[^']+)'", re.M)
@@ -93,6 +99,20 @@ class LogFacts:
     configs: tuple[str, ...] = ()  # merged configuration fragments, in order
     base_config: str = ""  # the board defconfig Kconfig loaded first
     diagnostics: tuple[Diagnostic, ...] = field(default_factory=tuple)
+
+
+def _identity(d: Diagnostic) -> tuple[str, ...]:
+    """What makes two configures' diagnostics the same one: not the "defined at" lines,
+    which move between refs, nor build paths. A message without a subject (dt-error) is
+    compared as text with its paths masked."""
+    text = "" if d.symbol else re.sub(r"\S*/\S*", "<path>", d.message)
+    return (d.kind, d.symbol, d.value, d.got, d.node, text)
+
+
+def preexisting(d: Diagnostic, source: Iterable[Diagnostic]) -> bool:
+    """True if the source configure printed the same diagnostic (AUDIT.md F1: the
+    settings sample's CONFIG_STDOUT_CONSOLE warning was reported as new at v4.2.0)."""
+    return _identity(d) in {_identity(s) for s in source}
 
 
 def _join_wrapped(text: str) -> str:
@@ -191,7 +211,18 @@ def parse_log(text: str) -> LogFacts:
         )
     for m in _DT_ERROR.finditer(text):
         if m.start() not in undeclared:
-            diags.append(Diagnostic("dt-error", message=m[0].strip()))
+            # Still a dt-error (finding IDs depend on the kind), with its subject when
+            # edtlib named one (AUDIT.md §6 item 6).
+            r = _DT_REQUIRED.search(m["msg"])
+            diags.append(
+                Diagnostic(
+                    "dt-error",
+                    symbol=r["prop"] if r else "",
+                    node=r["node"] if r else "",
+                    binding=r["binding"] if r else "",
+                    message=m[0].strip(),
+                )
+            )
     for m in _BOARD_INVALID.finditer(text):
         diags.append(Diagnostic("board-invalid", symbol=m["board"], message=m[0]))
     loaded = _LOADED.search(text)
@@ -258,6 +289,7 @@ _W_INCLUDED = re.compile(r"^(?:In file included|\s+) from (?P<file>[^\s:]+):(?P<
 _W_FUNCTION = re.compile(r"^(?P<file>[^\s:]+): In (?:function|member function) '[^']*':$")
 _W_NOTE = re.compile(r"^(?P<file>[^\s:]+):(?P<line>\d+):(?:\d+:)? note: (?P<msg>.*)$")
 _W_EXCERPT = re.compile(r"^\s+\d*\s*\|")
+_DEFINED_AT = re.compile(r"\(defined\s+at\s+[^)]*\)")
 
 
 @dataclass(frozen=True)
@@ -282,7 +314,12 @@ class BuildWarning:
                 s = s.replace(prefix, token)
             return " ".join(s.split())
 
-        return (self.source, norm(self.file), norm(self.message))
+        message = self.message
+        if self.source == "kconfig":
+            # Kconfig names definitions inline: "(defined at lib/libc/Kconfig:156)" moved
+            # to :160 between v4.1 and v4.2 with the warning unchanged.
+            message = _DEFINED_AT.sub(lambda m: re.sub(r":\d+\b", "", m[0]), message)
+        return (self.source, norm(self.file), norm(message))
 
 
 def compiler_sites(lines: list[str], i: int) -> tuple[tuple[str, int], ...]:

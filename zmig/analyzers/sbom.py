@@ -10,7 +10,7 @@ app includes directly are checked against git separately.
 from __future__ import annotations
 
 from collections import Counter
-from typing import ClassVar, Literal
+from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact
@@ -34,6 +34,15 @@ def _norm(module: str) -> str:
     """One spelling for module names: west uses `hal_nordic`, SPDX IDs can't contain '_',
     and package names vary across Zephyr versions."""
     return module.replace("_", "-")
+
+
+def api_covers(sites: set[str], coverage: dict[str, Any] | None, api_sites: set[str]) -> bool:
+    """True if libclang already answered "does this header change affect the project?":
+    every file that includes the header is a TU the API analyzer compared cleanly at both
+    refs (`coverage["clean_tus"]`) and has no API finding in it (`api_sites`). Includes from
+    project headers aren't TUs, so they never qualify."""
+    clean = set((coverage or {}).get("clean_tus", ()))
+    return bool(sites) and all(s in clean and s not in api_sites for s in sites)
 
 
 class SbomAnalyzer:
@@ -65,6 +74,7 @@ class SbomAnalyzer:
             new_v: object = None,
             old_v: object = None,
             ev: tuple[JSON, ...] = (),
+            heuristics: tuple[str, ...] = (),
         ) -> None:
             findings.append(
                 Finding(
@@ -80,8 +90,20 @@ class SbomAnalyzer:
                     evidence=ev,
                     old=old_v,
                     new=new_v,
+                    heuristics=heuristics,
                 )
             )
+
+        # API findings for this image: their use sites are where a header change mattered.
+        image = None if ctx.is_app else ctx.image
+        api_sites = {
+            str(e["path"])
+            for f in ctx.prior
+            if f.analyzer == "api" and f.image == image and f.severity is not Severity.INFO
+            for e in f.evidence
+            if e.get("type") == "file_line"
+        }
+        coverage = ctx.shared.get("api_coverage", {}).get(ctx.image)
 
         old_mods = {_norm(m.name): m.sha for m in ctx.old.workspace.modules(ctx.runner)}
         new_mods = {_norm(m.name): m.sha for m in ctx.new.workspace.modules(ctx.runner)}
@@ -183,6 +205,22 @@ class SbomAnalyzer:
                     Severity.BREAKING if used else Severity.INFO,
                     "Find where its declarations moved (see the migration guides).",
                     ev=ev,
+                )
+            elif used and api_covers({loc.path for loc in used}, coverage, api_sites):
+                # A byte diff isn't a risk when libclang compared what the project uses from
+                # it and found nothing changed (AUDIT.md F8; bms A1 precision 50% -> 11%,
+                # docs/EVALUATION.md).
+                add(
+                    "header-changed",
+                    inc,
+                    f"<{inc}>, which your code includes, changed upstream ({detail}); none of "
+                    f"the declarations your code uses from it changed",
+                    Severity.INFO,
+                    "libclang compared the declarations your code uses at both versions; "
+                    "review the header only for behavior changes behind unchanged signatures.",
+                    ev=ev,
+                    new_v=detail,
+                    heuristics=("sbom.api-covered-no-change",),
                 )
             else:
                 add(

@@ -226,6 +226,10 @@ def key_inputs(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> dict
         "modules": [[m.name, m.sha] for m in modules],
         "board": spec.board,
         "app": hash_tree(spec.app),
+        # The copy built is apps/<tree hash>/<name> (app_source()), and the name is in its
+        # ninja records and image names: identical trees under different names must not
+        # share a build (regression: tests/fixtures/app and a copy named fixture-app).
+        "app_name": spec.app.resolve().name,
         "mode": spec.mode,
         "sysbuild": spec.sysbuild,
         "cmake_args": list(spec.cmake_args),
@@ -250,6 +254,7 @@ _INPUT_NAMES = {
     "zmig": "zmig version",
     "recipe": "build recipe",
     "app": "app tree",
+    "app_name": "app directory name",
     "sdk": "SDK",
 }
 
