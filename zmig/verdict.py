@@ -193,6 +193,16 @@ def upgrade_path(
         verdict = "unknown"
     else:
         verdict = "direct-ok"
+    # "Doesn't apply" needs positive evidence (observed .config values, the image set);
+    # without it the category is unknown, never not-applicable.
+    for name, c in cats.items():
+        if c["status"] == "not-applicable" and not c.get("evidence"):
+            cats[name] = {
+                **c,
+                "status": "unknown",
+                "confidence": "low",
+                "reason": "not-applicable without positive evidence",
+            }
     judged = [c["confidence"] for c in cats.values() if c["status"] in ("clean", "hazard")]
     confidence = min(judged, key=RANK.__getitem__, default="low")
     if capped:
@@ -249,8 +259,17 @@ def upgrade_path(
     unchecked = sorted(n for n, c in cats.items() if c["status"] == "unknown")
     if unchecked and verdict in ("needs-changes", "blocked"):
         basis.append("remedies are a lower bound: not established for " + ", ".join(unchecked))
+    # How a deployed device gets the target image: without a bootloader there's no app OTA,
+    # so the verdict is about reflashing (persistent data and peers), not an OTA path.
+    reflash = cats.get("mcuboot", {}).get("status") == "not-applicable"
+    if reflash:
+        basis.append(
+            "no bootloader in either build: the verdict covers reflashing the target image "
+            "(persistent data and peers); there is no app-OTA path"
+        )
     return {
         "verdict": verdict,
+        "update_path": "reflash" if reflash else "app-ota",
         "unchecked": unchecked,
         "confidence": confidence,
         **({"api_coverage": coverage} if coverage else {}),
@@ -274,6 +293,7 @@ def invariant_violations(report: JSON) -> list[str]:
     4. a pre-existing breaking finding in a deployment category caps confidence at low.
     5. an image whose project TUs the API diff mostly didn't interpret: api is partial
        for it, and confidence is low.
+    6. every not-applicable category carries positive evidence.
     """
     up = report.get("upgrade_path")
     if not up:
@@ -319,6 +339,11 @@ def invariant_violations(report: JSON) -> list[str]:
     ]
     if pre and up["confidence"] != "low":
         out.append(f"pre-existing breaking {pre} but confidence {up['confidence']}")
+    # Reports from schema 1.4 on record positive evidence for not-applicable categories.
+    if tuple(int(x) for x in str(report.get("schema_version", "1.0")).split(".")) >= (1, 4):
+        for n, c in cats.items():
+            if c["status"] == "not-applicable" and not c.get("evidence"):
+                out.append(f"category {n} is not-applicable without positive evidence")
     for image, c in (up.get("api_coverage") or {}).items():
         if not mostly_uninterpreted(c):
             continue

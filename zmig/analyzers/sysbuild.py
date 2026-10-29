@@ -94,7 +94,19 @@ class SysbuildAnalyzer:
         if ov is not None and nv is not None:
             ov, nv = _normalized(ov, ctx.old), _normalized(nv, ctx.new)
         if ov is None or nv is None:
-            set_category(ctx.shared, "sysbuild", "not-applicable", "high", ["not a sysbuild build"])
+            set_category(
+                ctx.shared,
+                "sysbuild",
+                "not-applicable",
+                "high",
+                ["not a sysbuild build"],
+                extra={
+                    "evidence": [
+                        "no sysbuild configuration (zephyr/.config of _sysbuild) in "
+                        "either build directory"
+                    ]
+                },
+            )
             return AnalyzerResult(
                 not_checked=[
                     NotChecked(

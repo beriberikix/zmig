@@ -270,7 +270,7 @@ def render_markdown(report: Report) -> str:
 def _field_upgrade(u: dict[str, Any]) -> list[str]:
     """The upgrade-path verdict: can deployed devices take the target build by app OTA?"""
     out = [
-        "## Field upgrade",
+        "## Field-upgrade verdict",
         "",
         f"**Verdict: {u['verdict']}** ({u['confidence']} confidence): "
         f"{VERDICT_TEXT.get(u['verdict'], '')}"
@@ -281,8 +281,17 @@ def _field_upgrade(u: dict[str, Any]) -> list[str]:
         )
         + ".",
         "",
-        "| Category | Status | Confidence | Notes |",
-        "|---|---|---|---|",
+        *(
+            [
+                "No bootloader in either build: this verdict covers reflashing the target "
+                "image (persistent data and peers); there is no app-OTA path.",
+                "",
+            ]
+            if u.get("update_path") == "reflash"
+            else []
+        ),
+        "| Category | Status | Confidence | Notes | Evidence (not-applicable) |",
+        "|---|---|---|---|---|",
     ]
     for name, c in u["categories"].items():
         notes = c.get("reason") or (
@@ -292,7 +301,8 @@ def _field_upgrade(u: dict[str, Any]) -> list[str]:
         )
         notes = str(notes).replace("|", "\\|")
         title = SECTION_TITLES.get(name, name)
-        out.append(f"| {title} | {c['status']} | {c.get('confidence', '')} | {notes} |")
+        ev = "; ".join(c.get("evidence", [])).replace("|", "\\|")
+        out.append(f"| {title} | {c['status']} | {c.get('confidence', '')} | {notes} | {ev} |")
     out.append("")
     if u.get("remedies"):
         out += ["Remedies:", ""]

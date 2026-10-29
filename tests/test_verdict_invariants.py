@@ -123,3 +123,58 @@ def test_the_checker_catches_each_violation() -> None:
     )
     skipped = {**base, "analyzers": [{"name": "ble", "status": "skipped"}]}
     assert any("didn't run" in v for v in invariant_violations(skipped))
+
+
+def test_not_applicable_needs_positive_evidence() -> None:
+    """A category with no positive evidence is unknown, never not-applicable; a build
+    with no bootloader gets a verdict about reflashing, not an OTA path."""
+    from zmig.findings import AnalyzerStatus
+    from zmig.verdict import CATEGORIES, upgrade_path
+
+    shared = {
+        "categories": {
+            "mcuboot": {"status": "not-applicable", "confidence": "high", "checked": ["x"],
+                        "evidence": ["v1: CONFIG_BOOTLOADER_MCUBOOT=n"]},
+            "storage": {"status": "not-applicable", "confidence": "high", "checked": ["y"]},
+        }
+    }  # fmt: skip
+    statuses = [AnalyzerStatus(a, "ok") for a in set(CATEGORIES.values())]
+    up = upgrade_path(shared, [], statuses)
+    assert up["categories"]["storage"]["status"] == "unknown"
+    assert up["categories"]["storage"]["reason"] == "not-applicable without positive evidence"
+    assert up["categories"]["mcuboot"]["status"] == "not-applicable"
+    assert up["update_path"] == "reflash"
+    assert any("no app-OTA path" in b for b in up["basis"])
+
+
+def test_invariant_not_applicable_without_evidence_from_schema_1_4() -> None:
+    """On a real report (CANnectivity C1, schema 1.3: no evidence recorded yet)."""
+    import json
+    from pathlib import Path
+
+    from zmig.verdict import invariant_violations
+
+    rep = json.loads(
+        (Path(__file__).parent / "fixtures" / "watch" / "cannectivity-c1.json").read_text()
+    )
+    assert not any("positive evidence" in v for v in invariant_violations(rep))
+    rep["schema_version"] = "1.4"
+    got = {v for v in invariant_violations(rep) if "positive evidence" in v}
+    assert got == {
+        f"category {n} is not-applicable without positive evidence"
+        for n in ("mcuboot", "storage", "ble", "sysbuild")
+    }
+
+
+def test_build_migration_summary_line() -> None:
+    from zmig.report.human import target_build
+
+    ctxs = [
+        {"status": "ok"},
+        {"status": "configure-failed"},
+        {"status": "ok", "salvage_of": "k", "salvage_edits": [{}, {}]},
+    ]
+    assert target_build(ctxs) == (
+        "target build: configure-failed; salvaged build ok (2 line(s) disabled)"
+    )
+    assert target_build([{"status": "ok"}, {"status": "ok"}]) == "target build: ok"

@@ -62,7 +62,7 @@ def test_schema_12_fields_validate() -> None:
     )
     doc = json.loads(render(r, "json"))
     jsonschema.validate(doc, SCHEMA)
-    assert doc["schema_version"] == "1.3"
+    assert doc["schema_version"] == "1.4"
     (j,) = doc["findings"]
     assert (j["introduced_by_migration"], j["remedy"]) == (False, "reflash")
 
@@ -349,7 +349,7 @@ def test_report_rendering_separates_pre_existing_and_lists_not_checked() -> None
         .split("\n\n", 2)[2]
     )
     human = render(r, "human")
-    assert "Field upgrade: blocked (low confidence); remedies: reflash x1" in human
+    assert "Field-upgrade verdict: blocked (low confidence); remedies: reflash x1" in human
 
 
 def test_verdict_with_unchecked_categories_is_a_lower_bound() -> None:

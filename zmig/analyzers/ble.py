@@ -101,6 +101,13 @@ class BleAnalyzer:
                     if act_n
                     else []
                 ),
+                extra={
+                    "evidence": [
+                        f"{ctx.old_spec} .config: CONFIG_BT={cv_o.get('BT', 'not set')}, "
+                        f"CONFIG_SETTINGS={cv_o.get('SETTINGS', 'not set')}; no y symbol defined "
+                        f"under {', '.join(cfg['trees'])} selects or depends on SETTINGS"
+                    ]
+                },
             )
             return AnalyzerResult()
         findings: list[Finding] = []

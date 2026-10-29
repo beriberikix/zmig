@@ -147,12 +147,30 @@ class StorageAnalyzer:
         on_o = {b for b, v in enabled["old"].items() if v}
         on_n = {b for b, v in enabled["new"].items() if v}
         if not on_o and not on_n:
+            checked_syms = sorted({s for m in (mem_o, mem_n) for syms in m.values() for s in syms})
+            salvaged = bool(ctx.salvage)
             set_category(
                 ctx.shared,
                 "storage",
                 "not-applicable",
-                "high",
+                # A salvaged target's .config lacks the lines salvage disabled.
+                "medium" if salvaged else "high",
                 ["no storage backend symbol is enabled in the app at either ref"],
+                extra={
+                    "evidence": [
+                        f"{len(checked_syms)} backend symbol(s) ({', '.join(checked_syms[:6])}"
+                        f"{', ...' if len(checked_syms) > 6 else ''}) not y in the .config at "
+                        f"{ctx.old_spec} or {ctx.new_spec}"
+                    ]
+                    + (
+                        [
+                            f"the target .config is the salvaged build's ({len(ctx.salvage)} "
+                            "line(s) disabled); confidence medium"
+                        ]
+                        if salvaged
+                        else []
+                    )
+                },
             )
             return AnalyzerResult(not_checked=nc)
         checked.append(

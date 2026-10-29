@@ -13,7 +13,7 @@ from enum import StrEnum
 from typing import Any
 
 SCHEMA_URI = "https://zmig.dev/schema/report/1"
-SCHEMA_VERSION = "1.3"
+SCHEMA_VERSION = "1.4"
 
 
 class Severity(StrEnum):

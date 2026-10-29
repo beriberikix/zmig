@@ -100,12 +100,21 @@ class McubootAnalyzer:
 
         if ob.image is None or nb.image is None:
             if ob.evidence == "unknown" and nb.evidence == "unknown":
+                from zmig.snapshots import config_values
+
+                bl = [
+                    f"{spec}: CONFIG_BOOTLOADER_MCUBOOT="
+                    f"{config_values(img).get('BOOTLOADER_MCUBOOT', 'not set')} in the app .config"
+                    for spec, img in ((ctx.old_spec, ctx.old_img), (ctx.new_spec, ctx.new_img))
+                    if img.has(Artifact.CONFIG)
+                ]
                 set_category(
                     ctx.shared,
                     "mcuboot",
                     "not-applicable",
                     "high",
                     ["no bootloader image, and the app isn't built for MCUboot, at either ref"],
+                    extra={"evidence": [*bl, "no mcuboot image in either build"]},
                 )
                 return AnalyzerResult()
             return unknown(

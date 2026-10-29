@@ -3,10 +3,30 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from zmig.findings import Finding, Report, Severity
 
 MARK = {Severity.BREAKING: "BREAKING", Severity.RISKY: "risky   ", Severity.INFO: "info    "}
+
+
+def target_build(contexts: list[dict[str, Any]]) -> str:
+    """'target build: ok', or how it failed and whether a salvaged build was compared."""
+    targets = contexts[1:]
+    if not targets:
+        return "target build: not run"
+    raw = next(
+        (c for c in targets if "salvage_of" not in c and "superseded_by_module_recovery" not in c),
+        targets[0],
+    )
+    salv = next((c for c in targets if "salvage_of" in c), None)
+    out = f"target build: {raw.get('status')}"
+    if raw.get("modules_added"):
+        out += f" (with {', '.join(map(str, raw['modules_added']))} added)"
+    if salv is not None:
+        n = len(salv.get("salvage_edits") or [])
+        out += f"; salvaged build {salv.get('status')} ({n} line(s) disabled)"
+    return out
 
 
 def _where(f: Finding) -> str:
@@ -26,10 +46,18 @@ def render_human(report: Report) -> str:
     lines = [f"zmig {report.command}: {label(inp['from'])} → {label(inp['to'])}"]
     if board := inp.get("board"):
         lines[0] += f"  ({board['from']} → {board['to']})"
-    lines.append(f"{c['breaking']} breaking, {c['risky']} risky, {c['info']} info")
+    lines.append(
+        f"Build migration: {c['breaking']} breaking, {c['risky']} risky, {c['info']} info"
+        + (f"; {target_build(report.contexts)}" if report.command == "scan" else "")
+    )
     if u := report.upgrade_path:
         lines.append(
-            f"Field upgrade: {u['verdict']} ({u['confidence']} confidence)"
+            f"Field-upgrade verdict: {u['verdict']} ({u['confidence']} confidence)"
+            + (
+                " for reflashing (no bootloader: no app-OTA path)"
+                if u.get("update_path") == "reflash"
+                else ""
+            )
             + (
                 "; remedies: " + ", ".join(f"{r} x{len(ids)}" for r, ids in u["remedies"].items())
                 if u.get("remedies")

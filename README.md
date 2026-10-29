@@ -94,10 +94,10 @@ errors, so it usually does), zmig reports Zephyr's errors as findings, then disa
 exactly those lines in a copy of your app and compares the rest. The report lists every
 disabled line.
 
-## Field upgrades (`--sysbuild` builds, or any build with persistent state)
+## Field-upgrade verdict (`--sysbuild` builds, or any build with persistent state)
 
 `scan` also answers: can a device running the `--from` build take the `--to` build by app
-OTA? The report's `upgrade_path` (and the "Field upgrade" section of MIGRATION.md) gives
+OTA? The report's `upgrade_path` (and the "Field-upgrade verdict" section of MIGRATION.md) gives
 one verdict: `direct-ok`, `needs-changes`, `blocked` or `unknown`. It is never OK by
 default: every category below must be checked clean or shown not to apply.
 
