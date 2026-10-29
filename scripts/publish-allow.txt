@@ -1,0 +1,21 @@
+# Values scripts/publish.sh lets through. One per line: <kind> <exact value>.
+# kind: email, home, host. Each is reported with its count on every scan.
+
+# Commit identities
+email 178376+beriberikix@users.noreply.github.com
+email noreply@anthropic.com
+# Test identities and placeholders
+email t@example.com
+email fixture@example.com
+email git@github.com
+# The identity docs/examples/opendeck-patched.sh gives its patch commits
+email patch.sh@zenv.github.com
+# Copyright header of an upstream Zephyr file kept verbatim in a test fixture
+# (tests/fixtures/patch-methods/*/drivers/ethernet/eth_esp32.c)
+email grant.ramsay@hotmail.com
+
+# Scrubbed or generic home directories in fixtures and tests
+home /home/user
+home /home/u
+# GitHub Actions runner paths in CI report fixtures
+home /home/runner
