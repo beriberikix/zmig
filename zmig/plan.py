@@ -50,6 +50,10 @@ class PlanContext:
             return None
         return (self.patch_dir / hit.relative_to(self.patch_dir)).as_posix()
 
+    def patch_text(self, subject: str) -> str | None:
+        f = self.patch_file(subject)
+        return Path(f).read_text(errors="replace") if f else None
+
     @property
     def scope(self) -> tuple[str, str]:
         return (self.old.resolved.ref.sha, self.new.resolved.ref.sha)

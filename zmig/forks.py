@@ -15,7 +15,8 @@ Classification of each local, non-merge commit, first match wins:
   applies     merges cleanly onto target plus the previously applied local commits
   conflicts   merge-tree reports conflicted paths
 Independently, `overlap` lists files the commit touches that upstream also changed, and
-`overlap_near` those where upstream changed lines within NEAR_LINES of the commit's own.
+`overlap_near` those where upstream changed lines inside one of the commit's hunks,
+each hunk spanning its changed lines plus the context lines its patch carries (`_windows`).
 
 How a commit "applies" depends on how the project applies its patches (`methods`):
   3way       `git merge-tree` with the commit's parent as base, i.e. a cherry-pick /
@@ -37,7 +38,7 @@ import os
 import re
 import tempfile
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Literal
@@ -165,9 +166,12 @@ def classify(
     target: str,
     unpushed: frozenset[str] = frozenset(),
     methods: tuple[PatchMethod, ...] = DEFAULT_METHODS,
+    patch_text: Callable[[str], str | None] | None = None,
 ) -> ForkResult:
     """Classify the commits on `head` that upstream doesn't have, against `target`, under
-    each patch-application method in `methods` (see the module docstring)."""
+    each patch-application method in `methods` (see the module docstring). `patch_text`
+    maps a commit subject to the project patch file it came from, whose hunks' context
+    sets how close an upstream change must be to count as near."""
     git = _Git(mirror)
     rc, mb = git("merge-base", head, base, check=False)
     if rc != 0:
@@ -197,7 +201,10 @@ def classify(
         pid_out = git.out("patch-id", "--stable", input=git.out("show", "--format=commit %H", c))
         pid = pid_out.split()[0] if pid_out.strip() else ""
         overlap = tuple(sorted(set(files) & upstream_changed))
-        overlap_near = tuple(f for f in overlap if _near(git, c, mb, target, f, upstream_ranges))
+        patch = patch_text(subject) if patch_text and overlap else None
+        overlap_near = tuple(
+            f for f in overlap if _near(git, c, mb, target, f, upstream_ranges, patch)
+        )
         overlap_commits: tuple[tuple[str, str], ...] = ()
         if overlap:
             lines = git.out(
@@ -293,32 +300,99 @@ def classify(
     return ForkResult(head, base, target, mb, tuple(results), merges)
 
 
-# A patch whose file upstream changed only far from the patch's own lines still applies the
-# same way; only changes this close (git's default diff context) can change what it means
-# (regression: 7 OpenDeck patches flagged risky for changes 5-176 lines away, DOGFOOD-5).
-NEAR_LINES = 3
+# A patch whose file upstream changed only outside its hunks still applies the same way; a
+# change inside a hunk (its changed lines plus the context lines the patch carries, which
+# `git apply` matches) can change what it means (regression: 7 OpenDeck
+# patches flagged risky for changes 5-176 lines away, DOGFOOD-5). Without a patch file the
+# context is git's default, 3 lines, cut short at the ends of the file.
+DEFAULT_CONTEXT = 3
 _HUNK_OLD = re.compile(r"^@@ -(\d+)(?:,(\d+))?", re.M)
+_PATCH_FILE = re.compile(r"^\+\+\+ (?:b/)?(\S+)", re.M)
 
 
-def _old_ranges(diff: str) -> list[tuple[int, int]]:
+def _changes(diff: str) -> list[tuple[int, int]]:
+    """Old-side line ranges a -U0 diff changes; a pure insertion after line L is (L+1, L)."""
     out = []
     for m in _HUNK_OLD.finditer(diff):
         start, n = int(m[1]), int(m[2]) if m[2] is not None else 1
-        out.append((start, start + max(n, 1) - 1))
+        out.append((start + 1, start) if n == 0 else (start, start + n - 1))
     return out
 
 
+def _patch_hunks(patch: str, path: str) -> list[tuple[int, int, int]]:
+    """For each hunk of `patch` on `path`: its change runs (blocks of -/+ lines), and its
+    leading and trailing context line counts."""
+    out: list[tuple[int, int, int]] = []
+    cur: str | None = None
+    hunk: list[str] | None = None
+
+    def close() -> None:
+        if hunk is None or cur != path:
+            return
+        body = [ln for ln in hunk if not ln.startswith("\\")]
+        is_ctx = [not ln.startswith(("+", "-")) for ln in body]
+        runs = sum(1 for i, c in enumerate(is_ctx) if not c and (i == 0 or is_ctx[i - 1]))
+        lead = next((i for i, c in enumerate(is_ctx) if not c), len(body))
+        trail = next((i for i, c in enumerate(reversed(is_ctx)) if not c), len(body))
+        out.append((runs, lead, trail))
+
+    for ln in patch.splitlines():
+        if ln.startswith(("diff ", "--- ")):
+            close()
+            hunk = None
+        elif ln.startswith("+++ "):
+            close()
+            m = _PATCH_FILE.match(ln)
+            cur, hunk = (m[1] if m else None), None
+        elif ln.startswith("@@"):
+            close()
+            hunk = []
+        elif hunk is not None:
+            hunk.append(ln)
+    close()
+    return out
+
+
+def _windows(
+    changes: list[tuple[int, int]], hunks: list[tuple[int, int, int]] | None, length: int
+) -> list[tuple[int, int]]:
+    """Each hunk's span in old-side lines: its first change minus its leading context to its
+    last change plus its trailing context. `changes` are the commit's -U0 ranges; `hunks`
+    the patch file's (runs, lead, trail) for this path, used when their runs line up with
+    `changes`; otherwise one window per change with the default context."""
+    if hunks and sum(h[0] for h in hunks) == len(changes):
+        out, i = [], 0
+        for runs, lead, trail in hunks:
+            group = changes[i : i + runs]
+            i += runs
+            out.append((group[0][0] - lead, group[-1][1] + trail))
+        return out
+    return [
+        (max(x - DEFAULT_CONTEXT, 1), min(y + DEFAULT_CONTEXT, max(length, y))) for x, y in changes
+    ]
+
+
 def _near(
-    git: _Git, c: str, mb: str, target: str, path: str, cache: dict[str, list[tuple[int, int]]]
+    git: _Git,
+    c: str,
+    mb: str,
+    target: str,
+    path: str,
+    cache: dict[str, list[tuple[int, int]]],
+    patch: str | None = None,
 ) -> bool:
-    """Upstream changed `path` within NEAR_LINES of the lines `c` changes (both in the merge
-    base's line numbers, approximately: `c`'s parent may carry earlier local commits)."""
+    """Upstream changed or inserted lines inside one of `c`'s hunk windows (both in
+    the merge base's line numbers, approximately: `c`'s parent may carry earlier local
+    commits)."""
     if path not in cache:
-        cache[path] = _old_ranges(git.out("diff", "-U0", "--no-color", mb, target, "--", path))
-    mine = _old_ranges(git.out("diff", "-U0", "--no-color", f"{c}^", c, "--", path))
+        cache[path] = _changes(git.out("diff", "-U0", "--no-color", mb, target, "--", path))
+    mine = _changes(git.out("diff", "-U0", "--no-color", f"{c}^", c, "--", path))
     if not mine or not cache[path]:
         return bool(cache[path]) and not mine  # a new file upstream also adds: near
-    return any(max(a, x) - min(b, y) <= NEAR_LINES for a, b in mine for x, y in cache[path])
+    rc, old = git("show", f"{c}^:{path}", check=False)
+    length = len(old.splitlines()) if rc == 0 else 0
+    hunks = _patch_hunks(patch, path) if patch else None
+    return any(x <= b and y >= a for a, b in _windows(mine, hunks, length) for x, y in cache[path])
 
 
 def _telling(text: str) -> bool:

@@ -163,7 +163,13 @@ class ForksAnalyzer:
         tgt_sha = mirror.resolve(target)[0] if target else base_sha
         try:
             res: ForkResult = classify(
-                mirror, head, base_sha, tgt_sha, up.unpushed, ctx.patch_methods
+                mirror,
+                head,
+                base_sha,
+                tgt_sha,
+                up.unpushed,
+                ctx.patch_methods,
+                patch_text=ctx.patch_text,
             )
         except ZmigError as e:
             out.append(
@@ -362,16 +368,17 @@ class ForksAnalyzer:
                 scope,
                 "applies-cleanly",
                 subject,
-                f"{label} {short} applies cleanly, but upstream changed lines next to it",
+                f"{label} {short} applies cleanly, but upstream changed lines inside its hunks",
                 Severity.RISKY,
                 Confidence.HIGH,
-                f"Applies without conflicts; review it against the upstream changes next to "
-                f"its lines in {_files_note(c.overlap_near)}.",
+                f"Applies without conflicts; review it against the upstream changes to the "
+                f"lines it changes or the context lines it carries in "
+                f"{_files_note(c.overlap_near)}.",
                 tuple(ev),
                 new,
             )
         if c.overlap:
-            # Upstream changed the same files, but nowhere near the commit's lines.
+            # Upstream changed the same files, but outside the commit's hunks.
             return _finding(
                 scope,
                 "applies-cleanly",

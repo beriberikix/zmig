@@ -49,6 +49,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ | ″ | 5 | tuned (§10, §11) | 1 (20%) | 1 (20%) | 11/11 (100%) | 1/5 | ″ | ″ | DOGFOOD-5 §10–11 |
 | **OpenDeck** plan (patch triage) | ″ | 9 | clean: DOGFOOD-5 baseline | 6 (67%) | 9 (100%) | 8/15 (53%) | 0 | — | — | DOGFOOD-5-baseline §4–5 |
 | ″ | ″ | 9 | tuned (§10, §11) | 9 (100%) | 9 (100%) | 8/9 (89%) | 8/9 | — | — | DOGFOOD-5 §10–11 |
+| ″ | ″ | 9 | tuned (§10, §11, §11.4 hunk window) | 9 (100%) | 9 (100%) | 8/8 (100%) | 8/9 | — | — | DOGFOOD-5 §11.4 |
 | **P1 fixtures** (`tests/fixtures/p1-layout`, `p1-mode`, `p1-rename`, `p1-ble`, `xapp*`) | v4.2.2 → v4.3.0 (constructed) | — | **tuned by construction** (written to exercise P1) | — | — | — | — | | each fixture's expected verdict (layout hazard, MCUboot mode, rename, BLE clean; cross-image) is asserted by `tests/test_p1_fixture.py`, `test_cross_fixture.py` | DESIGN-P1 §11 |
 
 ### Clean results only

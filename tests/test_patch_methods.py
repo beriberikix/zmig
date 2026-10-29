@@ -170,24 +170,70 @@ def near_repo(tmp_path_factory: pytest.TempPathFactory) -> tuple[SimpleNamespace
     return mirror, head, base, target
 
 
-def test_overlap_is_risky_only_next_to_the_patch_lines(
+def test_overlap_is_risky_only_inside_the_patch_hunks(
     near_repo: tuple[SimpleNamespace, str, str, str],
 ) -> None:
     """Post-baseline fix (DOGFOOD-5 plan precision): 7 OpenDeck patches that apply were
-    flagged risky because upstream changed the same files, 5-176 lines away. Only a change
-    within 3 lines (git's diff context) of the patch's own lines stays risky."""
+    flagged risky because upstream changed the same files, 1-176 lines away. Overlap is
+    risky only inside a hunk's window: its changed lines plus the context lines the patch
+    carries. The watchdog patch's one hunk ends at the end of board.cmake (1 trailing
+    context line); upstream appended after it, outside the window (it was risky under the
+    earlier fixed 3-line rule)."""
     from zmig.analyzers.forks import ForksAnalyzer
     from zmig.findings import Severity
 
     mirror, head, base, target = near_repo
-    res = _by_patch(classify(mirror, head, base, target).commits)  # type: ignore[arg-type]
-    midi = res["usb_midi2_01_configurable_buffer_size.patch"]
-    wdt = res["esp32s3_reset_with_watchdog_after_flash.patch"]
-    assert midi.state == wdt.state == "applies"
-    assert midi.overlap and midi.overlap_near == ()
-    assert wdt.overlap_near == ("boards/espressif/esp32s3_devkitc/board.cmake",)
-    fm = ForksAnalyzer._commit_finding(midi, "zephyr", ("s",))
-    fw = ForksAnalyzer._commit_finding(wdt, "zephyr", ("s",))
-    assert (fm.severity, fw.severity) == (Severity.INFO, Severity.RISKY)
-    assert "upstream changed other parts of" in fm.title
-    assert "upstream changed lines next to it" in fw.title
+    texts = {p: (FIX / "patches" / p).read_text() for p in NEAR}
+    for patch_text in (None, texts.get):
+        res = _by_patch(classify(mirror, head, base, target, patch_text=patch_text).commits)  # type: ignore[arg-type]
+        midi = res["usb_midi2_01_configurable_buffer_size.patch"]
+        wdt = res["esp32s3_reset_with_watchdog_after_flash.patch"]
+        assert midi.state == wdt.state == "applies"
+        assert midi.overlap and midi.overlap_near == ()
+        assert wdt.overlap == ("boards/espressif/esp32s3_devkitc/board.cmake",)
+        assert wdt.overlap_near == ()
+        fw = ForksAnalyzer._commit_finding(wdt, "zephyr", ("s",))
+        assert fw.severity == Severity.INFO
+        assert "upstream changed other parts of" in fw.title
+
+
+def test_near_window_comes_from_the_patch_files_own_context(tmp_path: Path) -> None:
+    """A patch made with 5 context lines reads lines 5-15 around its change at line 10;
+    upstream changing line 14 is inside that window (risky), though outside git's default
+    3. Under 3way the two changes merge cleanly, so only the window says it is risky."""
+    from zmig.analyzers.forks import ForksAnalyzer
+    from zmig.findings import Severity
+
+    w = tmp_path
+    f = w / "f.txt"
+    lines = [f"line {i}" for i in range(1, 21)]
+    _git(w, "init", "-q", "-b", "main")
+    f.write_text("\n".join(lines) + "\n")
+    _git(w, "add", "-A")
+    _git(w, "commit", "-q", "-m", "base")
+    base = _git(w, "rev-parse", "HEAD")
+    _git(w, "checkout", "-q", "-b", "fork")
+    f.write_text("\n".join([*lines[:9], "line 10 patched", *lines[10:]]) + "\n")
+    _git(w, "commit", "-q", "-am", "wide.patch")
+    head = _git(w, "rev-parse", "HEAD")
+    patch = _git(w, "diff", "-U5", "HEAD^", "HEAD") + "\n"
+    _git(w, "checkout", "-q", "main")
+    f.write_text("\n".join([*lines[:13], "line 14 upstream", *lines[14:]]) + "\n")
+    _git(w, "commit", "-q", "-am", "upstream")
+    target = _git(w, "rev-parse", "HEAD")
+    _git(w, "branch", "-D", "fork")
+    _git(w, "update-ref", "refs/fork/head", head)
+    mirror = SimpleNamespace(path=w / ".git", git=shutil.which("git"), runner=Runner())
+
+    def run(patch_text: object) -> CommitResult:
+        (c,) = classify(
+            mirror, head, base, target, methods=("3way",), patch_text=patch_text
+        ).commits  # type: ignore[arg-type]
+        return c
+
+    default, wide = run(None), run({"wide.patch": patch}.get)
+    assert default.state == wide.state == "applies"
+    assert default.overlap_near == () and wide.overlap_near == ("f.txt",)
+    fw = ForksAnalyzer._commit_finding(wide, "zephyr", ("s",))
+    assert fw.severity == Severity.RISKY
+    assert "upstream changed lines inside its hunks" in fw.title

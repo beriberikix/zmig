@@ -295,7 +295,8 @@ isn't a hazard.
 **Fix (`76196d6`, post-baseline, generic).** Overlap is risky only when upstream changed
 lines within 3 lines of the patch's own changed lines (3 is git's default diff context).
 Otherwise it's info: "applies cleanly; upstream changed other parts of …". There's a
-regression test on the real Zephyr files with two of these patches.
+regression test on the real Zephyr files with two of these patches. (Replaced in §11.4 by
+a window taken from each patch's own hunks.)
 
 ### 11.2 Source locations for configure errors (`a622add`, post-baseline, generic)
 
@@ -320,3 +321,49 @@ Regression tests use the real log and preprocessed devicetree.
 
 † Not a clean measurement. D1 changed in both §10 and §11, D2 in §10, and P5, P7 and P8
 in §10.
+
+### 11.4 Proximity window from each patch's hunk context (post-baseline, **not clean**)
+
+The fixed 3-line rule of §11.1 is replaced. Each hunk's window is now:
+
+- its changed lines;
+- plus the leading and trailing context lines **the patch itself carries**. These are the
+  lines `git apply` matches.
+
+With `--patch-dir`, the context comes from the patch file matched to the commit. Without
+one, it is git's default 3 lines, cut short at the ends of the file (as `git diff` makes
+them). Overlap is risky only if upstream changed or inserted lines **inside** a window.
+
+OpenDeck's 31 patches have 63 hunks:
+
+- 61 carry 3 leading context lines, and 2 hand-edited hunks carry 4 or 5;
+- 13 carry fewer than 3 trailing lines.
+
+**Re-run** (zmig with this change; `--patch-method git-apply`; with and without
+`--patch-dir`; `~/.cache/zmig/dogfood/d6/rescore3-*`):
+
+| Patch | §11 (fixed 3 lines) | §11.4, with `--patch-dir` | §11.4, no patch dir |
+|---|---|---|---|
+| `esp32s3_reset_with_watchdog_after_flash` | risky: "upstream changed lines next to it" | **info**: "upstream changed other parts of board.cmake" | info |
+| every other patch | unchanged | unchanged | unchanged |
+
+- **Why it changed.** The patch's one hunk (`board.cmake @@ -6,4 +6,5 @@`) ends at the end
+  of the file, with 1 trailing context line (line 9). Upstream appended its QEMU block
+  after line 9: outside the lines the patch reads.
+- **Totals.** Plan goes from 7 breaking, 2 risky to 7 breaking, 1 risky. The risky one left
+  is `esp32_eth_pass_multicast_frames` (absorbed upstream; the patch no longer applies).
+- **Score.** Recall is unchanged: 9/9 strict and lenient, 8/9 actionable. Precision goes
+  from 8/9 to **8/8**. The finding removed was scored "unhelpful: true and worth a look,
+  but no action needed" (§11.1); the maintainers left that patch unchanged.
+
+This is **tuned**: the rule was changed after seeing this case. Two things limit what the
+8/8 says:
+
+- **Under `git-apply`, an applying patch rarely has near overlap.** An upstream change
+  inside a window changes the context `git apply` matches, so the patch conflicts instead.
+  The window matters mostly for `3way` (rebase) workflows, where such changes still merge.
+- **Regression tests.** `tests/test_patch_methods.py` has two:
+  - the watchdog case, on the real file, with and without the patch text;
+  - a constructed 3way case. The patch is made with 5 context lines, and upstream changes
+    a line 4 away from the patch's change. That is risky with the patch file's context,
+    and info with the default 3.
