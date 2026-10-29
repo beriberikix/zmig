@@ -12,6 +12,35 @@ Every workflow input counts as unverified until a real run passes.
 Run links point to `https://github.com/beriberikix/zmig-ci-cannectivity/actions/runs/<id>`;
 both repos are private.
 
+## Summary: what is verified and what isn't
+
+**Verified by real runs** (links in the table below):
+
+- the nightly path (`workflow_dispatch`): target tracking to the next release, the pinned
+  second scan, "due to target movement" labels, exit 3 failing the job;
+- PR runs pinned to the baseline's target, exit 0;
+- a new breaking finding (exit 3);
+- an accepted-baseline change (`--update-baseline`), and expired acceptances for a gap
+  (exit 4, turned into a warning) and for a finding (exit 3);
+- a new use site of an accepted finding (exit 3, after the fix);
+- the zmig upgrade with `--rebase-baseline`;
+- the PR comment edited in place, and the job summary;
+- installing zmig from a private repo pinned by commit;
+- cache save on the default branch and restore on a PR, plus the SDK download and the
+  checkout and setup actions.
+
+**Not verified:**
+
+| | Why |
+|---|---|
+| **Fork PRs** | needs a second GitHub account |
+| **Cron schedules** | the test repo has no cron; `workflow_dispatch` runs the same steps, but the schedule trigger and its `case` branch never ran |
+| **SARIF upload** | needs code scanning (GitHub Code Security) on the private repo, which wasn't enabled. The step runs and fails, and the job ignores that |
+| **Cache limits** | the per-repository cache size limit and eviction under nightly churn (one new entry, about 1.65 GB, per nightly) weren't tested |
+
+The `ZMIG_READ` secret and its token are still in place; they're removed only when CI
+testing is declared finished.
+
 ## Repositories
 
 Both are **private**, under the `beriberikix` account. Nothing else was pushed.
