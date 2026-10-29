@@ -94,6 +94,55 @@ wasn't used.**
 On the bundled fixture (`tests/fixtures/app`, a constructed project) the run gives 4
 act-now, 12 review and 13 FYI, out of 29 findings.
 
+## Recomputed on regenerated reports (2026-10-29)
+
+**How the reports were made.** CANnectivity C1, C2 and the OpenDeck scan were regenerated
+with the current zmig (`5f7560a`), offline (`GIT_ALLOW_PROTOCOL=file`):
+`~/.cache/zmig/dogfood/d10`.
+
+**The builds weren't cached; they recompiled locally.** The app trees match the old
+reports, so a key input changed, most likely the Python environment, whose package set is
+part of the build key. zmig doesn't store the key's inputs, so this is unverified. The
+tiers are zmig's own, from the reports.
+
+| Report | breaking/risky | act-now | review | fyi |
+|---|---|---|---|---|
+| CANnectivity C1 | 8 | 3 | 5 | 0 |
+| CANnectivity C2 | 8 | 3 | 5 | 0 |
+| OpenDeck scan | 11 | **1: D1** `target-configure-failed` at `firmware.overlay:20` | 2 | 8 |
+
+**OpenDeck's D1 is act-now with the current zmig.** It missed act-now earlier only
+because that count used the clean baseline report, made before the §11 fix that gave this
+finding its source location (DOGFOOD-5 §11.2). CANnectivity's `target-build-failed` also
+cites `src/led.c` now, and is act-now.
+
+**Every breaking finding with a project file:line that isn't act-now:**
+
+| Report | Finding | Tier | The rule that placed it lower |
+|---|---|---|---|
+| C1, C2 | `entry-match` "smf_set_handled has been removed" (`src/led.c:225…`) | review | confidence medium, not high (a guide match). It duplicates `function-removed`, which is act-now |
+
+There are none on OpenDeck.
+
+**Breaking findings below act-now with no project file:line:**
+
+| Report | Finding | Tier | Why |
+|---|---|---|---|
+| C1, C2 | `module-required` cmsis_6 | review | no project `file_line`. Its evidence is the target build's error ("`cmsis_core.h` is missing") and `zephyr/west.yml:130`. The fix goes in your workspace manifest, which the scan doesn't read |
+
+**A confirmed blocker misses act-now:** `module-required` (CANnectivity N2: the target
+build fails without `cmsis_6`).
+
+**Proposed rule change (not implemented; run-time evidence only).** A breaking,
+high-confidence finding is act-now when its evidence includes `tool_output` from the
+target build's own failure (invocation `target build` or `target configure`), even
+without a project file:line. The failure itself shows that the finding blocks the
+upgrade.
+
+- On these reports, only `module-required` moves to act-now (C1, C2); nothing else.
+- The cost: a failure-only finding with no file to act on could also land in act-now.
+  That's open question 1.
+
 ## Open questions
 
 1. Should the first configure or build failure, which has no location, be act-now? It

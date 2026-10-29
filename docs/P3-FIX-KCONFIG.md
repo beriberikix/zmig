@@ -313,3 +313,48 @@ cache paths.
 
 Whether they could ever be auto-fixed: [DESIGN-KCONFIG-OVERRIDES.md](DESIGN-KCONFIG-OVERRIDES.md).
 
+## Remove category end to end, for real (no stubs)
+
+**The scratch project.**
+
+- Location: `~/.cache/zmig/dogfood/d10/fixproj`, a git copy of `tests/fixtures/app` plus
+  two lines in `prj.conf`:
+  ```
+  # POSIX page size for the sysconf() shim
+  CONFIG_POSIX_PAGE_SIZE_BITS=12
+  ```
+- Why this symbol: v3.6.0 defines it (`lib/posix/options/Kconfig.sysconf:14`, int, no
+  dependencies), and the v3.6.0 kconfiglib gives it 12. v3.7.0 doesn't define it. Neither
+  `migration-guide-3.7.rst` nor `release-notes-3.7.rst` mentions it, and there's no
+  Kconfig-level replacement.
+- v3.7.0 does have `POSIX_PAGE_SIZE`, in bytes, hex, and "not user-configurable". Nothing
+  in Kconfig or the guide links the two, so the note's "no replacement evidenced" is
+  literally true. The new symbol can't be set anyway.
+- The builds weren't cached (a new app tree). They were local compiles from the existing
+  workspaces with `GIT_ALLOW_PROTOCOL=file`; nothing was downloaded.
+
+**Run 1, `--apply`** (exit 0, 103 s):
+
+- two commits on `zmig/fix-kconfig-v3.7.0`:
+  - `5de19c5` "rename (deprecation select)": `CONFIG_CPLUSPLUS` → `CONFIG_CPP`;
+  - `e64e616` "remove (no replacement evidenced)": `prj.conf:8` commented out, the
+    `# POSIX page size …` comment kept, and the note added above it;
+- the needs-human line (`CAN_AUTO_BUS_OFF_RECOVERY`, guide rename, "inverted") left as is;
+- rebuild:
+  - before: "configure-failed; salvaged build ok (3 line(s) disabled)";
+  - after: "configure-failed; salvaged build ok (1 line(s) disabled)", the CAN line;
+- gone: 4 (`CPLUSPLUS` removed, `POSIX_PAGE_SIZE_BITS` removed, and two dependency
+  findings about `CPLUSPLUS`); revealed 0; introduced 0.
+
+**Run 2, `--apply` again** (exit 0, 11 s):
+
+- 7 assignments checked;
+- only the needs-human line is listed;
+- no commit, no new branch; the tree is clean.
+
+```
+     7  # POSIX page size for the sysconf() shim
+     8  # zmig: CONFIG_POSIX_PAGE_SIZE_BITS removed in v3.7.0: no replacement evidenced
+     9  # CONFIG_POSIX_PAGE_SIZE_BITS=12
+```
+
