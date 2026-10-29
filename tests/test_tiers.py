@@ -69,7 +69,13 @@ def test_no_build_records_means_used() -> None:
 def test_inputs_are_run_time_evidence_only() -> None:
     """No evaluation data can reach the rule: its inputs are severity, confidence, the
     evidence items and the build's use of files."""
-    assert list(inspect.signature(tier).parameters) == ["severity", "confidence", "evidence", "use"]
+    assert list(inspect.signature(tier).parameters) == [
+        "severity",
+        "confidence",
+        "evidence",
+        "use",
+        "kind",
+    ]
     assert "confirmed" not in inspect.getsource(tiers).split('"""', 2)[2]
 
 

@@ -4,13 +4,23 @@ run), and how the modules the source build used changed in Zephyr's manifest."""
 
 from __future__ import annotations
 
+import os
 from typing import ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact
-from zmig.findings import JSON, Category, Checked, Confidence, Finding, Severity, tool_output
+from zmig.findings import (
+    JSON,
+    Category,
+    Checked,
+    Confidence,
+    Finding,
+    Severity,
+    file_line,
+    tool_output,
+)
 from zmig.manifest import load_manifest
-from zmig.modulecheck import manifest_changes
+from zmig.modulecheck import manifest_changes, user_manifest
 from zmig.scan import ScanContext
 
 
@@ -56,14 +66,28 @@ class ModulesAnalyzer:
                 ev.append(
                     tool_output("target manifest", f"zephyr/{need.declared} declares {need.module}")
                 )
+            app = ctx.old.spec.app.resolve()
+            mine = user_manifest(app)
+            in_manifest = ""
+            if mine is not None:
+                path, line, what = mine
+                rel = os.path.relpath(path, app).replace(os.sep, "/")
+                text = path.read_text(errors="replace").splitlines()[line - 1].strip()
+                ev.insert(0, file_line(rel, line, text))
+                in_manifest = f" in {rel}:{line} ({what})"
             add(
                 "module-required",
                 need.module,
                 f"The target build needs module {need.module}, which the build's module set "
                 f"doesn't include",
                 Severity.BREAKING,
-                f"Add {need.module} to your workspace (the name-allowlist or project list "
-                f"that imports Zephyr) and run `west update`."
+                (
+                    f"Add {need.module} to your manifest{in_manifest} and run `west update`."
+                    if in_manifest
+                    else f"Add {need.module} to your workspace (the name-allowlist or project "
+                    f"list that imports Zephyr) and run `west update`; no west manifest was "
+                    f"found above the app."
+                )
                 + (
                     " zmig added it to analyze the target; the rest of this report "
                     "compares against that build."

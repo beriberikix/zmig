@@ -46,6 +46,37 @@ wasn't used.**
 | **review** | any other breaking finding; or risky with a project file:line the build used |
 | **fyi** | everything else: risky without such a location, and all info |
 
+**One exception, implemented (review decision, the only change during the feature
+freeze).** A breaking, high-confidence `module-required` finding whose evidence includes
+`tool_output` from the target build's own failure (`target build` or `target configure`)
+is act-now even without a project file:line. No other kind uses this rule
+(`TARGET_FAILURE_KINDS`; `tests/test_module_required_location.py`).
+
+`module-required` now also cites the user's manifest: the file and line where the module
+is added (`modulecheck.user_manifest`). The manifest comes from a west workspace above
+the app, else the nearest `west.yml` above it, up to the git root or 3 levels. The line
+is the Zephyr import's `name-allowlist:`, else the `zephyr` project entry. For
+CANnectivity C1 the action now reads "Add cmsis_6 to your manifest in ../west.yml:14 (the
+name-allowlist of the Zephyr import)", which is where the maintainers made the N2 fix.
+With that location the general rule already puts it in act-now; the exception covers
+projects where no manifest is found.
+
+**Before and after, on every stored report** (78 reports: test fixtures and every
+dogfood `report.json`; 2,121 findings; build use not stored, so "used" for all):
+
+- 26 findings changed tier, all `module-required`, all breaking and high confidence,
+  review → act-now;
+- no other finding changed.
+
+The 26 are mostly the same CANnectivity finding, repeated across runs and CI fixtures.
+**These counts are anecdotal.**
+
+**Watch fingerprints.** A fingerprint includes a finding's first file location. Adding
+the manifest `file_line` changes `module-required` fingerprints. The CI baseline fixture
+(`tests/fixtures/watch/ci-baseline.json`) has no `module-required` entry. The live
+baseline in the CI repository wasn't checked (offline); if it has one, the next watch run
+after upgrading zmig reports it as new until `--rebase-baseline`.
+
 ## Invariants, all tested (`tests/test_tiers.py`)
 
 1. **Nothing is hidden or dropped.**

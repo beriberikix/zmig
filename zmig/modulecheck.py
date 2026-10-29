@@ -50,6 +50,55 @@ class ModuleNeed:
     alternatives: tuple[str, ...] = field(default_factory=tuple)
 
 
+def user_manifest(app: Path) -> tuple[Path, int, str] | None:
+    """The user's own west manifest for `app`, and the line where a module is added to it:
+    (file, line, what the line is). From a west workspace above the app (`.west/config`:
+    manifest.path / manifest.file), else the nearest `west.yml` above the app, up to the
+    app's git root, or 3 levels when it isn't in git. The line is the Zephyr import's
+    `name-allowlist:`, else the `zephyr` project entry, else 1. None if there is none."""
+    import configparser
+    import subprocess
+
+    app = app.resolve()
+    proc = subprocess.run(
+        ["git", "-C", str(app), "rev-parse", "--show-toplevel"], capture_output=True, text=True
+    )
+    top = Path(proc.stdout.strip()).resolve() if proc.returncode == 0 else None
+    found: Path | None = None
+    for d in [app, *app.parents]:
+        cfg = d / ".west" / "config"
+        if cfg.is_file():
+            c = configparser.ConfigParser()
+            c.read(cfg)
+            m = (
+                d
+                / c.get("manifest", "path", fallback="")
+                / c.get("manifest", "file", fallback="west.yml")
+            )
+            if m.is_file():
+                found = m
+                break
+    if found is None:
+        limit = top if top is not None else app.parents[min(3, len(app.parents) - 1)]
+        for d in [app, *app.parents]:
+            if (d / "west.yml").is_file():
+                found = d / "west.yml"
+                break
+            if d == limit:
+                break
+    if found is None:
+        return None
+    lines = found.read_text(errors="replace").splitlines()
+    for pattern, what in (
+        (r"^\s*name-allowlist:", "the name-allowlist of the Zephyr import"),
+        (r"^\s*-\s*name:\s*zephyr\s*$", "the zephyr project entry"),
+    ):
+        for i, line in enumerate(lines, 1):
+            if re.match(pattern, line):
+                return found, i, what
+    return found, 1, "the manifest"
+
+
 def manifest_line(zephyr: Path, name: str) -> str:
     """`west.yml:<line>` of the project entry `name` in a Zephyr tree's manifest."""
     path = zephyr / "west.yml"
