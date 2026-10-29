@@ -499,3 +499,17 @@ breaking/high; TLS rename breaking/low).
 they are **tuned** under the clean-vs-tuned rule in `docs/EVALUATION.md`. EVALUATION.md was
 not edited. Rows that may be stale are named in each commit message, chiefly bms A1
 precision (d0f9e03). None was re-measured.
+
+### Follow-up (2026-10-29, same branch)
+
+- **Shared builds across app copies:** closed. The build key now includes the app directory
+  name (cb90465), and the `APPLICATION_SOURCE_DIR` alias from 5753b7a is removed as
+  unreachable. Every cached build misses once.
+- **Byte stability.** Cold and warm caches gave different `report.json` text: the libclang
+  coverage line reported parse-cache counts. Exposed by the key change and fixed in 61cd355.
+- **Buildlog warning noise:** closed in f284f92. A kconfig warning whose "defined at" line
+  moved is no longer reported as new plus resolved.
+- **F4, partly:** each crossed release with no migration guide (anything before 3.5) is now
+  a "not checked" gap, and the guide analyzer is `partial` (1275465). In `watch` that gap
+  blocks until it is accepted. Hard-coded file names and section titles, and dropped
+  directive bodies, remain open.
