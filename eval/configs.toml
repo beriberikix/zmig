@@ -337,7 +337,7 @@ sha = "0ad20d0fc4ec70d6f4c3d399357e59d0544cf07f"  # branch `zephyr` tip since 20
 
 [configs.edgehog]
 oracle = "docs/oracles/edgehog.md"
-scored = "not yet scored (oracle frozen 2026-10-30)"
+scored = "DOGFOOD-13 (zmig 7c64974, clean)"
 app = "{src:edgehog}/e2e"
 # e2e/ reaches ../samples, ../lib and ../Kconfig, which aren't in zmig's copy of the app: the
 # root comes from -DEDGEHOG_ROOT instead, and the Kconfig through the module.

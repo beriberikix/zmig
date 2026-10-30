@@ -86,6 +86,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | **proves** (`proves_flight_control_board_v5e`, F´) | v4.3.0 → v4.4.1 | 5 | **clean**: DOGFOOD-12 baseline | 1 (20%) | 4 (80%) | 20/24 (83%) | 2 (fix-actionable 0) | configure failed (Mbed TLS module, after Kconfig) | unknown | DOGFOOD-12 §2 |
 | ″ | ″ | 5 | tuned: E1 (configure failed after Kconfig) | **2 (40%)** | 4 (80%) | **21/25 (84%)** | **3** (fix-actionable **1**) | ″ | ″ | DOGFOOD-12 §5 |
 | ″ | ″ | 5 | tuned: E3 (guide vendor sections, struct members) | 2 (40%) | 4 (80%) | **21/21 (100%)** | 3 (fix-actionable 1) | ″ | ″ | DOGFOOD-12 §7 |
+| **edgehog** `e2e` (native_sim) | v4.3.0 → v4.4.0 | 8 | **clean**: DOGFOOD-13 baseline | 4 (50%) | 7 (88%) | 38/40 (95%) | 7 (fix-actionable 2) | configure failed (Kconfig); salvaged build failed | unknown | DOGFOOD-13 §2 |
 | **P1 fixtures** (`tests/fixtures/p1-layout`, `p1-mode`, `p1-rename`, `p1-ble`, `xapp*`) | v4.2.2 → v4.3.0 (constructed) | — | **tuned by construction** (written to exercise P1) | — | — | — | — | | each fixture's expected verdict (layout hazard, MCUboot mode, rename, BLE clean; cross-image) is asserted by `tests/test_p1_fixture.py`, `test_cross_fixture.py` | DESIGN-P1 §11 |
 
 ### Clean results only
@@ -101,6 +102,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ after Phase 0, clean part only (ardep, RIT FSW; DOGFOOD-9) | 9 | 0 | 4 (44%) | 7/11 (64%) | **2** (fix-actionable 0) |
 | ″ after the change database, clean part only (ardep; DOGFOOD-11) | 6 | **2 (33%)** | 5 (83%) | 8/10 (80%) | **4** (fix-actionable **2**) |
 | Held-out 2026-10-30, second set (ble-copro, proves; DOGFOOD-12) | 7 | 1 (14%) | 6 (86%) | 25/47 (53%) | 4 (fix-actionable 0) |
+| Held-out 2026-10-30, third set (edgehog; DOGFOOD-13) | 8 | 4 (50%) | 7 (88%) | 38/40 (95%) | 7 (fix-actionable 2) |
 
 Across every clean scan result, zmig names *what* breaks more often than *where to fix it*:
 **actionable was 0 on every clean measurement** until Phase 0 (ardep 2, DOGFOOD-9) and the

@@ -1,0 +1,566 @@
+{
+ "config": "edgehog",
+ "scored": "DOGFOOD-13 (zmig 7c64974, clean)",
+ "schema_version": "1.5",
+ "verdict": "unknown",
+ "findings": [
+  {
+   "id": "API-FIELD-CHANGED-801b65ba",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "field-changed",
+   "title": "Field k_thread.stack_info, which your code uses, changed: struct _thread_stack_info at bit offset 1120 → struct _thread_stack_info at bit offset 1088",
+   "action": "In edgehog-zephyr-device/lib/edgehog_device/system_status.c:41: only its position moved; source code is unaffected, binaries built against the old layout aren't.",
+   "files": "edgehog-zephyr-device/lib/edgehog_device/system_status.c"
+  },
+  {
+   "id": "API-FIELD-CHANGED-9c7d7f50",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "field-changed",
+   "title": "Field zsock_addrinfo.ai_addr, which your code uses, changed: struct sockaddr * at bit offset 224 → struct net_sockaddr * at bit offset 224",
+   "action": "In edgehog-zephyr-device/lib/edgehog_device/http.c:339: check the code that uses it.",
+   "files": "edgehog-zephyr-device/lib/edgehog_device/http.c"
+  },
+  {
+   "id": "BUILD-NEW-WARNING-659234c9",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "new-warning",
+   "title": "New compiler warning at v4.4.0: Macro is deprecated",
+   "action": "In edgehog-zephyr-device/lib/edgehog_device/include/log.h:22, edgehog-zephyr-device/lib/edgehog_device/nvs.c:19, edgehog-zephyr-device/lib/edgehog_device/ota.c:47: look at it before it becomes an error in a later release.",
+   "files": "edgehog-zephyr-device/lib/edgehog_device/include/log.h edgehog-zephyr-device/lib/edgehog_device/nvs.c edgehog-zephyr-device/lib/edgehog_device/ota.c"
+  },
+  {
+   "id": "BUILD-NEW-WARNING-7c6a29d5",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "new-warning",
+   "title": "New cmake warning at v4.4.0: CONFIG_ZVFS_OPEN_MAX is less than requested minimum: 25 < 26 Setting the file descriptor size to 26",
+   "action": "Check whether it points at a real problem.",
+   "files": ""
+  },
+  {
+   "id": "BUILD-NEW-WARNING-b1b2ddf6",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "new-warning",
+   "title": "New compiler warning at v4.4.0: This header file is deprecated, please use zephyr/kvss/nvs.h instead.",
+   "action": "In edgehog-zephyr-device/lib/edgehog_device/nvs.c:7, edgehog-zephyr-device/lib/edgehog_device/storage_usage.c:9: look at it before it becomes an error in a later release.",
+   "files": "edgehog-zephyr-device/lib/edgehog_device/nvs.c edgehog-zephyr-device/lib/edgehog_device/storage_usage.c"
+  },
+  {
+   "id": "BUILD-TARGET-BUILD-FAILED-42d2c437",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "target-build-failed",
+   "title": "The target build fails (after salvage): 3 errors (compiler)",
+   "action": "The Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
+   "files": ""
+  },
+  {
+   "id": "BUILD-WARNINGS-RESOLVED-b7a5fda6",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "warnings-resolved",
+   "title": "Warnings from v4.3.0 that no longer appear: 1",
+   "action": "None needed.",
+   "files": ""
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-dadb9ddd",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&flash0/partitions (/flash-controller@0/flash@0/partitions): binding defaults changed, not set in the DTS: wakeup-source, zephyr,deferred-init, zephyr,pm-device-runtime-auto",
+   "action": "In boards/native_sim.overlay:25: only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/native_sim.overlay"
+  },
+  {
+   "id": "DEVICETREE-OTHER-NODES-c193f678",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "other-nodes",
+   "title": "3 nodes your app doesn't reference changed, disappeared or appeared; 3 more nodes only changed binding",
+   "action": "None needed unless you start using them.",
+   "files": ""
+  },
+  {
+   "id": "GUIDE-COVERAGE-ec0e5c0b",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "coverage",
+   "title": "Read 192 entries from 2 documents; 10 touch your app",
+   "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+   "files": ""
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-050b60de",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 release notes (Removed APIs and options): Mbed TLS CONFIG_PSA_WANT_KEY_TYPE_DES CONFIG_PSA_WANT_ECC_SECP_K1_192 CONFIG_PSA_WANT_ECC_SECP_R1_192 CONFIG_PSA_WANT_ECC_SECP_R1_224 CONFIG_CUSTOM_MBEDTLS_CFG_",
+   "action": "In prj.conf:87: read RN-4.4-0003 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-13b21971",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Networking): Automatic selection of crypto Kconfigs has been removed from NET_SOCKETS_SOCKOPT_TLS as they strongly depend on the final application's needs.",
+   "action": "In prj.conf:96: read MG-4.4-0143 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-1fcb6a3a",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (File System): CONFIG_FS_FATFS_FSTAB_AUTOMOUNT is now enabled by default, if any enabled zephyr,fstab,fatfs with the automount property are present in the devicetree.",
+   "action": "In boards/native_sim.overlay:14, boards/qemu_x86.overlay:14: probably not relevant: it applies only with CONFIG_FS_FATFS_FSTAB_AUTOMOUNT, which neither build enables. Read MG-4.4-0063 and update the lines listed.",
+   "files": "boards/native_sim.overlay boards/qemu_x86.overlay"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-3068fec0",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (NXP): nxp,imx-flexspi-nor compatible nodes now have a soc-nv-flash compatible child node to describe the flash memory.",
+   "action": "In boards/native_sim.overlay:24: probably not relevant: it's in the guide's NXP section, and this build's SoC is native. Read MG-4.4-0077 and update the lines listed.",
+   "files": "boards/native_sim.overlay"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-34f724f0",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Mbed TLS): CONFIG_MBEDTLS_SERVER_NAME_INDICATION has been renamed to CONFIG_MBEDTLS_SSL_SERVER_NAME_INDICATION.",
+   "action": "In prj.conf:77, change `CONFIG_MBEDTLS_SERVER_NAME_INDICATION` to `CONFIG_MBEDTLS_SSL_SERVER_NAME_INDICATION` (guide: MG-4.4-0168; low confidence). The guide says CONFIG_MBEDTLS_SERVER_NAME_INDICATION was renamed to CONFIG_MBEDTLS_SSL_SERVER_NAME_INDICATION: \"CONFIG_MBEDTLS_SERVER_NAME_INDICATION has been renamed to CONFIG_MBEDTLS_SSL_SERVER_NAME_INDICATION.\"",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-3cb80502",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Mbed TLS): The following Mbed TLS Kconfig symbols have been removed [MBEDTLS_GENPRIME_ENABLED]",
+   "action": "In prj.conf:82: read MG-4.4-0171 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-41aa1b42",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 release notes (Removed APIs and options): Mbed TLS CONFIG_PSA_WANT_KEY_TYPE_DES CONFIG_PSA_WANT_ECC_SECP_K1_192 CONFIG_PSA_WANT_ECC_SECP_R1_192 CONFIG_PSA_WANT_ECC_SECP_R1_224 CONFIG_CUSTOM_MBEDTLS_CFG_",
+   "action": "In prj.conf:86: read RN-4.4-0003 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-58f14418",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (NXP): zephyr,flash chosen property must point to the soc-nv-flash compatible node.",
+   "action": "In boards/native_sim.overlay:24: probably not relevant: it's in the guide's NXP section, and this build's SoC is native. Read MG-4.4-0078 and update the lines listed.",
+   "files": "boards/native_sim.overlay"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-673d1bf5",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Mbed TLS): The following Mbed TLS Kconfig symbols have been removed [MBEDTLS_ECP_C]",
+   "action": "In prj.conf:87: read MG-4.4-0171 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-830de8d2",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Mbed TLS): The following Mbed TLS Kconfig symbols have been removed [MBEDTLS_ECP_DP_SECP256R1_ENABLED]",
+   "action": "In prj.conf:88: read MG-4.4-0171 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-833d4ec7",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 release notes (Removed APIs and options): Mbed TLS CONFIG_PSA_WANT_KEY_TYPE_DES CONFIG_PSA_WANT_ECC_SECP_K1_192 CONFIG_PSA_WANT_ECC_SECP_R1_192 CONFIG_PSA_WANT_ECC_SECP_R1_224 CONFIG_CUSTOM_MBEDTLS_CFG_",
+   "action": "In prj.conf:82: read RN-4.4-0003 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-86bc571a",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 release notes (Removed APIs and options): CONFIG_MBEDTLS_SERVER_NAME_INDICATION has been renamed to CONFIG_MBEDTLS_SSL_SERVER_NAME_INDICATION.",
+   "action": "In prj.conf:77, change `CONFIG_MBEDTLS_SERVER_NAME_INDICATION` to `CONFIG_MBEDTLS_SSL_SERVER_NAME_INDICATION` (guide: RN-4.4-0003; low confidence). The guide says CONFIG_MBEDTLS_SERVER_NAME_INDICATION was renamed to CONFIG_MBEDTLS_SSL_SERVER_NAME_INDICATION: \"CONFIG_MBEDTLS_SERVER_NAME_INDICATION has been renamed to CONFIG_MBEDTLS_SSL_SERVER_NAME_INDICATION.\"",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-a1466a60",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 release notes (Removed APIs and options): Mbed TLS CONFIG_PSA_WANT_KEY_TYPE_DES CONFIG_PSA_WANT_ECC_SECP_K1_192 CONFIG_PSA_WANT_ECC_SECP_R1_192 CONFIG_PSA_WANT_ECC_SECP_R1_224 CONFIG_CUSTOM_MBEDTLS_CFG_",
+   "action": "In prj.conf:88: read RN-4.4-0003 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-a1cf82c5",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 release notes (Removed APIs and options): Mbed TLS CONFIG_PSA_WANT_KEY_TYPE_DES CONFIG_PSA_WANT_ECC_SECP_K1_192 CONFIG_PSA_WANT_ECC_SECP_R1_192 CONFIG_PSA_WANT_ECC_SECP_R1_224 CONFIG_CUSTOM_MBEDTLS_CFG_",
+   "action": "In prj.conf:69: read RN-4.4-0003 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-b2be8332",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Mbed TLS): The following Mbed TLS Kconfig symbols have been removed [MBEDTLS_USE_PSA_CRYPTO]",
+   "action": "In prj.conf:69: read MG-4.4-0171 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-b97f4329",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Mbed TLS): CONFIG_MBEDTLS_PEM_CERTIFICATE_FORMAT has been replaced by the underlying options it used to enable: CONFIG_MBEDTLS_PEM_PARSE_C, CONFIG_MBEDTLS_PEM_WRITE_C and ",
+   "action": "In prj.conf:74, change `CONFIG_MBEDTLS_PEM_CERTIFICATE_FORMAT` to `CONFIG_MBEDTLS_PEM_PARSE_C` (guide: MG-4.4-0167; low confidence). The guide says CONFIG_MBEDTLS_PEM_CERTIFICATE_FORMAT was renamed to CONFIG_MBEDTLS_PEM_PARSE_C: \"CONFIG_MBEDTLS_PEM_CERTIFICATE_FORMAT has been replaced by the underlying options it used to enable: CONFIG_MBEDTLS_PEM_PARSE_C, CONFIG_MBEDTLS_PEM_WRITE_C and CONFIG_MBEDTLS_BASE64_C.\"",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-c39cf845",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 release notes (Removed APIs and options): CONFIG_MBEDTLS_PEM_CERTIFICATE_FORMAT has been replaced by the underlying options it used to enable: CONFIG_MBEDTLS_PEM_PARSE_C, CONFIG_MBEDTLS_PEM_WRITE_C and ",
+   "action": "In prj.conf:74, change `CONFIG_MBEDTLS_PEM_CERTIFICATE_FORMAT` to `CONFIG_MBEDTLS_PEM_PARSE_C` (guide: RN-4.4-0003; low confidence). The guide says CONFIG_MBEDTLS_PEM_CERTIFICATE_FORMAT was renamed to CONFIG_MBEDTLS_PEM_PARSE_C: \"CONFIG_MBEDTLS_PEM_CERTIFICATE_FORMAT has been replaced by the underlying options it used to enable: CONFIG_MBEDTLS_PEM_PARSE_C, CONFIG_MBEDTLS_PEM_WRITE_C and CONFIG_MBEDTLS_BASE64_C.\"",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-c8ee0b23",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Mbed TLS): The following Mbed TLS Kconfig symbols have been removed [MBEDTLS_ECDH_C]",
+   "action": "In prj.conf:85: read MG-4.4-0171 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-d2cf9339",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Mbed TLS): The following Mbed TLS Kconfig symbols have been removed [MBEDTLS_ECDSA_C]",
+   "action": "In prj.conf:86: read MG-4.4-0171 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-d5d6caad",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 release notes (Removed APIs and options): Mbed TLS CONFIG_PSA_WANT_KEY_TYPE_DES CONFIG_PSA_WANT_ECC_SECP_K1_192 CONFIG_PSA_WANT_ECC_SECP_R1_192 CONFIG_PSA_WANT_ECC_SECP_R1_224 CONFIG_CUSTOM_MBEDTLS_CFG_",
+   "action": "In prj.conf:85: read RN-4.4-0003 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-da0c6702",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Kernel): Heap hardening support has been implemented by adding a build time generated zephyr/heap_constants.h file that is now included from kernel.h.",
+   "action": "In src/device_handler.c:9, src/main.c:7, src/runner.c:14: read MG-4.4-0010 and update the lines listed.",
+   "files": "src/device_handler.c src/main.c src/runner.c"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-e95a4298",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (OpenThread): CONFIG_OPENTHREAD_CRYPTO_PSA no longer depends on CONFIG_PSA_CRYPTO_CLIENT, but instead selects CONFIG_PSA_CRYPTO.",
+   "action": "In prj.conf:67: read MG-4.4-0173 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "IMAGES-IMAGES-SUMMARY-f4a19c93",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "images-summary",
+   "title": "1 image at v4.4.0: e2e (app)",
+   "action": "Per-image findings follow, grouped by image.",
+   "files": ""
+  },
+  {
+   "id": "IMAGES-MCUBOOT-REVISION-cc16aee2",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "mcuboot-revision",
+   "title": "MCUboot moves from 96576b341ee1 (96576b34) to ee39e2d694bd (ee39e2d6); the bootloader image's SBOM isn't available",
+   "action": "Read MCUboot's release notes for that range; image format, swap and signature changes need the bootloader and app updated together.",
+   "files": ""
+  },
+  {
+   "id": "KCONFIG-DEFAULT-CHANGED-0b6047d3",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "default-changed",
+   "title": "11 Kconfig symbols: other symbols resolve to a different value in v4.4.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-CHANGED-065babd4",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "dependency-changed",
+   "title": "CONFIG_MBEDTLS_RSA_C, which your configuration of CONFIG_MBEDTLS_GENPRIME_ENABLED relies on, changed from y to unset in v4.4.0",
+   "action": "In prj.conf:82: CONFIG_MBEDTLS_GENPRIME_ENABLED depends on CONFIG_MBEDTLS_RSA_C. Check that CONFIG_MBEDTLS_GENPRIME_ENABLED still does what your app expects.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-CHANGED-06a30b25",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "dependency-changed",
+   "title": "CONFIG_MBEDTLS_CFG_FILE, which your configuration of CONFIG_MBEDTLS_ECDH_C relies on, changed from \"config-mbedtls.h\" to \"\" in v4.4.0",
+   "action": "In prj.conf:85: CONFIG_MBEDTLS_ECDH_C depends on CONFIG_MBEDTLS_CFG_FILE. Check that CONFIG_MBEDTLS_ECDH_C still does what your app expects.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-CHANGED-488e6658",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "dependency-changed",
+   "title": "CONFIG_MBEDTLS_PKCS1_V21, which your configuration of CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED relies on, changed from y to unset in v4.4.0",
+   "action": "In prj.conf:84: CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED depends on CONFIG_MBEDTLS_PKCS1_V21. Check that CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED still does what your app expects. Its definition changed in v4.4.0: depends on ((MBEDTLS_PKCS1_V15 || MBEDTLS_PKCS1_V21) && MBEDTLS_ECDH_C && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS) || ((MBEDTLS_PKCS1_V15 || MBEDTLS_PKCS1_V21) && MBEDTLS_ECDH_C && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS && 0) -> (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0).",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-CHANGED-82811585",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "dependency-changed",
+   "title": "CONFIG_MBEDTLS_PKCS1_V15, which your configuration of CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED relies on, changed from y to unset in v4.4.0",
+   "action": "In prj.conf:84: CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED depends on CONFIG_MBEDTLS_PKCS1_V15. Check that CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED still does what your app expects. Its definition changed in v4.4.0: depends on ((MBEDTLS_PKCS1_V15 || MBEDTLS_PKCS1_V21) && MBEDTLS_ECDH_C && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS) || ((MBEDTLS_PKCS1_V15 || MBEDTLS_PKCS1_V21) && MBEDTLS_ECDH_C && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS && 0) -> (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0).",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-CHANGED-a1b96e82",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "dependency-changed",
+   "title": "CONFIG_DEPRECATED, which your configuration of CONFIG_NATIVE_UART_0_ON_STDINOUT relies on, changed from y to unset in v4.4.0",
+   "action": "In boards/native_sim.conf:6: CONFIG_NATIVE_UART_0_ON_STDINOUT selects CONFIG_DEPRECATED. Check that CONFIG_NATIVE_UART_0_ON_STDINOUT still does what your app expects.",
+   "files": "boards/native_sim.conf"
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-CHANGED-b86fd507",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "dependency-changed",
+   "title": "CONFIG_MBEDTLS_CIPHER_AES_ENABLED, which your configuration of CONFIG_NET_SOCKETS_SOCKOPT_TLS relies on, changed from y to unset in v4.4.0",
+   "action": "In prj.conf:96: CONFIG_NET_SOCKETS_SOCKOPT_TLS implies CONFIG_MBEDTLS_CIPHER_AES_ENABLED. Check that CONFIG_NET_SOCKETS_SOCKOPT_TLS still does what your app expects. Its definition changed in v4.4.0: selects MBEDTLS -> MBEDTLS, PSA_CRYPTO; implies MBEDTLS_CIPHER_AES_ENABLED, MBEDTLS_KEY_EXCHANGE_RSA_ENABLED, MBEDTLS_MD_C, MBEDTLS_PKCS1_V15, MBEDTLS_PKCS1_V21, MBEDTLS_RSA_C, MBEDTLS_SSL_PROTO_TLS1_2, PSA_WANT_ALG_CBC_NO_PADDING, PSA_WANT_KEY_TYPE_AES, TLS_CREDENTIALS -> TLS_CREDENTIALS.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-CHANGED-f549087e",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "dependency-changed",
+   "title": "CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_ENABLED, which your configuration of CONFIG_NET_SOCKETS_SOCKOPT_TLS relies on, changed from y to unset in v4.4.0",
+   "action": "In prj.conf:96: CONFIG_NET_SOCKETS_SOCKOPT_TLS implies CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_ENABLED. Check that CONFIG_NET_SOCKETS_SOCKOPT_TLS still does what your app expects. Its definition changed in v4.4.0: selects MBEDTLS -> MBEDTLS, PSA_CRYPTO; implies MBEDTLS_CIPHER_AES_ENABLED, MBEDTLS_KEY_EXCHANGE_RSA_ENABLED, MBEDTLS_MD_C, MBEDTLS_PKCS1_V15, MBEDTLS_PKCS1_V21, MBEDTLS_RSA_C, MBEDTLS_SSL_PROTO_TLS1_2, PSA_WANT_ALG_CBC_NO_PADDING, PSA_WANT_KEY_TYPE_AES, TLS_CREDENTIALS -> TLS_CREDENTIALS.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-EXPRESSION-CHANGED-0da8c3c3",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "dependency-expression-changed",
+   "title": "23 Kconfig symbols your build sets or reads changed their depends/selects/implies in v4.4.0",
+   "action": "In src/main.c:14, prj.conf:9: value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
+   "files": "prj.conf src/main.c"
+  },
+  {
+   "id": "KCONFIG-NEWLY-SET-be47db5b",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "newly-set",
+   "title": "35 Kconfig symbols: symbols are newly enabled or set in v4.4.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
+  },
+  {
+   "id": "KCONFIG-NO-LONGER-SET-5692ac6e",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "no-longer-set",
+   "title": "20 Kconfig symbols: symbols set before are absent in v4.4.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
+  },
+  {
+   "id": "KCONFIG-SALVAGED-b7a87dab",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "salvaged",
+   "title": "The target configure failed; zmig disabled 11 lines in a copy of your app to compare the rest",
+   "action": "In boards/native_sim.conf:6, prj.conf:69: everything else in this report compares against that salvaged build, so values that depended on the disabled lines (symbols they selected, for example) differ in it too. Fix the breaking findings and rerun.",
+   "files": "boards/native_sim.conf prj.conf"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-REMOVED-08a9a0ba",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "symbol-removed",
+   "title": "CONFIG_MBEDTLS_ECP_C, set in prj.conf, no longer exists in v4.4.0",
+   "action": "In prj.conf:87: remove the assignment, or find its replacement in the migration guides. Zephyr aborts the target configure on this assignment.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-REMOVED-09e2a297",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "symbol-removed",
+   "title": "CONFIG_MBEDTLS_PEM_CERTIFICATE_FORMAT, set in prj.conf, no longer exists in v4.4.0",
+   "action": "In prj.conf:74, change `CONFIG_MBEDTLS_PEM_CERTIFICATE_FORMAT=y` to `CONFIG_MBEDTLS_PEM_PARSE_C=y` (kconfig: the 4.4 migration guide says so (RN-4.4-0003); medium confidence). Replace it with CONFIG_MBEDTLS_PEM_PARSE_C (the 4.4 migration guide says so (RN-4.4-0003)). Zephyr aborts the target configure on this assignment.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-REMOVED-176ef0a6",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "symbol-removed",
+   "title": "CONFIG_MBEDTLS_USE_PSA_CRYPTO, set in prj.conf, no longer exists in v4.4.0",
+   "action": "In prj.conf:69: remove the assignment, or find its replacement in the migration guides. Zephyr aborts the target configure on this assignment.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-REMOVED-52160972",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "symbol-removed",
+   "title": "CONFIG_NATIVE_UART_0_ON_STDINOUT, set in boards/native_sim.conf, no longer exists in v4.4.0",
+   "action": "In boards/native_sim.conf:6, change `CONFIG_NATIVE_UART_0_ON_STDINOUT=y` to `CONFIG_UART_NATIVE_PTY_0_ON_STDINOUT=y` (kconfig: the deprecated NATIVE_UART_0_ON_STDINOUT's help text says to use UART_NATIVE_PTY_0_ON_STDINOUT; medium confidence). Replace it with CONFIG_UART_NATIVE_PTY_0_ON_STDINOUT (the deprecated NATIVE_UART_0_ON_STDINOUT's help text says to use UART_NATIVE_PTY_0_ON_STDINOUT). Zephyr aborts the target configure on this assignment.",
+   "files": "boards/native_sim.conf"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-REMOVED-55f17406",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "symbol-removed",
+   "title": "CONFIG_MBEDTLS_ECDSA_C, set in prj.conf, no longer exists in v4.4.0",
+   "action": "In prj.conf:86: remove the assignment, or find its replacement in the migration guides. Zephyr aborts the target configure on this assignment.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-REMOVED-895322e3",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "symbol-removed",
+   "title": "CONFIG_MBEDTLS_ECP_DP_SECP256R1_ENABLED, set in prj.conf, no longer exists in v4.4.0",
+   "action": "In prj.conf:88: remove the assignment, or find its replacement in the migration guides. Zephyr aborts the target configure on this assignment.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-REMOVED-8d3345c4",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "symbol-removed",
+   "title": "CONFIG_MBEDTLS_GENPRIME_ENABLED, set in prj.conf, no longer exists in v4.4.0",
+   "action": "In prj.conf:82: remove the assignment, or find its replacement in the migration guides. Zephyr aborts the target configure on this assignment.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-REMOVED-a528dfe0",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "symbol-removed",
+   "title": "CONFIG_MBEDTLS_SERVER_NAME_INDICATION, set in prj.conf, no longer exists in v4.4.0",
+   "action": "In prj.conf:77, change `CONFIG_MBEDTLS_SERVER_NAME_INDICATION=y` to `CONFIG_MBEDTLS_SSL_SERVER_NAME_INDICATION=y` (kconfig: the 4.4 migration guide says so (RN-4.4-0003); medium confidence). Replace it with CONFIG_MBEDTLS_SSL_SERVER_NAME_INDICATION (the 4.4 migration guide says so (RN-4.4-0003)). Zephyr aborts the target configure on this assignment.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-SYMBOL-REMOVED-bf17c8c5",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "symbol-removed",
+   "title": "CONFIG_MBEDTLS_ECDH_C, set in prj.conf, no longer exists in v4.4.0",
+   "action": "In prj.conf:85: remove the assignment, or find its replacement in the migration guides. Zephyr aborts the target configure on this assignment.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-VALUE-NOT-TAKEN-836f1342",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "value-not-taken",
+   "title": "CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED=y no longer takes effect in v4.4.0 (it gets n)",
+   "action": "In prj.conf:84: new or changed dependencies are unmet: ((PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0)) (=n). Enable them, or drop the assignment if the feature moved. Its definition changed in v4.4.0: depends on ((MBEDTLS_PKCS1_V15 || MBEDTLS_PKCS1_V21) && MBEDTLS_ECDH_C && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS) || ((MBEDTLS_PKCS1_V15 || MBEDTLS_PKCS1_V21) && MBEDTLS_ECDH_C && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS && 0) -> (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0).",
+   "files": "prj.conf"
+  },
+  {
+   "id": "KCONFIG-VALUE-NOT-TAKEN-92cd75b8",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "value-not-taken",
+   "title": "CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED=y no longer takes effect in v4.4.0 (it gets n)",
+   "action": "In prj.conf:83: new or changed dependencies are unmet: ((PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0)) (=n). Enable them, or drop the assignment if the feature moved. Its definition changed in v4.4.0: depends on (((MBEDTLS_ECDH_C && MBEDTLS_ECDSA_C) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA)) && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS) || (((MBEDTLS_ECDH_C && MBEDTLS_ECDSA_C) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA)) && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS && 0) -> (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0).",
+   "files": "prj.conf"
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-3d892a76",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module mcuboot, which the build uses, moves from 96576b341ee1 to ee39e2d694bd",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-589bce4d",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module mbedtls, which the build uses, moves from c5b06d89c9c4 to a3e190fe44c7",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-ccd5c8d1",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module picolibc, which the build uses, moves from ca8b6ebba522 to 01254932e8e8",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "STORAGE-BACKEND-OPTIONS-CHANGED-47d2137e",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "backend-options-changed",
+   "title": "Storage backend filesystem options changed: CONFIG_FS_LITTLEFS_FSTAB_AUTOMOUNT unset → y",
+   "action": "The backend stays enabled; review these options.",
+   "files": ""
+  },
+  {
+   "id": "STORAGE-BACKEND-OPTIONS-CHANGED-621554fd",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "backend-options-changed",
+   "title": "Storage backend settings options changed: CONFIG_SETTINGS_SAVE_SINGLE_SUBTREE_WITHOUT_MODIFICATION unset → n",
+   "action": "The backend stays enabled; review these options.",
+   "files": ""
+  }
+ ]
+}
