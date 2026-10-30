@@ -413,12 +413,18 @@ class ApiAnalyzer:
             for k in uses
             if k in old_decls
             and k in new_decls
-            and old_decls[k]["kind"] == "typedef"
+            and old_decls[k]["kind"] == new_decls[k]["kind"] == "typedef"
             and old_decls[k]["type"] != new_decls[k]["type"]
         }
         for name in sorted(uses):
             o = old_decls.get(name)
             if o is None:
+                continue
+            # The compiler's own headers at either ref (clang's builtin stand-ins, e.g.
+            # stdarg.h, stddef.h) aren't Zephyr's API (zmig.apidiff; regression: ardep's
+            # va_start, ZMK's size_t declared by Zephyr's libc at one ref and stddef.h at
+            # the other).
+            if o["kind"] == "builtin" or new_decls.get(name, {}).get("kind") == "builtin":
                 continue
             sites = uses[name]
             # Only claim a removal if a target parse covered a file that uses it.

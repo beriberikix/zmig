@@ -450,3 +450,41 @@ def test_a_function_declared_the_same_at_both_refs_is_not_removed(tmp_path: Path
         is None
     )
     assert _declaration_text(tmp_path / "new", "zephyr/include/zephyr/gone.h:3", "x") is None
+
+
+def test_compiler_builtin_headers_are_not_zephyr_api(tmp_path: Path) -> None:
+    """DOGFOOD-8 B3, ardep (`modules/iso14229/drv.c`): `va_start` was reported as "2
+    parameters -> 1, update every use". Both declarations were clang's own builtin
+    `__stdarg_va_arg.h`, whose C23 branch has the 1-parameter form; GCC never reads those
+    headers. Declarations in clang's resource directory aren't Zephyr's or a module's."""
+    from zmig.analyzers.api import ApiAnalyzer
+    from zmig.apidiff import parse, resource_dir
+
+    if resource_dir() is None:
+        pytest.skip("no clang resource directory")
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "main.c").write_text(
+        "#include <stdarg.h>\nint f(int n, ...) { va_list ap; va_start(ap, n);\n"
+        "int v = va_arg(ap, int); va_end(ap); return v; }\n"
+    )
+    out = []
+    for std in ("c11", "c2x"):
+        r = parse(str(app / "main.c"), f"cc -std={std} -c {app / 'main.c'}", {str(app): ""},
+                  lambda f, a=str(app): f[len(a) + 1 :] if f.startswith(a + "/") else None,
+                  str(tmp_path))  # fmt: skip
+        assert r.decls["va_start"]["kind"] == "builtin", r.decls["va_start"]
+        fields = ("decls", "refs", "diags", "fn_values", "errors", "dropped")
+        out.append({"file": "main.c", **{k: getattr(r, k) for k in fields}})
+    ws = SimpleNamespace(zephyr=tmp_path, root=tmp_path)
+    ctx = SimpleNamespace(old=SimpleNamespace(workspace=ws), new=SimpleNamespace(workspace=ws),
+                          new_spec="new", scope=("s",))  # fmt: skip
+    assert ApiAnalyzer()._declaration_changes(ctx, [out[0]], [out[1]]) == []  # type: ignore[arg-type]
+    # ZMK (zephyr fork v3.2 -> v3.5): size_t from Zephyr's libc header at the source and
+    # clang's stddef.h at the target is not a removal.
+    src = dict(out[0], decls={"size_t": {"kind": "typedef", "type": "unsigned int",
+                                         "where": "lib/libc/minimal/include/stddef.h:9"}},
+               refs=[{"name": "size_t", "kind": "typedef", "at": "main.c:2"}])  # fmt: skip
+    tgt = dict(out[1], decls={"size_t": {"kind": "builtin", "where": "/clang/include/stddef.h:1"}},
+               refs=[{"name": "size_t", "kind": "typedef", "at": "main.c:2"}])  # fmt: skip
+    assert ApiAnalyzer()._declaration_changes(ctx, [src], [tgt]) == []  # type: ignore[arg-type]

@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 # Bump when what a parse records changes (invalidates the per-build snapshots).
-API_VERSION = 14
+API_VERSION = 16
 
 # GCC options clang rejects or that don't matter for parsing (prefix match).
 GCC_ONLY = (
@@ -286,14 +286,23 @@ def parse(
             shown[name] = show(os.path.normpath(name))
         return shown[name]
 
+    rd = resource_dir()
+    builtin = os.path.join(os.path.normpath(rd), "include") + os.sep if rd else None
+
     def outside(cur: Any) -> bool:
         """A declaration outside project code: Zephyr's or a module's, not one the build
         generated (regression: ZMK's own __syscall wrappers in the build directory's
-        syscalls/behavior.h were reported as removed Zephyr functions)."""
+        syscalls/behavior.h were reported as removed Zephyr functions). One in clang's
+        builtin headers is recorded with `builtin`: those stand in for the compiler's own,
+        so the diff doesn't compare it (regression: ardep's `va_start`, "2 parameters -> 1"
+        from __stdarg_va_arg.h's C23 branch, which GCC never reads, DOGFOOD-8 B3)."""
         f = cur.location.file
         if f is None or own_file(f) is not None:
             return False
         return not (build_dir and os.path.normpath(f.name).startswith(build_dir + os.sep))
+
+    def is_builtin(loc: Any) -> bool:
+        return bool(builtin and loc.file and os.path.normpath(loc.file.name).startswith(builtin))
 
     def record(cur: Any) -> None:
         """The declaration table entry for a referenced Zephyr/module declaration."""
@@ -301,7 +310,9 @@ def parse(
             return
         where_ = f"{decl_path(cur.location)}:{cur.location.line}"
         dep = cur.availability == ci.AvailabilityKind.DEPRECATED
-        if cur.kind == K.FUNCTION_DECL:
+        if is_builtin(cur.location):
+            res.decls[cur.spelling] = {"kind": "builtin", "where": where_}
+        elif cur.kind == K.FUNCTION_DECL:
             t = norm_type(cur.type.get_canonical().spelling)
             res.decls[cur.spelling] = {"kind": "function", "type": t, "where": where_,
                                        "deprecated": dep}  # fmt: skip
@@ -327,6 +338,9 @@ def parse(
         d = c.referenced
         if d is None or not outside(d):
             continue
+        if d.spelling not in res.decls and is_builtin(d.location):
+            where_ = f"{decl_path(d.location)}:{d.location.line}"
+            res.decls[d.spelling] = {"kind": "builtin", "where": where_}
         if d.spelling not in res.decls:
             toks = [t.spelling for t in d.get_tokens()]
             fn_like = _function_like(d)
