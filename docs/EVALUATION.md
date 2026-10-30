@@ -60,6 +60,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | **OpenDeck** nucleo_h563zi, scan | bump `ab8f6af` (Zephyr `main` 4.4.99, both sides plus OpenDeck's patches) | 5 | clean: DOGFOOD-5 baseline | 0 (0%) | 2 (40%) | 11/22 (50%) | 0 | **configure failed** (devicetree label; a patch-supplied Kconfig function behind it) | needs-changes (low) | DOGFOOD-5-baseline §2–5 |
 | ″ | ″ | 5 | tuned (§10, §11) | 1 (20%) | 1 (20%) | 11/11 (100%) | 1/5 | ″ | ″ | DOGFOOD-5 §10–11 |
 | ″ | ″ | 5 | tuned (audit fixes, re-run at `aa95a10`) | 1 (20%) | 1 (20%) | 11/11 (100%) | 1/5 | ″ | ″ | DOGFOOD-6 |
+| ″ | ″ | 5 | tuned (change database; `RING_BUFFER` deprecated, confirmed, not in the oracle) | 1 (20%) | 1 (20%) | **12/12 (100%)** | 1/5 | ″ | ″ | DOGFOOD-11 §11 |
 | **OpenDeck** plan (patch triage) | ″ | 9 | clean: DOGFOOD-5 baseline | 6 (67%) | 9 (100%) | 8/15 (53%) | 0 | — | — | DOGFOOD-5-baseline §4–5 |
 | ″ | ″ | 9 | tuned (§10, §11) | 9 (100%) | 9 (100%) | 8/9 (89%) | 8/9 | — | — | DOGFOOD-5 §10–11 |
 | ″ | ″ | 9 | tuned (§10, §11, §11.4 hunk window) | 9 (100%) | 9 (100%) | 8/8 (100%) | 8/9 | — | — | DOGFOOD-5 §11.4 |
@@ -69,6 +70,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ | ″ | 6 | **clean**: change database, steps 1–4 (`eval/runs/step4`) | **2 (33%)** | **5 (83%)** | 8/10 (80%) | **4** (fix-actionable **2**) | ″ | ″ | DOGFOOD-11 §2 |
 | ″ | ″ | 6 | tuned: + `hostap` fix and B3 `va_start` (`eval/runs/b3vb`) | 2 (33%) | 5 (83%) | **8/8 (100%)** | 4 (fix-actionable 2) | ″ | ″ | DOGFOOD-11 §2 |
 | ″ | ″ | 6 | tuned: + board schema cause (A3, `eval/runs/a3`) | **3 (50%)** | 5 (83%) | 8/8 (100%) | **5** (fix-actionable **3**) | ″ | ″ | DOGFOOD-11 §9 |
+| ″ | ″ | 6 | tuned: + newly deprecated symbols (A2, `eval/runs/a2`) | **4 (67%)** | 5 (83%) | **9/9 (100%)** | 5 (fix-actionable 3) | ″ | ″ | DOGFOOD-11 §11 |
 | **RIT FSW** `sensor_module` | v4.1.0 → v4.2.0 | 3 | **clean**: DOGFOOD-8 baseline | 0 | 1 (33%) | 3/6 (50%) | 0 (fix-actionable 0) | configure failed (Kconfig) | unknown (low) | DOGFOOD-8 §2 |
 | ″ | ″ | 3 | **clean**: after Phase 0 (DOGFOOD-9) | 0 | 1 (33%) | 3/6 (50%) | 0 (fix-actionable 0) | ″ | ″ | DOGFOOD-9 §3 |
 | ″ | ″ | 3 | tuned: after the detection fixes (DOGFOOD-10) | 0 | 1 (33%) | **3/3 (100%)** | **1** (fix-actionable 0) | ″ | ″ | DOGFOOD-10 §2 |

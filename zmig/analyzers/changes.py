@@ -9,6 +9,9 @@ analyzer looks those facts up for what the source build shows the project uses:
   a symbol a fragment the build merged sets   symbol-removed            (kconfig's kind)
   a symbol the project's Kconfig re-declares  kconfig-override-orphaned (buildlog's kind)
   a symbol the project's code reads           read-symbol-removed       (kconfig's kind)
+  a symbol newly deprecated that the source   symbol-deprecated         (kconfig's kind)
+  build enables, assigned in a fragment or
+  referenced in the project's own Kconfig
 
 Likewise the devicetree analyzer's `compatible-unbound`, when the target has no
 devicetree: a compatible the app or the project's own DTS uses (zmig.usage, project_dts),
@@ -27,6 +30,7 @@ candidates are ranked by the conditions the source build satisfies (zmig.changes
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
@@ -37,6 +41,7 @@ from zmig.changes import (
     _DEF_GREP,
     COMPAT,
     choose,
+    kconfig_references,
     load_or_build,
     parse_table,
 )
@@ -102,6 +107,7 @@ class ChangesAnalyzer:
         if kconfig:
             removed = {s: v for s, v in db["kconfig"]["removed"].items() if s not in in_modules}
             findings += self._kconfig(ctx, removed, reported)
+            findings += self._deprecated(ctx, db["kconfig"].get("deprecated", {}), reported)
         if dts:
             gone = {
                 c: v for c, v in db["devicetree"]["removed"].items() if c not in compats_in_modules
@@ -114,6 +120,64 @@ class ChangesAnalyzer:
                         unbound_compatible(ctx, token, compat, locs, gone, self.name, lexical)
                     )
         return AnalyzerResult(findings)
+
+    def _deprecated(
+        self, ctx: ScanContext, deprecated: dict[str, Any], reported: set[tuple[str, str]]
+    ) -> list[Finding]:
+        """Newly deprecated symbols the source build enables, where the project assigns or
+        references them (ardep A2: `CONFIG_STD_C11=y` in prj.conf, `default STD_C11` in
+        the board's Kconfig.uds)."""
+        enabled = {s for s in deprecated if ctx.old_config.get(s) == "y"}
+        if not enabled:
+            return []
+        refs = project_kconfig_references(ctx, enabled)
+        findings = []
+        for sym in sorted(enabled):
+            if ("symbol-deprecated", f"CONFIG_{sym}") in reported:
+                continue
+            ev: list[JSON] = [
+                file_line(loc.path, loc.line, loc.text)
+                for loc, _ in ctx.usage.kconfig_set.get(sym, [])
+            ]
+            ev += [file_line(path, line, text) for path, line, text in refs.get(sym, [])]
+            if not ev:
+                continue
+            entry = deprecated[sym]
+            facts = f"{entry['defined_at']} selects DEPRECATED at the target, not at the source"
+            ev.append(tool_output("Kconfig trees at both refs", ctx.runner.redact(facts)))
+            instead = entry.get("instead") or []
+            findings.append(
+                Finding(
+                    category=Category.KCONFIG,
+                    kind="symbol-deprecated",
+                    subject=f"CONFIG_{sym}",
+                    title=f"CONFIG_{sym} is deprecated in {ctx.new_spec}",
+                    severity=Severity.RISKY,
+                    confidence=Confidence.HIGH,
+                    action="Move off it before the release that removes it."
+                    + (f" Its help text names CONFIG_{instead[0]}." if instead else "")
+                    + " (The target configure didn't reach Kconfig; this comes from the "
+                    "Kconfig trees at both refs: zmig changes.)",
+                    analyzer=self.name,
+                    scope=ctx.scope,
+                    evidence=tuple(ev),
+                    old=ctx.old_config.get(sym),
+                    new={
+                        "candidates": [
+                            {
+                                "symbol": n,
+                                "why": "the deprecated symbol's help text names it",
+                                "confidence": "medium",
+                            }
+                            for n in instead
+                        ]
+                    }
+                    if instead
+                    else None,
+                    heuristics=("changes.lexical",),
+                )
+            )
+        return findings
 
     def _kconfig(
         self, ctx: ScanContext, removed: dict[str, Any], reported: set[tuple[str, str]]
@@ -203,6 +267,31 @@ class ChangesAnalyzer:
             add(Category.KCONFIG, "read-symbol-removed", sym, title, Severity.BREAKING, ev, cands,
                 "#ifdef/IS_ENABLED() on it is now always false; use")  # fmt: skip
         return findings
+
+
+def project_kconfig_references(
+    ctx: ScanContext, symbols: set[str]
+) -> dict[str, list[tuple[str, int, str]]]:
+    """{symbol: [(path shown, line, text)]} of references to `symbols` in the project's own
+    Kconfig files that the source build parsed (zephyr/kconfig/sources.txt): the app's and
+    the project's modules', not Zephyr's."""
+    sources = ctx.old_img.dir / "zephyr" / "kconfig" / "sources.txt"
+    if not sources.is_file():
+        return {}
+    roots = project_roots(ctx.old, ctx.old_img.dir)
+    out: dict[str, list[tuple[str, int, str]]] = {}
+    for raw in dict.fromkeys(sources.read_text().split()):
+        path = os.path.normpath(raw)
+        shown = project_path(path, roots)
+        if shown is None:
+            continue
+        try:
+            text = Path(path).read_text()
+        except (OSError, UnicodeDecodeError):
+            continue
+        for line, sym, code in kconfig_references(text, symbols):
+            out.setdefault(sym, []).append((shown, line, code))
+    return out
 
 
 def bound_compatible(edt: dict[str, Any], token: str) -> str | None:

@@ -12,6 +12,8 @@ fails before Kconfig or devicetree. Kconfig:
                  intermediate renames to a symbol the target defines (A -> B -> C)
   conditions     each candidate's `depends on` lines and enclosing `if` blocks at the
                  target, so a scan can pick the one its build enables
+  deprecated     symbols whose block selects DEPRECATED at the target and not at the
+                 source (STD_C11 at v4.4.0), with replacements their help text names
 
 Devicetree bindings, the same way: every `compatible:` line under dts/bindings at each
 ref, removed compatibles, and their replacements from the commits that removed them (a
@@ -43,7 +45,7 @@ if TYPE_CHECKING:
     from zmig.refs import Mirror
     from zmig.tools import Runner
 
-CHANGES_VERSION = 4
+CHANGES_VERSION = 5
 _DEF = re.compile(r"^\s*(?:menu)?config\s+([A-Z0-9_]+)\s*$")
 _DEF_GREP = r"^\s*(menu)?config\s+[A-Z0-9_]+\s*$"
 _KCONFIG_PATHS = ("*Kconfig*",)
@@ -51,6 +53,13 @@ _KCONFIG_PATHS = ("*Kconfig*",)
 COMPAT = re.compile(r'^compatible:\s*"?([\w,.+-]+)"?\s*(?:#.*)?$')
 _COMPAT_GREP = r"^compatible:"
 _BINDING_PATHS = ("dts/bindings",)
+# `config` lines and `select DEPRECATED`, in file order: the select belongs to the block above.
+_DEPRECATED_GREP = r"^\s*(menu)?config\s+[A-Z0-9_]+\s*$|^\s*select\s+DEPRECATED\b"
+_SELECT_DEPRECATED = re.compile(r"^\s*select\s+DEPRECATED\b")
+# Kconfig lines whose expression references other symbols.
+_REF_LINE = re.compile(
+    r"^\s*(default|def_bool|def_tristate|select|imply|depends\s+on|visible\s+if|if|range)\b"
+)
 # A path into another module: `${ZEPHYR_TF_PSA_CRYPTO_MODULE_DIR}/drivers/...`.
 _GLUE_PATH = re.compile(r"\$\{ZEPHYR_([A-Z0-9_]+)_MODULE_DIR\}/")
 _GLUE_GREP = r"\$\{ZEPHYR_[A-Z0-9_]+_MODULE_DIR\}/"
@@ -109,6 +118,43 @@ def parse_definitions(grep_out: str) -> dict[str, list[str]]:
         if len(parts) == 4 and (m := _DEF.match(parts[3])):
             defs.setdefault(m[1], []).append(f"{parts[1]}:{parts[2]}")
     return defs
+
+
+def parse_deprecated(grep_out: str) -> dict[str, str]:
+    """`git grep -n` of `config` and `select DEPRECATED` lines -> {deprecated symbol:
+    "path:line" of its definition}."""
+    out: dict[str, str] = {}
+    last: dict[str, tuple[str, str]] = {}
+    for line in grep_out.splitlines():
+        parts = line.split(":", 3)
+        if len(parts) < 4:
+            continue
+        if m := _DEF.match(parts[3]):
+            last[parts[1]] = (m[1], f"{parts[1]}:{parts[2]}")
+        elif _SELECT_DEPRECATED.match(parts[3]) and parts[1] in last:
+            sym, loc = last[parts[1]]
+            out.setdefault(sym, loc)
+    return out
+
+
+def newly_deprecated(source: dict[str, str], target: dict[str, str]) -> dict[str, Any]:
+    """Symbols deprecated at the target and not at the source."""
+    return {s: {"defined_at": loc} for s, loc in sorted(target.items()) if s not in source}
+
+
+def kconfig_references(text: str, symbols: set[str]) -> list[tuple[int, str, str]]:
+    """(line, symbol, line text) of each reference to `symbols` in a Kconfig file's
+    expressions (`default`, `select`, `depends on`, ...), not in comments or `config` lines
+    (ardep's `choice STD_C` / `default STD_C11` override, A2a)."""
+    out = []
+    for i, raw in enumerate(text.splitlines(), 1):
+        code = raw.split("#", 1)[0]
+        if not _REF_LINE.match(code):
+            continue
+        for sym in dict.fromkeys(re.findall(r"\b[A-Z][A-Z0-9_]*\b", code)):
+            if sym in symbols:
+                out.append((i, sym, raw.strip()))
+    return out
 
 
 def glue_paths(grep_out: str) -> dict[str, dict[str, str]]:
@@ -427,6 +473,12 @@ def definitions(mirror: Mirror, runner: Runner, sha: str) -> dict[str, list[str]
     )
 
 
+def deprecated_table(mirror: Mirror, runner: Runner, sha: str) -> dict[str, str]:
+    return parse_deprecated(
+        _git(mirror, runner, "grep", "-n", "-E", _DEPRECATED_GREP, sha, "--", *_KCONFIG_PATHS)
+    )
+
+
 def glue_references(mirror: Mirror, runner: Runner, sha: str) -> str:
     return _git(mirror, runner, "grep", "-n", "-E", _GLUE_GREP, sha, "--", "modules")
 
@@ -466,13 +518,23 @@ def build(mirror: Mirror, runner: Runner, old_sha: str, new_sha: str) -> dict[st
 
         return read
 
+    read_target = reader(new_sha)
+    deprecated = newly_deprecated(
+        deprecated_table(mirror, runner, old_sha), deprecated_table(mirror, runner, new_sha)
+    )
+    for sym, entry in deprecated.items():
+        text = read_target(entry["defined_at"].rpartition(":")[0])
+        entry["instead"] = [n for n in help_replacements(text, sym) if n in target] if text else []
     return {
         "schema": CHANGES_VERSION,
         "from": old_sha,
         "to": new_sha,
-        "kconfig": kconfig_changes(
-            source, target, parse_pairs(log(*_KCONFIG_PATHS)), reader(new_sha), reader(old_sha)
-        ),
+        "kconfig": {
+            **kconfig_changes(
+                source, target, parse_pairs(log(*_KCONFIG_PATHS)), read_target, reader(old_sha)
+            ),
+            "deprecated": deprecated,
+        },
         "devicetree": compat_changes(*compats, parse_pairs(log(*_BINDING_PATHS), COMPAT)),
         "modules": {
             "glue_paths": glue_paths(glue_references(mirror, runner, new_sha)),

@@ -240,3 +240,43 @@ changed.
 | Precision | 8/8 → **10/10** | 23/23 → **25/25** |
 | Actionable | 2 | 9 |
 | Fix-actionable | 1 | 6 |
+
+## 11. Addendum (2026-10-30): ardep A2 (tuned)
+
+**What changed.**
+- **Database (v5):** it records symbols newly deprecated at the target, those whose block
+  gains `select DEPRECATED`. v4.3.0 → v4.4.0 has 47, `STD_C11` among them.
+- **`changes` analyzer:** when the target has no `.config`, it reports the kconfig
+  analyzer's `symbol-deprecated` (same kind and subject) for a newly deprecated symbol
+  that the source build enables.
+- **Evidence:** the project's assignments, plus references in its own Kconfig files
+  (`default`, `select`, `depends on`, …). Those files are read from the source build's
+  `zephyr/kconfig/sources.txt`.
+
+**ardep:** `KCONFIG-SYMBOL-DEPRECATED-ae676b9e` (risky) at `prj.conf:9` (A2b),
+`ardep/boards/mercedes/ardep/Kconfig.uds:19` (A2a, `default STD_C11` in the `choice STD_C`
+override) and `ardep/modules/iso14229/Kconfig:10` (`depends on STD_C11 || …`, unchanged
+by the maintainers).
+- **A2: partly (d) → caught.** It's actionable, but not fix-actionable: no replacement is
+  named, and the maintainers moved to `STD_C17`.
+- **True** (oracle A2).
+
+**OpenDeck scan** (the gate): `KCONFIG-SYMBOL-DEPRECATED-ddcedfef`, `CONFIG_RING_BUFFER`,
+at `zlibs/module/src/drivers/uart_hw/Kconfig:5` (`select RING_BUFFER`).
+- **Verdict: confirmed hazard, not in the oracle.** At the target, `RING_BUFFER` became
+  "Restore legacy claim/finish and item ring buffer APIs [DEPRECATED]"
+  (`lib/utils/Kconfig:39-41`). At the source it was "Ring buffers". The project's driver,
+  which the source build parsed with `RING_BUFFER=y`, would select a deprecated legacy
+  mode at the target.
+- OpenDeck scan precision 11/11 → **12/12** (tuned). Recall is unchanged.
+
+**Re-scan** (`eval/runs/a2`, all 14 configurations; OpenDeck scan and plan): nothing else
+changed.
+
+| | ardep, tuned | Held-out total (13), tuned |
+|---|---|---|
+| Strict | 3 → **4** | 7 → **8** |
+| Lenient | 5 | 9 |
+| Precision | 8/8 → **9/9** | 25/25 → **26/26** |
+| Actionable | 5 | 9 |
+| Fix-actionable | 3 | 6 |

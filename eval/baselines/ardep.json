@@ -1,6 +1,6 @@
 {
  "config": "ardep",
- "scored": "DOGFOOD-11 §9 (A3, tuned)",
+ "scored": "DOGFOOD-11 §11 (A2, tuned)",
  "schema_version": "1.5",
  "verdict": "unknown",
  "findings": [
@@ -93,6 +93,15 @@
    "title": "MCUboot moves from 96576b341ee1 (96576b34) to ee39e2d694bd (ee39e2d6); the bootloader image's SBOM isn't available",
    "action": "Read MCUboot's release notes for that range; image format, swap and signature changes need the bootloader and app updated together.",
    "files": ""
+  },
+  {
+   "id": "KCONFIG-SYMBOL-DEPRECATED-ae676b9e",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "symbol-deprecated",
+   "title": "CONFIG_STD_C11 is deprecated in v4.4.0",
+   "action": "In prj.conf:9, ardep/boards/mercedes/ardep/Kconfig.uds:19, ardep/modules/iso14229/Kconfig:10: move off it before the release that removes it. (The target configure didn't reach Kconfig; this comes from the Kconfig trees at both refs: zmig changes.)",
+   "files": "ardep/boards/mercedes/ardep/Kconfig.uds ardep/modules/iso14229/Kconfig prj.conf"
   },
   {
    "id": "KCONFIG-SYMBOL-REMOVED-57758c3d",

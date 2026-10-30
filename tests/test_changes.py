@@ -400,6 +400,7 @@ def test_an_empty_symbol_table_is_an_error_not_no_changes(monkeypatch: pytest.Mo
         mod, "definitions", lambda m, r, sha: {} if sha == "bad" else {"A": ["x:1"]}
     )
     monkeypatch.setattr(mod, "glue_references", lambda m, r, sha: "")
+    monkeypatch.setattr(mod, "deprecated_table", lambda m, r, sha: {})
     monkeypatch.setattr(mod, "binding_table", lambda m, r, sha: {"v,a": "y:1"})
     with pytest.raises(ZmigError, match="no Kconfig symbols"):
         mod.build(SimpleNamespace(path="m"), SimpleNamespace(), "good", "bad")  # type: ignore[arg-type]
@@ -661,4 +662,80 @@ def test_a_change_database_that_cant_be_built_is_reported_not_silent(
     assert f.new is None
     assert [(n.area, "0123456789ab" in n.reason) for n in res.not_checked] == [
         ("change database", True)
+    ]
+
+
+def test_newly_deprecated_symbols_from_the_tree() -> None:
+    """ardep A2: STD_C11 gains `select DEPRECATED` at v4.4.0. The `select` belongs to the
+    `config` block above it in the same file; a symbol deprecated at both refs isn't new."""
+    from zmig.changes import newly_deprecated, parse_deprecated
+
+    src = parse_deprecated(
+        "v4.3.0:Kconfig.zephyr:403:config STD_C11\n"
+        "v4.3.0:Kconfig.zephyr:409:config STD_C17\n"
+        "v4.3.0:drivers/x/Kconfig:3:config OLD_ONE\n"
+        "v4.3.0:drivers/x/Kconfig:5:\tselect DEPRECATED\n"
+    )
+    tgt = parse_deprecated(
+        "v4.4.0:Kconfig.zephyr:435:config STD_C11\n"
+        "v4.4.0:Kconfig.zephyr:437:\tselect DEPRECATED\n"
+        "v4.4.0:Kconfig.zephyr:442:config STD_C17\n"
+        "v4.4.0:drivers/x/Kconfig:3:config OLD_ONE\n"
+        "v4.4.0:drivers/x/Kconfig:5:\tselect DEPRECATED\n"
+    )
+    assert src == {"OLD_ONE": "drivers/x/Kconfig:3"}
+    assert newly_deprecated(src, tgt) == {"STD_C11": {"defined_at": "Kconfig.zephyr:435"}}
+
+
+def test_project_kconfig_references() -> None:
+    """ardep A2a: `default STD_C11` in the board's `choice STD_C` override
+    (Kconfig.uds:19) references the symbol; comments and `config` lines don't."""
+    from zmig.changes import kconfig_references
+
+    text = (
+        "choice STD_C\n    default STD_C11 # requirement for external iso14229 module\n"
+        "endchoice\nconfig STD_C11_USER\n    depends on UDS && !STD_C11\n"
+        "# default STD_C11 in a comment\nconfig STD_C11\n"
+    )
+    assert kconfig_references(text, {"STD_C11"}) == [
+        (2, "STD_C11", "default STD_C11 # requirement for external iso14229 module"),
+        (5, "STD_C11", "depends on UDS && !STD_C11"),
+    ]
+
+
+def test_changes_analyzer_reports_a_newly_deprecated_symbol_the_project_uses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ardep A2: the target never reached Kconfig, so the kconfig analyzer's
+    `symbol-deprecated` comes from the tree, with the assignment (A2b, prj.conf:9) and the
+    project Kconfig reference (A2a, Kconfig.uds:19) as evidence. Only for a symbol the
+    source build enables."""
+    from zmig.analyzers import changes as mod
+    from zmig.findings import Category, Severity, make_id
+    from zmig.usage import Loc
+
+    db = {"kconfig": {"removed": {}, "deprecated": {"STD_C11": {"defined_at": "Kconfig.zephyr:435"},
+                                                    "OFF_SYM": {"defined_at": "x:1"}}},
+          "devicetree": {"removed": {}}}  # fmt: skip
+    monkeypatch.setattr(mod, "database", lambda ctx: db)
+    monkeypatch.setattr(mod, "project_roots", lambda b, d: {str(tmp_path / "ardep"): "ardep/"})
+    ctx = _ctx(tmp_path, target_configured=False)
+    uds = tmp_path / "ardep" / "boards" / "mercedes" / "ardep" / "Kconfig.uds"
+    uds.write_text("choice STD_C\n    default STD_C11\n    default OFF_SYM\nendchoice\n")
+    (ctx.old_img.dir / "zephyr" / "kconfig").mkdir(parents=True)
+    (ctx.old_img.dir / "zephyr" / "kconfig" / "sources.txt").write_text(
+        f"{uds}\n/ws/zephyr/Kconfig\n"
+    )
+    ctx.old_config = {**ctx.old_config, "STD_C11": "y", "OFF_SYM": "n"}
+    ctx.usage.kconfig_set = {"STD_C11": [(Loc("prj.conf", 9, "CONFIG_STD_C11=y"), "y")]}
+    found = [
+        f for f in mod.ChangesAnalyzer().analyze(ctx).findings if f.kind == "symbol-deprecated"
+    ]
+    assert len(found) == 1
+    f = found[0]
+    assert f.id == make_id(Category.KCONFIG, "symbol-deprecated", "CONFIG_STD_C11", ("s",))
+    assert f.severity is Severity.RISKY
+    assert [(e["path"], e["line"]) for e in f.evidence if e["type"] == "file_line"] == [
+        ("prj.conf", 9),
+        ("ardep/boards/mercedes/ardep/Kconfig.uds", 2),
     ]
