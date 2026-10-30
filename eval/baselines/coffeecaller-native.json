@@ -1,9 +1,27 @@
 {
  "config": "coffeecaller-native",
- "scored": "DOGFOOD-11 (zmig 983fe98, tuned)",
+ "scored": "DOGFOOD-11 §10 (C1, tuned)",
  "schema_version": "1.5",
  "verdict": "direct-ok",
  "findings": [
+  {
+   "id": "BUILD-INPUT-NOT-APPLIED-1423caeb",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "input-not-applied",
+   "title": "coffeecaller/boards/extensions/native_sim/native_sim.conf, a configuration fragment the v4.2.0 build merged, isn't merged at v4.4.0",
+   "action": "In coffeecaller/boards/extensions/native_sim/native_sim.conf:1: v4.4.0 no longer picks this file up from where it is, so what it sets is silently lost. Apply it explicitly (EXTRA_CONF_FILE or EXTRA_DTC_OVERLAY_FILE), or move it to where v4.4.0 looks for it (for a board's files: the board's directory, or a board variant).",
+   "files": "coffeecaller/boards/extensions/native_sim/native_sim.conf"
+  },
+  {
+   "id": "BUILD-INPUT-NOT-APPLIED-a3a66af1",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "input-not-applied",
+   "title": "coffeecaller/boards/extensions/native_sim/native_sim.overlay, a devicetree overlay the v4.2.0 build applied, isn't applied at v4.4.0",
+   "action": "In coffeecaller/boards/extensions/native_sim/native_sim.overlay:1: v4.4.0 no longer picks this file up from where it is, so what it sets is silently lost. Apply it explicitly (EXTRA_CONF_FILE or EXTRA_DTC_OVERLAY_FILE), or move it to where v4.4.0 looks for it (for a board's files: the board's directory, or a board variant).",
+   "files": "coffeecaller/boards/extensions/native_sim/native_sim.overlay"
+  },
   {
    "id": "BUILD-TARGET-BUILD-FAILED-acc08695",
    "severity": "breaking",

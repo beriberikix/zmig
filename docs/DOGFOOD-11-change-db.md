@@ -208,3 +208,35 @@ changed, and `compare` exits 0.
 | Precision | 8/8 | 23/23 |
 | Actionable | 4 → **5** | 8 → **9** |
 | Fix-actionable | 2 → **3** | 5 → **6** |
+
+## 10. Addendum (2026-10-30): CoffeeCaller C1 (tuned)
+
+**What changed.** A new risky finding, `input-not-applied` (buildlog): a project
+configuration fragment or devicetree overlay that the source build applied and the
+unmodified target build doesn't.
+- The data comes from the configure logs' "Merged configuration" and "Found devicetree
+  overlay" lines, as DOGFOOD-10 §4 proposed.
+- Fragments are judged only when the target merged any, and overlays only when it
+  generated a devicetree.
+
+**CoffeeCaller** gets `BUILD-INPUT-NOT-APPLIED-1423caeb` (`native_sim.conf`, C1b) and
+`-a3a66af1` (`native_sim.overlay`, C1a).
+- **Both are true**, per the oracle's observed logs.
+- **C1: partly (b) → caught.** Each part has a finding at its file that says it is no
+  longer applied, and how to apply it again.
+- **Judgement call:** the finding doesn't say why (Zephyr `c02c6add101` dropped HWMv1
+  extension handling). The cause condition counts as met because a reader knows what to
+  change.
+- **Not fix-actionable:** the maintainers made a board variant, which the action offers
+  only as one of the options.
+
+**Re-scan** (`eval/runs/c1`, all 14 configurations; OpenDeck scan and plan): nothing else
+changed.
+
+| | CoffeeCaller, tuned | Held-out total (13), tuned |
+|---|---|---|
+| Strict | 1 → **2** | 6 → **7** |
+| Lenient | 2 | 9 |
+| Precision | 8/8 → **10/10** | 23/23 → **25/25** |
+| Actionable | 2 | 9 |
+| Fix-actionable | 1 | 6 |

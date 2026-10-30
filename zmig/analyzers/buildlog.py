@@ -16,7 +16,14 @@ from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact, BuildContext, is_host_board, project_path, project_roots
-from zmig.diagnostics import BuildWarning, app_relative, compiler_sites, parse_log, parse_warnings
+from zmig.diagnostics import (
+    BuildWarning,
+    LogFacts,
+    app_relative,
+    compiler_sites,
+    parse_log,
+    parse_warnings,
+)
 from zmig.errors import ArtifactMissing
 from zmig.findings import (
     JSON,
@@ -276,6 +283,33 @@ def _yaml_line(text: str, where: list[Any]) -> int:
     return line
 
 
+def inputs_not_applied(
+    old: LogFacts,
+    new: LogFacts,
+    old_roots: dict[str, str],
+    new_roots: dict[str, str],
+    target_dts: bool,
+) -> list[tuple[str, str]]:
+    """The project's own configuration fragments and devicetree overlays the source build
+    applied and the unmodified target build doesn't, as (path shown, what). Fragments are
+    judged only if the target merged any (it reached Kconfig), overlays only if it
+    generated a devicetree (regression: CoffeeCaller's boards/extensions/native_sim/ files,
+    silently dropped at v4.4.0, DOGFOOD-10 §4)."""
+
+    def shown(paths: tuple[str, ...], roots: dict[str, str]) -> set[str]:
+        return {s for p in paths if (s := project_path(os.path.normpath(p), roots))}
+
+    out = []
+    for what, before, after, judged in (
+        ("configuration fragment", old.configs, new.configs, bool(new.configs)),
+        ("devicetree overlay", old.overlays, new.overlays, target_dts),
+    ):
+        if judged:
+            gone = shown(before, old_roots) - shown(after, new_roots)
+            out += [(path, what) for path in sorted(gone)]
+    return out
+
+
 # add(kind, subject, title, severity, action, evidence, old, new)
 Add = Callable[..., None]
 _COMPILER_ERROR = re.compile(
@@ -332,6 +366,35 @@ class BuildlogAnalyzer:
             )
 
         findings += self._kconfig_definitions(ctx)
+        raw = ctx.new_raw_img
+        if raw is not None:
+            target_dts = raw.has(Artifact.EDT)
+            for path, what in inputs_not_applied(
+                ctx.old_facts,
+                ctx.new_raw_facts,
+                project_roots(ctx.old, ctx.old_img.dir),
+                project_roots(ctx.new_raw, raw.dir),
+                target_dts,
+            ):
+                verb = "merged" if what == "configuration fragment" else "applied"
+                add(
+                    "input-not-applied",
+                    path,
+                    f"{path}, a {what} the {ctx.old_spec} build {verb}, isn't {verb} at "
+                    f"{ctx.new_spec}",
+                    Severity.RISKY,
+                    f"{ctx.new_spec} no longer picks this file up from where it is, so "
+                    f"what it sets is silently lost. Apply it explicitly (EXTRA_CONF_FILE or "
+                    f"EXTRA_DTC_OVERLAY_FILE), or move it to where {ctx.new_spec} looks for "
+                    f"it (for a board's files: the board's directory, or a board variant).",
+                    (
+                        file_line(path, 1, f"{what} {verb} at {ctx.old_spec}"),
+                        tool_output(
+                            "configure logs",
+                            f"{ctx.old_spec}: {verb} ({what}); {ctx.new_spec}: not {verb}",
+                        ),
+                    ),
+                )
         salvaged = " (after salvage)" if ctx.salvage else ""
         log = ctx.new_img.log.read_text()
         if ctx.new_img.status == "configure-failed":

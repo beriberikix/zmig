@@ -255,7 +255,7 @@ sha = "2b0a8f25b168680b883ab0df4d4ec87264c367cd"  # 0aefa36^1, parent of PR #16 
 
 [configs.coffeecaller-native]
 oracle = "docs/oracles/coffeecaller.md"
-scored = "DOGFOOD-11 (zmig 983fe98, tuned)"
+scored = "DOGFOOD-11 §10 (C1, tuned)"
 app = "{src:coffeecaller}/applications/coffeecaller"
 board = "native_sim"
 from = "v4.2.0"

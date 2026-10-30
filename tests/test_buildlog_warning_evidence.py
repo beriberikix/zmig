@@ -151,3 +151,31 @@ def test_a_malformed_board_yml_names_the_missing_property(tmp_path: Path) -> Non
     ((path, line, msg),) = board_yaml_causes(log, new, old, roots)
     assert line == 5 and "`full_name`" in msg and "$.boards[1]" in msg
     assert board_yaml_causes("no such error", new, old, roots) == []
+
+
+def test_project_inputs_the_source_applied_and_the_target_does_not() -> None:
+    """CoffeeCaller C1 (DOGFOOD-10 §4): v4.4.0 no longer applies boards/extensions/, so
+    native_sim.conf and native_sim.overlay, merged and applied at v4.2.0, are silently
+    ignored. Only judged where the target got that far: Kconfig merged anything (for
+    fragments), a devicetree was generated (for overlays). Zephyr's and generated files
+    aren't the project's."""
+    from zmig.analyzers.buildlog import inputs_not_applied
+    from zmig.diagnostics import LogFacts
+
+    old = LogFacts(
+        overlays=("/m/cc/boards/extensions/native_sim/native_sim.overlay",),
+        configs=(
+            "/m/cc/boards/extensions/native_sim/native_sim.conf",
+            "/s/app/prj.conf",
+            "/s/build/zephyr/misc/generated/extra_kconfig_options.conf",
+        ),
+    )
+    new = LogFacts(configs=("/t/app/prj.conf", "/t/build/extra_kconfig_options.conf"))
+    old_roots = {"/s/app": "", "/m/cc": "cc/"}
+    new_roots = {"/t/app": "", "/m/cc": "cc/"}
+    assert inputs_not_applied(old, new, old_roots, new_roots, target_dts=True) == [
+        ("cc/boards/extensions/native_sim/native_sim.conf", "configuration fragment"),
+        ("cc/boards/extensions/native_sim/native_sim.overlay", "devicetree overlay"),
+    ]
+    # The target never reached Kconfig or devicetree: nothing can be judged.
+    assert inputs_not_applied(old, LogFacts(), old_roots, new_roots, target_dts=False) == []
