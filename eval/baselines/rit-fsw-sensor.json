@@ -1,0 +1,125 @@
+{
+ "config": "rit-fsw-sensor",
+ "scored": "DOGFOOD-8 (zmig d0567c6, clean)",
+ "schema_version": "1.4",
+ "verdict": "unknown",
+ "findings": [
+  {
+   "id": "BUILD-TARGET-CONFIGURE-FAILED-0aa05f03",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "target-configure-failed",
+   "title": "The target configure fails: error: Aborting due to Kconfig warnings",
+   "action": "Fix the error in the evidence (often a board or toolchain change), then rerun; Kconfig and devicetree analysis need a configured target.",
+   "files": ""
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-b38002c0",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "alias rtc (/soc/rtc@40002800) changed: clocks",
+   "action": "Check these property changes against how your code uses the node.",
+   "files": "include/c_sensing_tenant.h include/c_sensor_module.h"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-c97add6b",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "alias imu (/soc/i2c@40005c00/lsm6dsl@6b) changed: irq-gpios",
+   "action": "Check these property changes against how your code uses the node.",
+   "files": "src/c_sensing_tenant.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-d42c45e0",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "alias magnetometer (/soc/i2c@40005c00/lis3mdl@1c) changed: irq-gpios",
+   "action": "Check these property changes against how your code uses the node.",
+   "files": "src/c_sensing_tenant.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-e569c9c3",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "alias thermometer (/soc/i2c@40005c00/tmp117@48) changed: (binding)",
+   "action": "Check these property changes against how your code uses the node.",
+   "files": "src/c_sensing_tenant.cpp"
+  },
+  {
+   "id": "DEVICETREE-OTHER-NODES-37d58d7a",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "other-nodes",
+   "title": "25 nodes your app doesn't reference changed, disappeared or appeared; 9 more nodes only changed binding",
+   "action": "None needed unless you start using them.",
+   "files": ""
+  },
+  {
+   "id": "GUIDE-COVERAGE-def043d8",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "coverage",
+   "title": "Read 160 entries from 2 documents; 1 touch your app",
+   "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+   "files": ""
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-7f0cd344",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.2 migration guide (Sensors): ti,tmp116 has been renamed to ti,tmp11x because it supports tmp116, tmp117 and tmp119.",
+   "action": "The guide says ti,tmp116 was renamed to ti,tmp11x: \"ti,tmp116 has been renamed to ti,tmp11x because it supports tmp116, tmp117 and tmp119.\"",
+   "files": "src/c_sensing_tenant.cpp"
+  },
+  {
+   "id": "IMAGES-IMAGES-SUMMARY-3a1f8601",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "images-summary",
+   "title": "1 image at v4.2.0: sensor_module (app)",
+   "action": "Per-image findings follow, grouped by image.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-42893b08",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module cmsis_6, which the build uses, moves from 783317a30725 to 06d952b6713a",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-a41ca17d",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module cmsis, which the build uses, moves from d1b8b20b6278 to 512cc7e895e8",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-af50181f",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module littlefs, which the build uses, moves from ed0531d59ee3 to 8f5ca3478433",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-c4f4f8cc",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module hal_stm32, which the build uses, moves from 55043bcc35ff to 1e753266ddfb",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  }
+ ]
+}

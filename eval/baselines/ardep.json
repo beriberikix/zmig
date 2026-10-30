@@ -1,0 +1,134 @@
+{
+ "config": "ardep",
+ "scored": "DOGFOOD-8 (zmig d0567c6, clean)",
+ "schema_version": "1.4",
+ "verdict": "unknown",
+ "findings": [
+  {
+   "id": "API-MACRO-CHANGED-7feea320",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "macro-changed",
+   "title": "Macro va_start, which your code uses, changed: function-like macro, 2 parameter(s) → function-like macro, 1 parameter(s)",
+   "action": "Update every use to the new parameters.",
+   "files": "ardep/modules/iso14229/drv.c"
+  },
+  {
+   "id": "BUILD-TARGET-CONFIGURE-FAILED-3e867c18",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "target-configure-failed",
+   "title": "The target configure fails: CMake Error at $ZMIG_CACHE/workspaces/684c9e8f32e4373a21098559f748f06915f950c9/zephyr/cmake/modules/boards.cmake:191 (message):",
+   "action": "Fix the error in the evidence (often a board or toolchain change), then rerun; Kconfig and devicetree analysis need a configured target.",
+   "files": ""
+  },
+  {
+   "id": "GUIDE-COVERAGE-3429ba69",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "coverage",
+   "title": "Read 192 entries from 2 documents; 4 touch your app",
+   "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+   "files": ""
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-12a8832a",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Mbed TLS): The following Mbed TLS Kconfig symbols have been removed [MBEDTLS_CIPHER_AES_ENABLED]",
+   "action": "Read MG-4.4-0171 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-3906323a",
+   "severity": "risky",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Build System): If your toolchain does not support this standard you will need to use one of the existing and now deprecated options: CONFIG_STD_C99 or CONFIG_STD_C11.",
+   "action": "Read MG-4.4-0005 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-8a9c7e10",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Kernel): Heap hardening support has been implemented by adding a build time generated zephyr/heap_constants.h file that is now included from kernel.h.",
+   "action": "Read MG-4.4-0010 and update the lines listed.",
+   "files": "src/authentication.c src/data_by_id.c src/dtc_information.c src/routine_control.c src/security_access.c"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-c99a2403",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 release notes (Removed APIs and options): Mbed TLS CONFIG_PSA_WANT_KEY_TYPE_DES CONFIG_PSA_WANT_ECC_SECP_K1_192 CONFIG_PSA_WANT_ECC_SECP_R1_192 CONFIG_PSA_WANT_ECC_SECP_R1_224 CONFIG_CUSTOM_MBEDTLS_CFG_",
+   "action": "Read RN-4.4-0003 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "IMAGES-IMAGES-SUMMARY-156ba0a3",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "images-summary",
+   "title": "1 image at v4.4.0: uds (app)",
+   "action": "Per-image findings follow, grouped by image.",
+   "files": ""
+  },
+  {
+   "id": "IMAGES-MCUBOOT-REVISION-e61caa5a",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "mcuboot-revision",
+   "title": "MCUboot moves from 96576b341ee1 (96576b34) to ee39e2d694bd (ee39e2d6); the bootloader image's SBOM isn't available",
+   "action": "Read MCUboot's release notes for that range; image format, swap and signature changes need the bootloader and app updated together.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-1c97c2e8",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module mbedtls, which the build uses, moves from c5b06d89c9c4 to a3e190fe44c7",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-58bf49e8",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module segger, which the build uses, moves from 9f08435a79d4 to 50892fdbcf2f",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-62d7154e",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module hal_st, which the build uses, moves from 9f81b4427e95 to 7a7928828472",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-83388d0a",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module hal_stm32, which the build uses, moves from 286dd285b5bb to 39130f29ae37",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-c7e5a6a4",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module mcuboot, which the build uses, moves from 96576b341ee1 to ee39e2d694bd",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  }
+ ]
+}

@@ -216,7 +216,7 @@ sha = "f7a43b10cd76930bf7cb24e4ca7987d8c1d02546"  # parent of the v4.2 bump 7aad
 
 [configs.ardep]
 oracle = "docs/oracles/ardep.md"
-scored = "not yet run"
+scored = "DOGFOOD-8 (zmig d0567c6, clean)"
 app = "{src:ardep}/samples/uds"
 board = "ardep"
 from = "v4.3.0"
@@ -231,7 +231,7 @@ cmake_args = [
 
 [configs.rit-fsw-sensor]
 oracle = "docs/oracles/rit-fsw.md"
-scored = "not yet run"
+scored = "DOGFOOD-8 (zmig d0567c6, clean)"
 app = "{src:rit-fsw}/app/backplane/sensor_module"
 app_patch = "eval/patches/rit-fsw-fsw-root.patch"  # FSW_ROOT from the command line
 board = "sensor_module"
@@ -255,7 +255,7 @@ sha = "2b0a8f25b168680b883ab0df4d4ec87264c367cd"  # 0aefa36^1, parent of PR #16 
 
 [configs.coffeecaller-native]
 oracle = "docs/oracles/coffeecaller.md"
-scored = "not yet run"
+scored = "DOGFOOD-8 (zmig d0567c6, clean)"
 app = "{src:coffeecaller}/applications/coffeecaller"
 board = "native_sim"
 from = "v4.2.0"

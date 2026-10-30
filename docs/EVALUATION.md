@@ -64,6 +64,9 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ | ″ | 9 | tuned (§10, §11) | 9 (100%) | 9 (100%) | 8/9 (89%) | 8/9 | — | — | DOGFOOD-5 §10–11 |
 | ″ | ″ | 9 | tuned (§10, §11, §11.4 hunk window) | 9 (100%) | 9 (100%) | 8/8 (100%) | 8/9 | — | — | DOGFOOD-5 §11.4 |
 | ″ | ″ | 9 | tuned (audit fixes, re-run at `aa95a10`) | 9 (100%) | 9 (100%) | 8/8 (100%) | 8/9 | — | — | DOGFOOD-6 |
+| **ardep** `samples/uds` (ardep) | v4.3.0 → v4.4.0 | 6 | **clean**: DOGFOOD-8 baseline | 0 | 3 (50%) | 4/5 (80%) | 0 (fix-actionable 0) | configure failed (`board.yml`) | unknown (low) | DOGFOOD-8 §2 |
+| **RIT FSW** `sensor_module` | v4.1.0 → v4.2.0 | 3 | **clean**: DOGFOOD-8 baseline | 0 | 1 (33%) | 3/6 (50%) | 0 (fix-actionable 0) | configure failed (Kconfig) | unknown (low) | DOGFOOD-8 §2 |
+| **CoffeeCaller** (native_sim) | v4.2.0 → v4.4.0 | 4 | **clean**: DOGFOOD-8 baseline | 0 | 2 (50%) | 3/4 (75%) | 0 (fix-actionable 0) | build failed (devicetree aliases) | direct-ok (low) | DOGFOOD-8 §2 |
 | **P1 fixtures** (`tests/fixtures/p1-layout`, `p1-mode`, `p1-rename`, `p1-ble`, `xapp*`) | v4.2.2 → v4.3.0 (constructed) | — | **tuned by construction** (written to exercise P1) | — | — | — | — | | each fixture's expected verdict (layout hazard, MCUboot mode, rename, BLE clean; cross-image) is asserted by `tests/test_p1_fixture.py`, `test_cross_fixture.py` | DESIGN-P1 §11 |
 
 ### Clean results only
@@ -75,6 +78,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | CANnectivity (C1, C2) | 6 | 2 (33%) | 4 (67%) | 14/19 (74%) | 0 |
 | OpenDeck scan | 5 | 0 | 2 (40%) | 11/22 (50%) | 0 |
 | OpenDeck plan (patches) | 9 | 6 (67%) | 9 (100%) | 8/15 (53%) | 0 |
+| Held-out 2026-10-30 (ardep, RIT FSW, CoffeeCaller; DOGFOOD-8) | 13 | 0 | 6 (46%) | 10/15 (67%) | 0 (fix-actionable 0) |
 
 Across every clean scan result, zmig names *what* breaks more often than *where to fix it*:
 **actionable was 0 on every clean measurement.** The only non-zero actionable figures are
