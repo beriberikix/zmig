@@ -182,3 +182,65 @@ to = "{src:zmk-zephyr-to}"
 sdk = "0.16.8"
 modules = ["hal_nordic", "cmsis", "tinycrypt", "lvgl"]
 cmake_args = ["-DSHIELD=corne_left nice_view_adapter nice_view"]
+
+# --- Held-out projects for PROPOSAL-CHANGE-DB (oracles frozen 2026-10-30, before any run) ----
+
+[sources.ardep]
+kind = "git"
+url = "https://github.com/mercedes-benz/ardep"
+sha = "5b6d3cacd2849cf5e787bda1a1ec48759db66540"  # parent of the v4.4.0 bump 266e0aa36e
+
+[sources.ardep-iso14229]
+kind = "git"
+dir = "iso14229"
+url = "https://github.com/frickly-systems/iso14229"
+sha = "50bea701694543c77099ebb82bd76b4919c9b010"  # branch `zephyr` tip on 2026-06-25
+
+[sources.ardep-zephyrboards]
+kind = "git"
+dir = "zephyrboards"
+url = "https://github.com/dragonlock2/zephyrboards"
+sha = "9443ad0ebe547a140ec54790687ae8b4d4e0cd34"  # ardep's west.yml pin, both sides
+
+[sources.ardep-cannectivity]
+kind = "git"
+dir = "cannectivity-v1.2.1"
+url = "https://github.com/CANnectivity/cannectivity"
+sha = "faad60d69338c1a0fa9c43b4f9febcb8488bd5ad"  # tag v1.2.1, the pre-bump pin
+
+[sources.rit-fsw]
+kind = "git"
+dir = "FSW"
+url = "https://github.com/RIT-Launch-Initiative/FSW"
+sha = "f7a43b10cd76930bf7cb24e4ca7987d8c1d02546"  # parent of the v4.2 bump 7aada9dfd3
+
+[configs.ardep]
+oracle = "docs/oracles/ardep.md"
+scored = "not yet run"
+app = "{src:ardep}/samples/uds"
+board = "ardep"
+from = "v4.3.0"
+to = "v4.4.0"
+# No `sdk`: v4.3.0 rejects SDK 1.x and v4.4.0 needs >= 1.0.0, so both go on CMAKE_PREFIX_PATH
+# and each ref picks the first compatible one.
+modules = ["cmsis_6", "hal_stm32", "segger", "hal_st", "mcuboot", "mbedtls", "littlefs"]
+cmake_args = [
+    "-DZEPHYR_EXTRA_MODULES={src:ardep};{src:ardep-iso14229};{src:ardep-zephyrboards};{src:ardep-cannectivity}",
+    "-DCMAKE_PREFIX_PATH={sdk:0.17.4};{sdk:1.0.1}",
+]
+
+[configs.rit-fsw-sensor]
+oracle = "docs/oracles/rit-fsw.md"
+scored = "not yet run"
+app = "{src:rit-fsw}/app/backplane/sensor_module"
+app_patch = "eval/patches/rit-fsw-fsw-root.patch"  # FSW_ROOT from the command line
+board = "sensor_module"
+from = "v4.1.0"
+to = "v4.2.0"
+sdk = "0.16.8"  # 0.17.4 fails in Zephyr v4.1.0's picolibc locks.c
+modules = ["cmsis", "cmsis_6", "hal_stm32", "littlefs"]
+cmake_args = [
+    "-DBOARD_ROOT={src:rit-fsw}",
+    "-DZEPHYR_EXTRA_MODULES={src:rit-fsw}",
+    "-DFSW_ROOT={src:rit-fsw}",
+]

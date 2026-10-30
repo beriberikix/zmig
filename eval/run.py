@@ -21,6 +21,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -98,7 +99,21 @@ def sources_of(cfg: dict[str, Any]) -> set[str]:
 
 
 def expand(value: str, paths: dict[str, Path]) -> str:
+    """{src:NAME}: a source checkout; {sdk:VERSION}: ~/.cache/zmig/sdks/zephyr-sdk-VERSION, for
+    configurations whose refs need different SDKs (Zephyr 4.3 rejects SDK 1.x, 4.4 needs it)."""
+    value = re.sub(r"\{sdk:([\w.]+)\}", lambda m: str(CACHE / "sdks" / f"zephyr-sdk-{m[1]}"), value)
     return re.sub(r"\{src:([\w-]+)\}", lambda m: str(paths[m[1]]), value)
+
+
+def patched_app(name: str, app: Path, patch: Path) -> Path:
+    """A fresh copy of `app` with `patch` (paths relative to the app directory) applied, for
+    apps that can't build from zmig's copy as they are (RIT FSW finds its repository by a
+    relative path out of the app directory). The copy keeps the app's directory name."""
+    dest = EVAL / "patched" / name / app.name
+    shutil.rmtree(dest.parent, ignore_errors=True)
+    shutil.copytree(app, dest, ignore=shutil.ignore_patterns(".git"))
+    git("apply", "-p1", str(patch), cwd=dest)
+    return dest
 
 
 # --- Running zmig ----------------------------------------------------------------------------
@@ -134,7 +149,9 @@ def zmig_cwd(ref: str | None) -> Path:
     return REPO if ref is None else EVAL / "zmig" / git("rev-parse", ref, cwd=REPO)[:12]
 
 
-def scan(configs: dict[str, Any], names: list[str], out: Path, ref: str | None) -> None:
+def scan(
+    configs: dict[str, Any], names: list[str], out: Path, ref: str | None, analyzers: str | None
+) -> None:
     allc = configs["configs"]
     prefix, env, commit = zmig_command(ref)
     out.mkdir(parents=True, exist_ok=True)
@@ -142,9 +159,12 @@ def scan(configs: dict[str, Any], names: list[str], out: Path, ref: str | None) 
     for name in names:
         cfg = allc[name]
         paths = {s: fetch_source(s, configs["sources"][s]) for s in sorted(sources_of(cfg))}
+        app = expand(cfg["app"], paths)
+        if "app_patch" in cfg:
+            app = str(patched_app(name, Path(app), REPO / cfg["app_patch"]))
         argv = [
             *prefix, "scan",
-            "--app", expand(cfg["app"], paths),
+            "--app", app,
             "--board", cfg["board"],
             "--from", expand(cfg["from"], paths),
             "--to", expand(cfg["to"], paths),
@@ -154,6 +174,10 @@ def scan(configs: dict[str, Any], names: list[str], out: Path, ref: str | None) 
         for m in cfg.get("modules", []):
             argv += ["--module", m]
         argv += [f"--cmake-arg={expand(a, paths)}" for a in cfg.get("cmake_args", [])]
+        if analyzers is not None:
+            # "none": a verification build only (no findings), for checking an invocation on a
+            # held-out project before its oracle is committed (ORACLE-RULES §1.4).
+            argv += ["--analyzers", analyzers]
         dest = out / name
         argv += ["--out", str(dest)]
         start = time.monotonic()
@@ -252,6 +276,7 @@ def main() -> int:
     s = sub.add_parser("scan")
     s.add_argument("--out", type=Path, required=True)
     s.add_argument("--zmig", help="zmig commit to run (default: this checkout)")
+    s.add_argument("--analyzers", help='passed to zmig scan; "none" = verification build only')
     s.add_argument("configs", nargs="*")
     c = sub.add_parser("compare")
     c.add_argument("--out", type=Path, required=True)
@@ -269,7 +294,7 @@ def main() -> int:
         for src in sorted({s for x in names for s in sources_of(configs["configs"][x])}):
             print(fetch_source(src, configs["sources"][src]))
     elif args.cmd == "scan":
-        scan(configs, names, args.out, args.zmig)
+        scan(configs, names, args.out, args.zmig, args.analyzers)
     elif args.cmd == "compare":
         return compare(configs, names, args.out)
     elif args.cmd == "snapshot":

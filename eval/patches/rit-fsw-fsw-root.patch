@@ -1,0 +1,17 @@
+Let the app's CMakeLists.txt take FSW_ROOT from the command line. Upstream finds the
+repository by a relative path out of the app directory, which breaks in zmig's copy of the
+app (docs/oracles/rit-fsw.md, "App shim"). No bump file is in the app directory.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -4,7 +4,9 @@
+ # Copyright (c) 2023 Launch Initiative
+ # SPDX-License-Identifier: Apache-2.0
+ 
+-set(FSW_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
++if(NOT DEFINED FSW_ROOT)
++    set(FSW_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
++endif()
+ include(${FSW_ROOT}/cmake/Autocoders.cmake)
+ include(${FSW_ROOT}/cmake/Snippets.cmake)
+ 
