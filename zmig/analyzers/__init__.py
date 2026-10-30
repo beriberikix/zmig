@@ -223,9 +223,17 @@ def build_inputs(base: ScanContext) -> set[str] | None:
             if deps.is_file():
                 found = True
                 paths += [t.rstrip(":") for t in deps.read_text().split() if t != "\\"]
+            # Fragments outside the app directory (a project's boards/extensions/) are cited
+            # relative to the user's app, `../../boards/...` (zmig.usage, user_files), so
+            # record that form too (regression: CoffeeCaller's native_sim.conf was judged
+            # unused although the source build merged it, DOGFOOD-8 B1).
+            app = b.spec.app.resolve()
             for p in paths:
-                if rel := project_path(os.path.normpath(p), roots):
+                norm = os.path.normpath(p)
+                if rel := project_path(norm, roots):
                     out.add(rel)
+                if os.path.isabs(norm) and (up := os.path.relpath(norm, app)).startswith(".."):
+                    out.add(up.replace(os.sep, "/"))
     return out if found else None
 
 

@@ -369,7 +369,8 @@ def test_findings_only_in_unused_input_files_become_info(tmp_path: Path) -> None
         f"empty_file.o: \\\n /ws/zephyr/boards/st/nucleo_h563zi/nucleo_h563zi.dts \\\n {app}/app.overlay\n"
     )
     img = SimpleNamespace(dir=img_dir, log=log)
-    b = SimpleNamespace(src=app, workspace=SimpleNamespace(root=tmp_path / "ws"), images=(img,))
+    b = SimpleNamespace(src=app, workspace=SimpleNamespace(root=tmp_path / "ws"), images=(img,),
+                        spec=SimpleNamespace(app=app))  # fmt: skip
     # The source build compiled src/main.c and the header it includes (ninja's records).
     base = SimpleNamespace(old=b, new=b, new_raw=b, build_files={"src/main.c", "src/app.h"})
 
@@ -405,7 +406,10 @@ def test_findings_only_in_uncompiled_sources_become_info(tmp_path: Path) -> None
     (tmp_path / "zephyr" / "zephyr.dts.d").write_text("")
     img = SimpleNamespace(dir=tmp_path, log=log)
     b = SimpleNamespace(
-        src=tmp_path / "app", workspace=SimpleNamespace(root=tmp_path), images=(img,)
+        src=tmp_path / "app",
+        workspace=SimpleNamespace(root=tmp_path),
+        images=(img,),
+        spec=SimpleNamespace(app=tmp_path / "app"),
     )
 
     def finding(*paths: str, image: str | None = None) -> Finding:
@@ -845,3 +849,42 @@ def test_dependency_expression_changes_are_one_info_finding(
     }
     (vnt,) = [f for f in found if f.kind == "value-not-taken"]
     assert "NET_IPV4 || NET_IPV6" in vnt.action and "NET_IPV4" in vnt.action
+
+
+def test_fragments_outside_the_app_dir_count_as_used(tmp_path: Path) -> None:
+    """DOGFOOD-8 B1, CoffeeCaller: the source build merged
+    <project>/boards/extensions/native_sim/native_sim.conf. Kconfig usage cites it relative
+    to the app (`../../boards/...`), so it must match that form, not be judged unused."""
+    from dataclasses import replace
+
+    from zmig.analyzers import outside_build
+    from zmig.findings import Category, Confidence, Finding, Severity, file_line
+
+    project = tmp_path / "CoffeeCaller"
+    app = project / "applications" / "coffeecaller"
+    frag = project / "boards" / "extensions" / "native_sim" / "native_sim.conf"
+    frag.parent.mkdir(parents=True)
+    frag.write_text("CONFIG_NATIVE_UART_0_ON_STDINOUT=y\n")
+    app.mkdir(parents=True)
+    img_dir = tmp_path / "build"
+    (img_dir / "zephyr").mkdir(parents=True)
+    log = img_dir / "log"
+    log.write_text(
+        f"Merged configuration '{frag}'\nMerged configuration '{tmp_path}/copy/prj.conf'\n"
+    )
+    (img_dir / "zephyr" / "zephyr.dts.d").write_text("")
+    img = SimpleNamespace(dir=img_dir, log=log)
+    b = SimpleNamespace(src=tmp_path / "copy", workspace=SimpleNamespace(root=tmp_path / "ws"),
+                        images=(img,), spec=SimpleNamespace(app=app))  # fmt: skip
+    base = SimpleNamespace(old=b, new=b, new_raw=b, build_files=None)
+    f = Finding(Category.KCONFIG, "symbol-removed", "CONFIG_NATIVE_UART_0_ON_STDINOUT", "t",
+                Severity.BREAKING, Confidence.HIGH, "a", "kconfig", ("s",),
+                evidence=(file_line("../../boards/extensions/native_sim/native_sim.conf", 11, "x"),))  # fmt: skip
+    other = replace(
+        f,
+        subject="CONFIG_B",
+        evidence=(file_line("../../boards/extensions/other/other.conf", 1, "x"),),
+    )
+    out = outside_build([f, other], base)  # type: ignore[arg-type]
+    assert out[0].severity is Severity.BREAKING
+    assert out[1].severity is Severity.INFO  # a fragment no build merged is still judged unused
