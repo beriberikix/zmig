@@ -182,7 +182,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--symbol",
         action="append",
         default=[],
-        help="only this removed symbol (with or without CONFIG_; repeatable)",
+        help="only this removed symbol (with or without CONFIG_) or compatible (vnd,name); "
+        "repeatable",
     )
 
     watch = sub.add_parser(
@@ -664,14 +665,27 @@ def cmd_changes(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     old, new = resolve_ref(args.from_ref, cache, runner), resolve_ref(args.to_ref, cache, runner)
     db = load_or_build(new.mirror, runner, cache.root, old.ref.sha, new.ref.sha)
     removed = db["kconfig"]["removed"]
-    want = {s.removeprefix("CONFIG_") for s in args.symbol}
-    if want:
-        unknown = sorted(want - removed.keys())
+    compats = db["devicetree"]["removed"]
+    # A name with a comma is a compatible (vnd,name); anything else a Kconfig symbol.
+    want = {s.removeprefix("CONFIG_") for s in args.symbol if "," not in s}
+    want_dt = {s for s in args.symbol if "," in s}
+    if want or want_dt:
+        unknown = sorted((want - removed.keys()) | (want_dt - compats.keys()))
         if unknown:
             raise UsageError(f"not removed between the refs: {', '.join(unknown)}")
         removed = {k: v for k, v in removed.items() if k in want}
+        compats = {k: v for k, v in compats.items() if k in want_dt}
     if args.format == "json":
-        print(json.dumps({**db, "kconfig": {**db["kconfig"], "removed": removed}}, indent=1))
+        print(
+            json.dumps(
+                {
+                    **db,
+                    "kconfig": {**db["kconfig"], "removed": removed},
+                    "devicetree": {**db["devicetree"], "removed": compats},
+                },
+                indent=1,
+            )
+        )
         return EXIT_OK
     k = db["kconfig"]
     named = sum(1 for v in k["removed"].values() if v["candidates"])
@@ -689,6 +703,22 @@ def cmd_changes(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
             cond = f"; if {' && '.join(c['conditions'])}" if c["conditions"] else ""
             commit = f", {c['commit'][:12]}" if c["commit"] else ""
             print(f"    -> CONFIG_{c['symbol']} ({c['how']}{commit}{via}{cond})")
+        if not cands:
+            print("    -> (no replacement found)")
+    d = db["devicetree"]
+    named = sum(1 for v in d["removed"].values() if v["candidates"])
+    print(
+        f"Bindings, {args.from_ref} -> {args.to_ref}: {len(d['removed'])} compatibles removed "
+        f"({named} with a replacement), {d['added']} added"
+    )
+    for compat, v in compats.items():
+        cands = v["candidates"]
+        if not cands and not want_dt:
+            continue
+        print(f"  {compat} ({v['defined_at']})")
+        for c in cands[:3]:
+            commit = f", {c['commit'][:12]}" if c["commit"] else ""
+            print(f"    -> {c['symbol']} ({c['how']}{commit})")
         if not cands:
             print("    -> (no replacement found)")
     return EXIT_OK

@@ -71,3 +71,19 @@ def test_resolve() -> None:
     assert resolve(NodeRef("label", "i2c0", "child@1"), edt) == "/i2c@0/child@1"
     assert resolve(NodeRef("label", "nope"), edt) is None
     assert dt_token("zephyr,native-linux-can") == "zephyr_native_linux_can"
+
+
+def test_project_dts_outside_the_app_adds_only_compatibles(tmp_path: Path) -> None:
+    """RIT FSW F1a: the board DTS is the project's (a module of its own), outside the app.
+    Its compatibles are indexed under the path evidence uses; its nodes aren't the app's
+    references, so nothing else is."""
+    app = tmp_path / "app"
+    app.mkdir()
+    dts = tmp_path / "FSW" / "boards" / "sensor_module.dts"
+    dts.parent.mkdir(parents=True)
+    dts.write_text('/ {\n\ttmp117: tmp117@48 {\n\t\tcompatible = "ti,tmp116";\n\t};\n};\n')
+    u = scan(app, project_dts=[("fsw/boards/sensor_module.dts", dts)])
+    assert [(loc.path, loc.line) for loc in u.dt_compats["ti_tmp116"]] == [
+        ("fsw/boards/sensor_module.dts", 3)
+    ]
+    assert u.dt_nodes == [] and u.dt_props_set == []

@@ -1,4 +1,5 @@
-"""Removed Kconfig symbols the project uses, when the target never reached Kconfig.
+"""Removed Kconfig symbols and compatibles the project uses, when the target build never
+got that far.
 
 The kconfig analyzer compares both builds' .config and symbol dumps, so it is skipped when
 the target configure fails before Kconfig. The two Zephyr trees still say which symbols
@@ -9,10 +10,14 @@ analyzer looks those facts up for what the source build shows the project uses:
   a symbol the project's Kconfig re-declares  kconfig-override-orphaned (buildlog's kind)
   a symbol the project's code reads           read-symbol-removed       (kconfig's kind)
 
+Likewise the devicetree analyzer's `compatible-unbound`, when the target has no
+devicetree: a compatible the app or the project's own DTS uses (zmig.usage, project_dts),
+bound by a binding at the source, whose binding the Zephyr tree no longer has.
+
 Same category, kind and subject as those analyzers, so a finding has the same ID whether
-or not the target configured. It runs only when the target has no .config, and skips a
-subject an earlier analyzer already reported. Candidates are ranked by the conditions the
-source build satisfies (zmig.changes.choose).
+or not the target configured. Each part runs only when the target lacks the artifact its
+analyzer needs, and skips a subject an earlier analyzer already reported. Kconfig
+candidates are ranked by the conditions the source build satisfies (zmig.changes.choose).
 """
 
 from __future__ import annotations
@@ -25,9 +30,10 @@ from zmig.buildctx import Artifact, project_path, project_roots
 from zmig.changes import choose, load_or_build
 from zmig.findings import JSON, Category, Confidence, Finding, Severity, file_line, tool_output
 from zmig.scan import ScanContext
+from zmig.usage import Loc, dt_token
 
 
-def _database(ctx: ScanContext) -> dict[str, Any]:
+def database(ctx: ScanContext) -> dict[str, Any]:
     mirror = ctx.new.workspace.resolved.mirror
     return load_or_build(
         mirror,
@@ -41,16 +47,39 @@ def _database(ctx: ScanContext) -> dict[str, Any]:
 class ChangesAnalyzer:
     name: ClassVar[str] = "changes"
     kind: ClassVar[Literal["build"]] = "build"
-    # Only the source build is needed; the point is the target's missing .config.
+    # Only the source build is needed; the point is what the target build lacks.
     requires: ClassVar[frozenset[Artifact]] = frozenset()
 
     def analyze(self, ctx: ScanContext) -> AnalyzerResult:
-        if not ctx.is_app or ctx.new_img.has(Artifact.CONFIG):
-            return AnalyzerResult([])  # the kconfig analyzer covers a configured target
-        if not ctx.old_img.has(Artifact.CONFIG):
-            return AnalyzerResult.skipped("the source build has no .config")
-        removed: dict[str, Any] = _database(ctx)["kconfig"]["removed"]
+        # The kconfig and devicetree analyzers cover what the target build generated.
+        need_kconfig = not ctx.new_img.has(Artifact.CONFIG)
+        need_dts = not ctx.new_img.has(Artifact.EDT)
+        if not ctx.is_app or not (need_kconfig or need_dts):
+            return AnalyzerResult([])
+        kconfig = need_kconfig and ctx.old_img.has(Artifact.CONFIG)
+        dts = need_dts and ctx.old_img.has(Artifact.EDT)
+        if not (kconfig or dts):
+            what = ".config" if need_kconfig else "devicetree"
+            return AnalyzerResult.skipped(f"the source build has no {what}")
+        db = database(ctx)
         reported = {(f.kind, f.subject) for f in ctx.prior}
+        findings: list[Finding] = []
+        if kconfig:
+            findings += self._kconfig(ctx, db["kconfig"]["removed"], reported)
+        if dts:
+            gone = db["devicetree"]["removed"]
+            for token, locs in sorted(ctx.usage.dt_compats.items()):
+                compat = bound_compatible(ctx.old_edt, token)
+                if compat and compat in gone and ("compatible-unbound", token) not in reported:
+                    lexical = ("changes.lexical",)
+                    findings.append(
+                        unbound_compatible(ctx, token, compat, locs, gone, self.name, lexical)
+                    )
+        return AnalyzerResult(findings)
+
+    def _kconfig(
+        self, ctx: ScanContext, removed: dict[str, Any], reported: set[tuple[str, str]]
+    ) -> list[Finding]:
         ok, ov = ctx.old_kconfig, ctx.old_config
         findings: list[Finding] = []
         handled: set[str] = set()
@@ -135,7 +164,66 @@ class ChangesAnalyzer:
             cands = choose(removed[sym]["candidates"], ov)
             add(Category.KCONFIG, "read-symbol-removed", sym, title, Severity.BREAKING, ev, cands,
                 "#ifdef/IS_ENABLED() on it is now always false; use")  # fmt: skip
-        return AnalyzerResult(findings)
+        return findings
+
+
+def bound_compatible(edt: dict[str, Any], token: str) -> str | None:
+    """The compatible, spelled as written, through which a binding matches a node in
+    `edt` for this dt_token, or None if no node is bound through it."""
+    return next(
+        (
+            n["matching_compat"]
+            for n in edt["nodes"].values()
+            if n["matching_compat"] and dt_token(n["matching_compat"]) == token
+        ),
+        None,
+    )
+
+
+def unbound_compatible(
+    ctx: ScanContext,
+    token: str,
+    compat: str,
+    locs: list[Loc],
+    removed: dict[str, Any],
+    analyzer: str,
+    heuristics: tuple[str, ...] = (),
+) -> Finding:
+    """The devicetree analyzer's `compatible-unbound`, with the binding's replacement when
+    the change database names one (`removed`: its devicetree part)."""
+    cands = removed.get(compat, {}).get("candidates", [])
+    payload = [
+        {"symbol": c["symbol"], "why": _why(c),
+         "confidence": "medium" if len(cands) == 1 and c["how"] != "same commit" else "low"}
+        for c in cands
+    ]  # fmt: skip
+    action = "The compatible was renamed or its binding removed; check the migration guide."
+    if payload:
+        action = f"Use {payload[0]['symbol']} ({payload[0]['why']})."
+        if len(payload) > 1:
+            action += f" Other candidates: {', '.join(c['symbol'] for c in payload[1:])}."
+    evidence: tuple[JSON, ...] = tuple(file_line(loc.path, loc.line, loc.text) for loc in locs)
+    if compat in removed:
+        facts = (
+            f"{compat} is bound by {removed[compat]['defined_at']} at the source; no binding "
+            "in the Zephyr tree has it at the target"
+        )
+        evidence += (tool_output("Bindings at both refs", ctx.runner.redact(facts)),)
+    return Finding(
+        category=Category.DEVICETREE,
+        kind="compatible-unbound",
+        subject=token,
+        title=f"No node matches compatible {token} through a binding in {ctx.new_spec}",
+        severity=Severity.BREAKING,
+        confidence=Confidence.MEDIUM,
+        action=action,
+        analyzer=analyzer,
+        scope=ctx.scope,
+        evidence=evidence,
+        old=compat,
+        new={"candidates": payload} if payload else None,
+        heuristics=("devicetree.compat-by-matching-node", *heuristics),
+    )
 
 
 def _why(c: dict[str, Any]) -> str:

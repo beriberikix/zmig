@@ -40,7 +40,8 @@ _FN_POINTER = re.compile(r"\s*\(\*\s*(?:const\s*|volatile\s*)*\)\s*")
 # Actions that only say "go and find the replacement": dropped once the fix names it.
 _GENERIC = re.compile(
     r"^(?:Find its replacement in the migration guides\.|Remove the assignment, or find its "
-    r"replacement in the migration guides\.|Read [A-Z]+-[\d.]+-\d+ and update the lines listed\.)"
+    r"replacement in the migration guides\.|Read [A-Z]+-[\d.]+-\d+ and update the lines listed\.|"
+    r"Use [\w,.+-]+ \([^)]*\)\.)"
     r"\s*"
 )
 MAX_PLACES = 3
@@ -164,6 +165,15 @@ def _derive(f: Finding, by_id: dict[str, Finding], ctx: ScanContext) -> JSON | N
     ):
         if fx := _kconfig(f, by_id, place):
             return fx
+    elif f.kind == "compatible-unbound" and isinstance(f.old, str) and new.get("candidates"):
+        # The edit only on a line that names the compatible (DOGFOOD-9 D1).
+        c = new["candidates"][0]
+        quoted = re.compile(rf'"{re.escape(f.old)}"')
+        at = next((p for p in places if quoted.search(p[2])), None)
+        if at is not None:
+            conf = _cap(f.confidence, Confidence(c["confidence"]))
+            renamed = quoted.sub(f'"{c["symbol"]}"', at[2])
+            return _fix(at, at[2], renamed, f"bindings: {c['why']}", conf)
     elif f.kind == "entry-match" and (r := _guide_rename(f)):
         # Only a line that contains the old name can take the edit (DOGFOOD-9 D1: RIT's
         # `DEVICE_DT_GET(DT_ALIAS(thermometer))` is where the node is used, not named).

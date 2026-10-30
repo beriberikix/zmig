@@ -146,9 +146,32 @@ class ScanContext:
             def keep(rel: str) -> bool:
                 return not (rel.startswith(SYSBUILD_DIR + "/") or rel == "sysbuild.conf")
 
-            return usage_scan(app, include=keep, conf_files=conf)
+            return usage_scan(app, include=keep, conf_files=conf, project_dts=self.project_dts)
         applied = set(app_relative(self.old_facts.overlays + self.old_facts.configs, self.old.src))
-        return usage_scan(app, include=lambda rel: rel in applied, conf_files=conf)
+        return usage_scan(
+            app, include=lambda rel: rel in applied, conf_files=conf, project_dts=self.project_dts
+        )
+
+    @cached_property
+    def project_dts(self) -> list[tuple[str, Path]]:
+        """The project's devicetree files outside the app that this image's source build
+        read (zephyr.dts.d): a board or DTS root of the project's own module, as
+        (`<module>/...` as evidence shows it, file). The app's own files are indexed
+        anyway; Zephyr's and other modules' aren't the project's."""
+        deps = self.old_img.dir / "zephyr" / "zephyr.dts.d"
+        if not deps.is_file():
+            return []
+        roots = project_roots(self.old, self.old_img.dir)
+        out: dict[str, Path] = {}
+        for tok in deps.read_text().split():
+            path = os.path.normpath(tok.rstrip(":"))
+            if not path.endswith((".dts", ".dtsi", ".overlay")):
+                continue
+            if path.startswith(f"{self.old.src}/"):
+                continue  # the app's own
+            if shown := project_path(path, roots):
+                out.setdefault(shown, Path(path))
+        return sorted(out.items())
 
     @cached_property
     def build_files(self) -> set[str] | None:

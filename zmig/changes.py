@@ -1,7 +1,7 @@
 """What changed between two Zephyr refs, from the tree alone (docs/DESIGN-CHANGE-DB.md).
 
-Step 1: Kconfig. Facts that need no build of either ref, so scans can use them when the
-target configure fails before Kconfig:
+Facts that need no build of either ref, so scans can use them when the target configure
+fails before Kconfig or devicetree. Kconfig:
 
   symbol table   every `config`/`menuconfig` definition in the tree at each ref (lexical:
                  `git grep`; symbols Zephyr generates, and module trees, aren't in it)
@@ -12,6 +12,10 @@ target configure fails before Kconfig:
                  intermediate renames to a symbol the target defines (A -> B -> C)
   conditions     each candidate's `depends on` lines and enclosing `if` blocks at the
                  target, so a scan can pick the one its build enables
+
+Devicetree bindings, the same way: every `compatible:` line under dts/bindings at each
+ref, removed compatibles, and their replacements from the commits that removed them (a
+binding file renamed with its compatible, `ti,tmp116.yaml` -> `ti,tmp11x.yaml`).
 
 Computed once per (source SHA, target SHA) and cached as JSON.
 """
@@ -31,10 +35,14 @@ if TYPE_CHECKING:
     from zmig.refs import Mirror
     from zmig.tools import Runner
 
-CHANGES_VERSION = 2
+CHANGES_VERSION = 3
 _DEF = re.compile(r"^\s*(?:menu)?config\s+([A-Z0-9_]+)\s*$")
 _DEF_GREP = r"^\s*(menu)?config\s+[A-Z0-9_]+\s*$"
 _KCONFIG_PATHS = ("*Kconfig*",)
+# A binding's `compatible: "vnd,name"` (quoted or not).
+COMPAT = re.compile(r'^compatible:\s*"?([\w,.+-]+)"?\s*(?:#.*)?$')
+_COMPAT_GREP = r"^compatible:"
+_BINDING_PATHS = ("dts/bindings",)
 # Symbols Zephyr generates at configure time; a lexical table can't speak for them.
 _GENERATED = re.compile(r"^(DT_HAS_\w+_ENABLED|ZEPHYR_\w+_MODULE(_BLOBS)?)$")
 _KEYWORD = re.compile(
@@ -67,24 +75,26 @@ class Candidate:
 # --- pure parsing ------------------------------------------------------------------------------
 
 
-def parse_table(grep_out: str) -> dict[str, str]:
-    """`git grep -n` output ("ref:path:line:text") -> {symbol: "path:line"}, first wins."""
+def parse_table(grep_out: str, pattern: re.Pattern[str] = _DEF) -> dict[str, str]:
+    """`git grep -n` output ("ref:path:line:text") -> {name: "path:line"}, first wins; the
+    name is `pattern`'s group 1 (a Kconfig symbol, or a binding's compatible)."""
     table: dict[str, str] = {}
     for line in grep_out.splitlines():
         parts = line.split(":", 3)
         if len(parts) < 4:
             continue
-        m = _DEF.match(parts[3])
+        m = pattern.match(parts[3])
         if m:
             table.setdefault(m[1], f"{parts[1]}:{parts[2]}")
     return table
 
 
-def parse_pairs(log: str) -> dict[str, list[tuple[str, str, str]]]:
+def parse_pairs(log: str, pattern: re.Pattern[str] = _DEF) -> dict[str, list[tuple[str, str, str]]]:
     """`git log -M --format='commit %H' -p -U0` over Kconfig files -> {removed symbol:
     [(added symbol, commit, "same hunk" | "same commit")]}. A symbol whose `config` line a
     hunk removes and another `config` line the same hunk adds is a rename; anything else
-    the same commit adds is a weaker candidate."""
+    the same commit adds is a weaker candidate. Bindings pair the same way on their
+    `compatible:` lines (pattern=COMPAT)."""
     out: dict[str, list[tuple[str, str, str]]] = {}
 
     def flush(commit: str, hunks: list[tuple[list[str], list[str]]]) -> None:
@@ -112,7 +122,7 @@ def parse_pairs(log: str) -> dict[str, list[tuple[str, str, str]]]:
             hunks.append(([], []))
         elif line.startswith(("---", "+++")):
             continue
-        elif line[:1] in "+-" and hunks and (m := _DEF.match(line[1:])):
+        elif line[:1] in "+-" and hunks and (m := pattern.match(line[1:])):
             hunks[-1][0 if line[0] == "-" else 1].append(m[1])
     if commit:
         flush(commit, hunks)
@@ -242,6 +252,26 @@ def kconfig_changes(
     }
 
 
+def compat_changes(
+    source: dict[str, str],
+    target: dict[str, str],
+    pairs: dict[str, list[tuple[str, str, str]]],
+) -> dict[str, Any]:
+    """The devicetree part of the database: compatibles a binding in the Zephyr tree has
+    at the source and none has at the target, with their ranked replacements."""
+    removed: dict[str, Any] = {}
+    for compat in sorted(source.keys() - target.keys()):
+        cands = rank(compat, pairs, target)
+        for c in cands:
+            c.defined_at = target[c.symbol]
+        removed[compat] = {"defined_at": source[compat], "candidates": [asdict(c) for c in cands]}
+    return {
+        "removed": removed,
+        "added": len(target.keys() - source.keys()),
+        "compatibles": {"source": len(source), "target": len(target)},
+    }
+
+
 # --- choosing a replacement for one build ------------------------------------------------------
 
 _TOKEN = re.compile(r'\s*(&&|\|\||!=|<=|>=|[!()=<>]|"[^"]*"|[A-Za-z0-9_]+)')
@@ -341,16 +371,31 @@ def symbol_table(mirror: Mirror, runner: Runner, sha: str) -> dict[str, str]:
     )
 
 
+def binding_table(mirror: Mirror, runner: Runner, sha: str) -> dict[str, str]:
+    return parse_table(
+        _git(mirror, runner, "grep", "-n", "-E", _COMPAT_GREP, sha, "--", *_BINDING_PATHS),
+        COMPAT,
+    )
+
+
 def build(mirror: Mirror, runner: Runner, old_sha: str, new_sha: str) -> dict[str, Any]:
     source = symbol_table(mirror, runner, old_sha)
     target = symbol_table(mirror, runner, new_sha)
-    for sha, table in ((old_sha, source), (new_sha, target)):
+    compats = binding_table(mirror, runner, old_sha), binding_table(mirror, runner, new_sha)
+    for what, sha, table in (
+        ("Kconfig symbols", old_sha, source),
+        ("Kconfig symbols", new_sha, target),
+        ("binding compatibles", old_sha, compats[0]),
+        ("binding compatibles", new_sha, compats[1]),
+    ):
         if not table:
             # Never let a failed grep read as "nothing changed" (AUDIT §4: text layers must
             # fail loudly, not return less).
-            raise ZmigError(f"no Kconfig symbols found at {sha[:12]} in {mirror.path}")
-    log = _git(mirror, runner, "log", "-M", "--format=commit %H", "-p", "-U0",
-               f"{old_sha}..{new_sha}", "--", *_KCONFIG_PATHS)  # fmt: skip
+            raise ZmigError(f"no {what} found at {sha[:12]} in {mirror.path}")
+
+    def log(*paths: str) -> str:
+        return _git(mirror, runner, "log", "-M", "--format=commit %H", "-p", "-U0",
+                    f"{old_sha}..{new_sha}", "--", *paths)  # fmt: skip
 
     def reader(sha: str) -> Any:
         def read(path: str) -> str | None:
@@ -366,8 +411,9 @@ def build(mirror: Mirror, runner: Runner, old_sha: str, new_sha: str) -> dict[st
         "from": old_sha,
         "to": new_sha,
         "kconfig": kconfig_changes(
-            source, target, parse_pairs(log), reader(new_sha), reader(old_sha)
+            source, target, parse_pairs(log(*_KCONFIG_PATHS)), reader(new_sha), reader(old_sha)
         ),
+        "devicetree": compat_changes(*compats, parse_pairs(log(*_BINDING_PATHS), COMPAT)),
     }
 
 

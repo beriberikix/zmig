@@ -10,7 +10,15 @@ from typing import Any
 
 import pytest
 
-from zmig.changes import conditions, kconfig_changes, parse_pairs, parse_table, rank
+from zmig.changes import (
+    COMPAT,
+    compat_changes,
+    conditions,
+    kconfig_changes,
+    parse_pairs,
+    parse_table,
+    rank,
+)
 
 # `git log -M -p -U0` of 231b2a0c19f "drivers: sensor: rename tmp116 to tmp11x" (RIT FSW F1c),
 # trimmed to the Kconfig hunks.
@@ -158,8 +166,13 @@ def test_held_out_renames_on_the_real_tree(tmp_path: Path) -> None:
     assert "CAN_STM32_FDCAN" in by["CAN_STM32_FDCAN_MAX_STD_ID_FILTERS"]["conditions"]
     assert "CAN_STM32_BXCAN" in by["CAN_STM32_BXCAN_MAX_STD_ID_FILTERS"]["conditions"]
     a, b = (resolve_ref(t, cache, runner).ref.sha for t in ("v4.1.0", "v4.2.0"))
-    tmp = build(mirror, runner, a, b)["kconfig"]["removed"]["TMP116"]["candidates"]
+    db = build(mirror, runner, a, b)
+    tmp = db["kconfig"]["removed"]["TMP116"]["candidates"]
     assert tmp[0]["symbol"] == "TMP11X" and tmp[0]["how"] == "same hunk"
+    # RIT FSW F1a/F1b: the binding files were renamed with their compatibles.
+    dt = db["devicetree"]["removed"]
+    assert [c["symbol"] for c in dt["ti,tmp116"]["candidates"]] == ["ti,tmp11x"]
+    assert [c["symbol"] for c in dt["ti,tmp116-eeprom"]["candidates"]] == ["ti,tmp11x-eeprom"]
 
 
 def test_big_restructuring_commits_give_no_same_commit_candidates() -> None:
@@ -335,7 +348,7 @@ def test_changes_analyzer_reports_what_the_skipped_kconfig_analyzer_would(
     from zmig.analyzers import changes as mod
     from zmig.findings import Category, Severity, make_id
 
-    monkeypatch.setattr(mod, "_database", lambda ctx: DB)
+    monkeypatch.setattr(mod, "database", lambda ctx: DB)
     monkeypatch.setattr(mod, "project_roots", lambda b, d: {str(tmp_path / "ardep"): "ardep/"})
     ctx = _ctx(tmp_path, target_configured=False)
     found = {f.kind: f for f in mod.ChangesAnalyzer().analyze(ctx).findings}
@@ -370,7 +383,7 @@ def test_changes_analyzer_stays_out_when_the_target_configured(
 ) -> None:
     from zmig.analyzers import changes as mod
 
-    monkeypatch.setattr(mod, "_database", lambda ctx: DB)
+    monkeypatch.setattr(mod, "database", lambda ctx: DB)
     assert mod.ChangesAnalyzer().analyze(_ctx(tmp_path, target_configured=True)).findings == []
 
 
@@ -383,5 +396,156 @@ def test_an_empty_symbol_table_is_an_error_not_no_changes(monkeypatch: pytest.Mo
     from zmig.errors import ZmigError
 
     monkeypatch.setattr(mod, "symbol_table", lambda m, r, sha: {} if sha == "bad" else {"A": "x:1"})
+    monkeypatch.setattr(mod, "binding_table", lambda m, r, sha: {"v,a": "y:1"})
     with pytest.raises(ZmigError, match="no Kconfig symbols"):
         mod.build(SimpleNamespace(path="m"), SimpleNamespace(), "good", "bad")  # type: ignore[arg-type]
+
+
+# `git log -M -p -U0 -- dts/bindings` of 231b2a0c19f (RIT FSW F1a/F1b), trimmed.
+BINDING_LOG = """\
+commit 231b2a0c19fc
+diff --git a/dts/bindings/mtd/ti,tmp116-eeprom.yaml b/dts/bindings/mtd/ti,tmp11x-eeprom.yaml
+similarity index 85%
+rename from dts/bindings/mtd/ti,tmp116-eeprom.yaml
+rename to dts/bindings/mtd/ti,tmp11x-eeprom.yaml
+--- a/dts/bindings/mtd/ti,tmp116-eeprom.yaml
++++ b/dts/bindings/mtd/ti,tmp11x-eeprom.yaml
+@@ -6 +6 @@
+-compatible: "ti,tmp116-eeprom"
++compatible: "ti,tmp11x-eeprom"
+diff --git a/dts/bindings/sensor/ti,tmp116.yaml b/dts/bindings/sensor/ti,tmp11x.yaml
+--- a/dts/bindings/sensor/ti,tmp116.yaml
++++ b/dts/bindings/sensor/ti,tmp11x.yaml
+@@ -6 +6 @@
+-compatible: "ti,tmp116"
++compatible: "ti,tmp11x"
+"""
+
+
+def test_binding_table_and_renamed_compatibles() -> None:
+    """DESIGN-CHANGE-DB §2.3: compatibles from the bindings' `compatible:` lines; a binding
+    file renamed with its compatible pairs them, each with its own (not the sibling's)."""
+    table = parse_table(
+        'v4.1.0:dts/bindings/sensor/ti,tmp116.yaml:6:compatible: "ti,tmp116"\n'
+        "v4.1.0:dts/bindings/x/vnd,plain.yaml:3:compatible: vnd,plain # unquoted\n",
+        COMPAT,
+    )
+    assert table == {
+        "ti,tmp116": "dts/bindings/sensor/ti,tmp116.yaml:6",
+        "vnd,plain": "dts/bindings/x/vnd,plain.yaml:3",
+    }
+    db = compat_changes(
+        {"ti,tmp116": "s:6", "ti,tmp116-eeprom": "e:6", "vnd,keep": "k:1"},
+        {"ti,tmp11x": "s2:6", "ti,tmp11x-eeprom": "e2:6", "vnd,keep": "k:1"},
+        parse_pairs(BINDING_LOG, COMPAT),
+    )
+    rem = db["removed"]
+    assert sorted(rem) == ["ti,tmp116", "ti,tmp116-eeprom"]
+    assert [(c["symbol"], c["how"], c["defined_at"]) for c in rem["ti,tmp116"]["candidates"]] == [
+        ("ti,tmp11x", "same hunk", "s2:6")
+    ]
+    assert [c["symbol"] for c in rem["ti,tmp116-eeprom"]["candidates"]] == ["ti,tmp11x-eeprom"]
+
+
+DT_DB = {
+    "kconfig": {"removed": {}, "added": 0, "symbols": {}},
+    "devicetree": {"removed": {
+        "ti,tmp116": {"defined_at": "dts/bindings/sensor/ti,tmp116.yaml:6", "candidates": [
+            {"symbol": "ti,tmp11x", "commit": "231b2a0c19fc", "how": "same hunk", "similarity": 0.89,
+             "via": [], "defined_at": "dts/bindings/sensor/ti,tmp11x.yaml:6", "conditions": []}]},
+    }},
+}  # fmt: skip
+BOARD_DTS = "fsw/boards/arm/sensor_module/sensor_module.dts"
+
+
+def _edt(matching: str | None) -> dict[str, Any]:
+    node = {"name": "tmp117@48", "labels": ["tmp117"], "aliases": [], "compats": ["ti,tmp116"],
+            "matching_compat": matching, "status": "okay", "ord": 5, "binding": None,
+            "props": {}, "raw_props": [], "raw_values": {}, "specs": {}}  # fmt: skip
+    return {"nodes": {"/soc/i2c@40005400/tmp117@48": node}, "chosen": {}}
+
+
+def _dt_ctx(tmp_path: Path, target_edt: bool) -> Any:
+    from types import SimpleNamespace
+
+    from zmig.buildctx import Artifact
+    from zmig.diagnostics import parse_log
+    from zmig.usage import Loc
+
+    return SimpleNamespace(
+        is_app=True,
+        old_edt=_edt("ti,tmp116"), new_edt=_edt(None),
+        old_facts=parse_log(""), new_raw_facts=parse_log(""),
+        new_raw=SimpleNamespace(src=tmp_path),
+        old_img=SimpleNamespace(dir=tmp_path / "b", has=lambda a: a in (Artifact.CONFIG, Artifact.EDT)),
+        new_img=SimpleNamespace(dir=tmp_path / "c", has=lambda a: target_edt and a is Artifact.EDT),
+        old_config={}, old_kconfig={},
+        old=SimpleNamespace(workspace=SimpleNamespace(zephyr=tmp_path / "ws"), src=tmp_path / "app"),
+        usage=SimpleNamespace(
+            app=tmp_path, dt_props_set=[], dt_props_read=[], dt_nodes=[], kconfig_set={}, kconfig_read={},
+            dt_compats={"ti_tmp116": [Loc(BOARD_DTS, 202, 'compatible = "ti,tmp116"; /* TMP117 */')]},
+        ),
+        build_files=set(), old_spec="v4.1.0", new_spec="v4.2.0", scope=("s",), prior=[],
+        runner=SimpleNamespace(redact=lambda s: s),
+    )  # fmt: skip
+
+
+def test_a_renamed_compatible_in_a_project_board_dts_gets_its_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """RIT FSW F1a: the target generated its devicetree, so the devicetree analyzer reports
+    `ti,tmp116` unbound at the board DTS; the database adds `ti,tmp11x`, and the fix is the
+    line edit."""
+    from zmig.analyzers import devicetree as dt
+    from zmig.fixes import apply_fixes
+
+    monkeypatch.setattr(dt, "_compat_database", lambda ctx: DT_DB)
+    found = [f for f in dt.DevicetreeAnalyzer().analyze(_dt_ctx(tmp_path, True)).findings
+             if f.kind == "compatible-unbound"]  # fmt: skip
+    assert len(found) == 1
+    f = found[0]
+    assert f.subject == "ti_tmp116" and f.old == "ti,tmp116"
+    assert f.new["candidates"][0]["symbol"] == "ti,tmp11x"
+    fixed = apply_fixes([f], None)[0]  # type: ignore[arg-type]
+    assert fixed.fix["file"] == BOARD_DTS and fixed.fix["line"] == 202
+    assert fixed.fix["old"] == 'compatible = "ti,tmp116"; /* TMP117 */'
+    assert fixed.fix["new"] == 'compatible = "ti,tmp11x"; /* TMP117 */'
+    assert fixed.fix["confidence"] == "medium"
+    assert fixed.action.count("ti,tmp11x") == 1  # the edit names it; no second "Use ..."
+
+
+def test_changes_analyzer_reports_an_unbound_compatible_when_the_target_has_no_devicetree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The target stopped before generating its devicetree: the bindings table stands in
+    for the devicetree analyzer, with its ID. With the target devicetree, it stays out."""
+    from zmig.analyzers import changes as mod
+    from zmig.analyzers import devicetree as dt
+    from zmig.findings import Category, make_id
+
+    monkeypatch.setattr(mod, "database", lambda ctx: DT_DB)
+    monkeypatch.setattr(dt, "_compat_database", lambda ctx: DT_DB)
+    found = mod.ChangesAnalyzer().analyze(_dt_ctx(tmp_path, False)).findings
+    assert [f.kind for f in found] == ["compatible-unbound"]
+    f = found[0]
+    assert f.id == make_id(Category.DEVICETREE, "compatible-unbound", "ti_tmp116", ("s",))
+    assert f.old == "ti,tmp116" and f.new["candidates"][0]["symbol"] == "ti,tmp11x"
+    assert "changes.lexical" in f.heuristics
+    assert mod.ChangesAnalyzer().analyze(_dt_ctx(tmp_path / "2", True)).findings == []
+
+
+def test_a_node_gone_at_the_target_is_not_an_unbound_compatible(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CoffeeCaller (tuned): the target doesn't apply boards/extensions/native_sim.overlay,
+    so its `gpio-keys` node is gone, not unbound; `gpio-keys` still has its binding.
+    Only a node the target still has, listing the compatible with no binding matching it,
+    is `compatible-unbound`."""
+    from zmig.analyzers import devicetree as dt
+
+    monkeypatch.setattr(dt, "_compat_database", lambda ctx: DT_DB)
+    ctx = _dt_ctx(tmp_path, True)
+    ctx.new_edt = {"nodes": {}, "chosen": {}}
+    assert [
+        f for f in dt.DevicetreeAnalyzer().analyze(ctx).findings if f.kind == "compatible-unbound"
+    ] == []

@@ -192,12 +192,16 @@ def scan(
     app: Path,
     include: Callable[[str], bool] | None = None,
     conf_files: Sequence[Path] | None = None,
+    project_dts: Sequence[tuple[str, Path]] = (),
 ) -> ProjectUsage:
     """Index the app's references; `include` (on app-relative paths) limits which files
     count, e.g. to the files one sysbuild image applies. `conf_files`, when given, are the
     Kconfig fragments the build itself read (whatever their names: defconfigs, board
     .conf files, EXTRA_CONF_FILE fragments, also outside the app); then only those are
-    indexed for assignments, not every `*.conf` under the app."""
+    indexed for assignments, not every `*.conf` under the app. `project_dts` are the
+    project's devicetree files outside the app that the build read (a board of its own,
+    RIT FSW F1a), as (path shown in evidence, file): only their compatibles are indexed,
+    since their nodes and properties aren't the app's references."""
     app = app.resolve()
     u = ProjectUsage(app)
     if conf_files is not None:
@@ -207,6 +211,15 @@ def scan(
             except (OSError, UnicodeDecodeError):
                 continue
             _scan_conf(os.path.relpath(f.resolve(), app).replace(os.sep, "/"), text, u)
+    for shown, f in project_dts:
+        try:
+            text = f.read_text()
+        except (OSError, UnicodeDecodeError):
+            continue
+        dts = ProjectUsage(app)
+        _scan_overlay(shown, text, dts)
+        for tok, locs in dts.dt_compats.items():
+            u.dt_compats.setdefault(tok, []).extend(locs)
     for p in _files(app):
         rel = p.relative_to(app).as_posix()
         if include is not None and not include(rel):

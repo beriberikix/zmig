@@ -12,8 +12,10 @@ from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
+from zmig.analyzers.changes import bound_compatible, unbound_compatible
 from zmig.buildctx import Artifact, find_dt_property
 from zmig.diagnostics import app_relative, preexisting
+from zmig.errors import ZmigError
 from zmig.findings import (
     JSON,
     Category,
@@ -73,6 +75,17 @@ def spec_changes(old: dict[str, Any], new: dict[str, Any], prop: str) -> list[tu
     if n["deprecated"] and not o["deprecated"]:
         out.append(("deprecated", False, True))
     return out
+
+
+def _compat_database(ctx: ScanContext) -> dict[str, Any]:
+    """The change database, for a removed binding's replacement; without it (a ref the
+    mirror can't build it for) the finding stands without one."""
+    from zmig.analyzers.changes import database
+
+    try:
+        return database(ctx)
+    except ZmigError:
+        return {"devicetree": {"removed": {}}}
 
 
 class DevicetreeAnalyzer:
@@ -409,25 +422,23 @@ class DevicetreeAnalyzer:
                     old_v=on[po]["props"][pold],
                 )
 
-        # Compatibles the app names (overlays, DT_DRV_COMPAT).
-        def has_binding(edt_nodes: dict[str, Any], token: str) -> bool:
-            return any(
-                n["matching_compat"] and dt_token(n["matching_compat"]) == token
-                for n in edt_nodes.values()
-            )
-
-        for token, locs in sorted(ctx.usage.dt_compats.items()):
-            if has_binding(on, token) and not has_binding(nn, token):
-                add(
-                    "compatible-unbound",
-                    token,
-                    f"No node matches compatible {token} through a binding in {ctx.new_spec}",
-                    Severity.BREAKING,
-                    Confidence.MEDIUM,
-                    "The compatible was renamed or its binding removed; check the migration guide.",
-                    _ev(locs),
-                    heuristics=("devicetree.compat-by-matching-node",),
-                )
+        # Compatibles the app names (overlays, DT_DRV_COMPAT) or the project's own DTS
+        # outside the app does (a board of its own, RIT FSW F1a), bound at the source, that a
+        # target node still lists with no binding matching it. A node gone at the target
+        # isn't unbound (regression: CoffeeCaller's unapplied native_sim.overlay, whose
+        # gpio-keys node was reported as if gpio-keys had lost its binding). The change
+        # database names the binding's replacement, when there is one.
+        listed = {dt_token(c) for n in nn.values() for c in n["compats"]}
+        unbound = [
+            (token, compat, locs)
+            for token, locs in sorted(ctx.usage.dt_compats.items())
+            if (compat := bound_compatible(old, token))
+            and token in listed
+            and not bound_compatible(new, token)
+        ]
+        removed = _compat_database(ctx)["devicetree"]["removed"] if unbound else {}
+        for token, compat, locs in unbound:
+            findings.append(unbound_compatible(ctx, token, compat, locs, removed, self.name))
 
         # Everything else, split by what changed: the node itself (as zephyr.dts shows
         # it) or only the binding that describes it.
