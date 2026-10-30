@@ -1,25 +1,16 @@
 {
  "config": "coffeecaller-native",
- "scored": "DOGFOOD-8 (zmig d0567c6, clean)",
- "schema_version": "1.4",
+ "scored": "DOGFOOD-11 (zmig 983fe98, tuned)",
+ "schema_version": "1.5",
  "verdict": "direct-ok",
  "findings": [
-  {
-   "id": "API-FUNCTION-REMOVED-299e3811",
-   "severity": "breaking",
-   "confidence": "high",
-   "kind": "function-removed",
-   "title": "Function led_strip_update_rgb, which your code uses, no longer exists in v4.4.0",
-   "action": "Find its replacement in the migration guides.",
-   "files": "coffeecaller/lib/cc_lib/leds.c"
-  },
   {
    "id": "BUILD-TARGET-BUILD-FAILED-acc08695",
    "severity": "breaking",
    "confidence": "high",
    "kind": "target-build-failed",
    "title": "The target build fails: 8 errors (compiler)",
-   "action": "The Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
+   "action": "In coffeecaller/lib/cc_lib/button.c:18, coffeecaller/lib/cc_lib/watchdog.c:21, coffeecaller/lib/cc_lib/aldrin.c:16: the Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
    "files": "coffeecaller/lib/cc_lib/aldrin.c coffeecaller/lib/cc_lib/button.c coffeecaller/lib/cc_lib/watchdog.c"
   },
   {
@@ -73,7 +64,7 @@
    "confidence": "medium",
    "kind": "dependency-changed",
    "title": "CONFIG_DT_HAS_ZEPHYR_PWM_NATIVE_SIM_ENABLED, which your configuration of CONFIG_PWM_NATIVE_SIM relies on, changed from y to unset in v4.4.0",
-   "action": "CONFIG_PWM_NATIVE_SIM depends on CONFIG_DT_HAS_ZEPHYR_PWM_NATIVE_SIM_ENABLED. Check that CONFIG_PWM_NATIVE_SIM still does what your app expects.",
+   "action": "In coffeecaller/drivers/pwm/Kconfig:5: CONFIG_PWM_NATIVE_SIM depends on CONFIG_DT_HAS_ZEPHYR_PWM_NATIVE_SIM_ENABLED. Check that CONFIG_PWM_NATIVE_SIM still does what your app expects.",
    "files": "coffeecaller/drivers/pwm/Kconfig"
   },
   {
@@ -82,7 +73,7 @@
    "confidence": "medium",
    "kind": "dependency-changed",
    "title": "CONFIG_DT_HAS_ZEPHYR_FAKE_LED_STRIP_ENABLED, which your configuration of CONFIG_FAKE_LED_STRIP relies on, changed from y to unset in v4.4.0",
-   "action": "CONFIG_FAKE_LED_STRIP depends on CONFIG_DT_HAS_ZEPHYR_FAKE_LED_STRIP_ENABLED. Check that CONFIG_FAKE_LED_STRIP still does what your app expects.",
+   "action": "In coffeecaller/drivers/led_strip/Kconfig:5: CONFIG_FAKE_LED_STRIP depends on CONFIG_DT_HAS_ZEPHYR_FAKE_LED_STRIP_ENABLED. Check that CONFIG_FAKE_LED_STRIP still does what your app expects.",
    "files": "coffeecaller/drivers/led_strip/Kconfig"
   },
   {
@@ -105,47 +96,47 @@
   },
   {
    "id": "KCONFIG-SYMBOL-REMOVED-c7b5b7b2",
-   "severity": "info",
+   "severity": "breaking",
    "confidence": "high",
    "kind": "symbol-removed",
-   "title": "CONFIG_NATIVE_UART_0_ON_STDINOUT, set in ../../boards/extensions/native_sim/native_sim.conf, no longer exists in v4.4.0 (only in files this build doesn't use: ../../boards/extensions/native_sim/native_sim.conf)",
-   "action": "Remove the assignment, or find its replacement in the migration guides.",
+   "title": "CONFIG_NATIVE_UART_0_ON_STDINOUT, set in ../../boards/extensions/native_sim/native_sim.conf, no longer exists in v4.4.0",
+   "action": "In ../../boards/extensions/native_sim/native_sim.conf:11, change `CONFIG_NATIVE_UART_0_ON_STDINOUT=y` to `CONFIG_UART_NATIVE_PTY_0_ON_STDINOUT=y` (kconfig: the deprecated NATIVE_UART_0_ON_STDINOUT's help text says to use UART_NATIVE_PTY_0_ON_STDINOUT; medium confidence). Replace it with CONFIG_UART_NATIVE_PTY_0_ON_STDINOUT (the deprecated NATIVE_UART_0_ON_STDINOUT's help text says to use UART_NATIVE_PTY_0_ON_STDINOUT).",
    "files": "../../boards/extensions/native_sim/native_sim.conf"
   },
   {
    "id": "KCONFIG-VALUE-NOT-TAKEN-a528fd72",
-   "severity": "info",
+   "severity": "breaking",
    "confidence": "high",
    "kind": "value-not-taken",
-   "title": "CONFIG_REBOOT=y took effect in v4.2.0 but not in v4.4.0 (it is n) (only in files this build doesn't use: ../../boards/extensions/native_sim/native_sim.conf)",
-   "action": "Check the dependencies of CONFIG_REBOOT: y.",
+   "title": "CONFIG_REBOOT=y took effect in v4.2.0 but not in v4.4.0 (it is n)",
+   "action": "In ../../boards/extensions/native_sim/native_sim.conf:5: check the dependencies of CONFIG_REBOOT: y.",
    "files": "../../boards/extensions/native_sim/native_sim.conf"
   },
   {
    "id": "KCONFIG-VALUE-NOT-TAKEN-b94271a8",
-   "severity": "info",
+   "severity": "breaking",
    "confidence": "high",
    "kind": "value-not-taken",
-   "title": "CONFIG_PWM=y took effect in v4.2.0 but not in v4.4.0 (it is n) (only in files this build doesn't use: ../../boards/extensions/native_sim/native_sim.conf)",
-   "action": "Check the dependencies of CONFIG_PWM: y.",
+   "title": "CONFIG_PWM=y took effect in v4.2.0 but not in v4.4.0 (it is n)",
+   "action": "In ../../boards/extensions/native_sim/native_sim.conf:9: check the dependencies of CONFIG_PWM: y.",
    "files": "../../boards/extensions/native_sim/native_sim.conf"
   },
   {
    "id": "KCONFIG-VALUE-NOT-TAKEN-d4e3e14b",
-   "severity": "info",
+   "severity": "breaking",
    "confidence": "high",
    "kind": "value-not-taken",
-   "title": "CONFIG_GPIO=y took effect in v4.2.0 but not in v4.4.0 (it is n) (only in files this build doesn't use: ../../boards/extensions/native_sim/native_sim.conf)",
-   "action": "Check the dependencies of CONFIG_GPIO: y.",
+   "title": "CONFIG_GPIO=y took effect in v4.2.0 but not in v4.4.0 (it is n)",
+   "action": "In ../../boards/extensions/native_sim/native_sim.conf:8: check the dependencies of CONFIG_GPIO: y.",
    "files": "../../boards/extensions/native_sim/native_sim.conf"
   },
   {
    "id": "KCONFIG-VALUE-NOT-TAKEN-ff79bd77",
-   "severity": "info",
+   "severity": "breaking",
    "confidence": "high",
    "kind": "value-not-taken",
-   "title": "CONFIG_LED_STRIP=y took effect in v4.2.0 but not in v4.4.0 (it is n) (only in files this build doesn't use: ../../boards/extensions/native_sim/native_sim.conf)",
-   "action": "Check the dependencies of CONFIG_LED_STRIP: y.",
+   "title": "CONFIG_LED_STRIP=y took effect in v4.2.0 but not in v4.4.0 (it is n)",
+   "action": "In ../../boards/extensions/native_sim/native_sim.conf:7: check the dependencies of CONFIG_LED_STRIP: y.",
    "files": "../../boards/extensions/native_sim/native_sim.conf"
   }
  ]

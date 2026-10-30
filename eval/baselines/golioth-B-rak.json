@@ -1,7 +1,7 @@
 {
  "config": "golioth-B-rak",
- "scored": "DOGFOOD-7 (zmig aa95a10)",
- "schema_version": "1.4",
+ "scored": "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)",
+ "schema_version": "1.5",
  "verdict": "blocked",
  "findings": [
   {
@@ -10,7 +10,7 @@
    "confidence": "high",
    "kind": "field-changed",
    "title": "Field net_mgmt_event_callback.<anonymous>.event_mask, which your code uses, changed: unsigned int at bit offset 0 → unsigned long long at bit offset 0",
-   "action": "Check the code that uses it.",
+   "action": "In golioth-firmware-sdk/examples/zephyr/common/net_connect.c:26: check the code that uses it.",
    "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
@@ -19,7 +19,7 @@
    "confidence": "high",
    "kind": "macro-changed",
    "title": "Macro NET_EVENT_IPV4_ADDR_ADD, which your code uses, changed: (unsigned long, 4 bytes) = 3758358529 → (unsigned long long, 8 bytes) = 16154411863377969153",
-   "action": "Its type got wider and your code stores it in a narrower type, which changes the value (see the lines listed); widen those.",
+   "action": "In golioth-firmware-sdk/examples/zephyr/common/net_connect.c:69: its type got wider and your code stores it in a narrower type, which changes the value (see the lines listed); widen those.",
    "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
@@ -28,7 +28,7 @@
    "confidence": "high",
    "kind": "typedef-changed",
    "title": "Typedef net_mgmt_event_handler_t, which your code uses, changed: void (*)(struct net_mgmt_event_callback *, unsigned int, struct net_if *) → void (*)(struct net_mgmt_event_callback *, unsigned long long, struct net_if *)",
-   "action": "Update the code that calls, implements or stores it (your callbacks no longer match it).",
+   "action": "In golioth-firmware-sdk/examples/zephyr/common/net_connect.c:20: update the code that calls, implements or stores it (your callbacks no longer match it).",
    "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
@@ -46,7 +46,7 @@
    "confidence": "high",
    "kind": "new-warning",
    "title": "New compiler warning at v4.2.0: assignment to 'net_mgmt_event_handler_t' {aka 'void (*)(struct net_mgmt_event_callback *, long long unsigned int, struct net_if *)'} from in",
-   "action": "Check whether it points at a real problem.",
+   "action": "In golioth-firmware-sdk/examples/zephyr/common/net_connect.c:36: check whether it points at a real problem.",
    "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
@@ -55,7 +55,7 @@
    "confidence": "high",
    "kind": "new-warning",
    "title": "New compiler warning at v4.2.0: conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1'",
-   "action": "Check whether it points at a real problem.",
+   "action": "In golioth-firmware-sdk/examples/zephyr/common/net_connect.c:69: check whether it points at a real problem.",
    "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
@@ -63,7 +63,7 @@
    "severity": "info",
    "confidence": "high",
    "kind": "other-nodes",
-   "title": "27 nodes your app doesn't reference changed, disappeared or appeared; 8 more nodes only changed binding",
+   "title": "7 nodes your app doesn't reference changed, disappeared or appeared; 8 more nodes only changed binding",
    "action": "None needed unless you start using them.",
    "files": ""
   },
@@ -82,7 +82,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.2 migration guide (Ethernet): ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecate (only in files this build doesn't use: socs/native.conf, socs/native_64.conf)",
-   "action": "Read MG-4.2-0046 and update the lines listed.",
+   "action": "In socs/native.conf:3, socs/native_64.conf:3: read MG-4.2-0046 and update the lines listed.",
    "files": "socs/native.conf socs/native_64.conf"
   },
   {
@@ -91,7 +91,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.2 migration guide (Modem): Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU.",
-   "action": "Read MG-4.2-0074 and update the lines listed.",
+   "action": "In boards/rak5010_nrf52840.conf:27: read MG-4.2-0074 and update the lines listed.",
    "files": "boards/rak5010_nrf52840.conf"
   },
   {
@@ -118,7 +118,7 @@
    "confidence": "high",
    "kind": "dependency-expression-changed",
    "title": "1 Kconfig symbol your build sets or reads changed their depends/selects/implies in v4.2.0",
-   "action": "Value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
+   "action": "In boards/rak5010_nrf52840.conf:26: value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
    "files": "boards/rak5010_nrf52840.conf"
   },
   {
@@ -145,7 +145,7 @@
    "confidence": "high",
    "kind": "salvaged",
    "title": "The target configure failed; zmig disabled 1 line in a copy of your app to compare the rest",
-   "action": "Everything else in this report compares against that salvaged build, so values that depended on the disabled lines (symbols they selected, for example) differ in it too. Fix the breaking findings and rerun.",
+   "action": "In boards/rak5010_nrf52840.conf:27: everything else in this report compares against that salvaged build, so values that depended on the disabled lines (symbols they selected, for example) differ in it too. Fix the breaking findings and rerun.",
    "files": "boards/rak5010_nrf52840.conf"
   },
   {
@@ -154,7 +154,7 @@
    "confidence": "high",
    "kind": "symbol-removed",
    "title": "CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE, set in boards/rak5010_nrf52840.conf, no longer exists in v4.2.0",
-   "action": "Remove the assignment, or find its replacement in the migration guides. Zephyr aborts the target configure on this assignment.",
+   "action": "In boards/rak5010_nrf52840.conf:27: remove the assignment, or find its replacement in the migration guides. Zephyr aborts the target configure on this assignment.",
    "files": "boards/rak5010_nrf52840.conf"
   },
   {
@@ -181,7 +181,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits); none of the declarations your code uses from it changed",
-   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "action": "In src/main.c:7: libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
    "files": "src/main.c"
   },
   {
@@ -190,7 +190,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+195/-37 lines in 14 commits); none of the declarations your code uses from it changed",
-   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "action": "In src/main.c:13: libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
    "files": "src/main.c"
   },
   {

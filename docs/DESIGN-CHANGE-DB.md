@@ -1,6 +1,9 @@
 # Design: the change database (PROPOSAL-CHANGE-DB Phase 1)
 
-Status: **design for review, not implemented** (2026-10-30). It builds on
+Status: **implemented** (steps 1–4: `8366fd9`, `c5ca2be`, `87cb54c`, `2341504`) and
+**measured** in [DOGFOOD-11-change-db.md](DOGFOOD-11-change-db.md), which also lists where
+the implementation falls short of this design (§6 there: §2.1's module-defined symbols).
+Written 2026-10-30 as a design for review. It builds on
 [PROPOSAL-CHANGE-DB.md](PROPOSAL-CHANGE-DB.md); decisions 1–5 there apply. Every fact
 quoted here was probed on the local Zephyr mirror; nothing has been built.
 

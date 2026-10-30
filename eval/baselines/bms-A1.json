@@ -1,7 +1,7 @@
 {
  "config": "bms-A1",
- "scored": "DOGFOOD-6 (zmig aa95a10)",
- "schema_version": "1.4",
+ "scored": "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)",
+ "schema_version": "1.5",
  "verdict": "unknown",
  "findings": [
   {
@@ -18,7 +18,7 @@
    "severity": "info",
    "confidence": "high",
    "kind": "other-nodes",
-   "title": "31 nodes your app doesn't reference changed, disappeared or appeared; 66 more nodes only changed binding",
+   "title": "13 nodes your app doesn't reference changed, disappeared or appeared; 83 more nodes only changed binding",
    "action": "None needed unless you start using them.",
    "files": ""
   },
@@ -37,7 +37,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.2 migration guide (Architectures): Moved CONFIG_SRAM_VECTOR_TABLE from zephyr/Kconfig.zephyr to zephyr/arch/Kconfig and added dependency to CONFIG_XIP, CONFIG_ARCH_HAS_VECTOR_TABLE_RELOCATION and",
-   "action": "Read MG-4.2-0142 and update the lines listed.",
+   "action": "In sysbuild/mcuboot/boards/bms_c1.conf:19: read MG-4.2-0142 and update the lines listed.",
    "files": "sysbuild/mcuboot/boards/bms_c1.conf"
   },
   {
@@ -46,7 +46,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.1 migration guide (Bluetooth Audio): The following Kconfig options are not longer automatically enabled by the LE Audio Kconfig options and may need to be enabled manually : CONFIG_BT_GATT_CLIENT C",
-   "action": "Read MG-4.1-0079 and update the lines listed.",
+   "action": "In boards/bms_16s100_sc_esp32c3.conf:13, boards/bms_c1.conf:23, boards/native_sim.conf:46: read MG-4.1-0079 and update the lines listed.",
    "files": "boards/bms_16s100_sc_esp32c3.conf boards/bms_c1.conf boards/native_sim.conf"
   },
   {
@@ -55,7 +55,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.1 migration guide (Networking): The CONFIG_NET_L2_OPENTHREAD symbol no longer implies the CONFIG_NVS Kconfig option.",
-   "action": "Read MG-4.1-0091 and update the lines listed.",
+   "action": "In boards/bms_16s100_sc.conf:13, boards/bms_16s100_sc_esp32c3.conf:5, boards/bms_c1.conf:15: read MG-4.1-0091 and update the lines listed.",
    "files": "boards/bms_16s100_sc.conf boards/bms_16s100_sc_esp32c3.conf boards/bms_c1.conf"
   },
   {
@@ -64,7 +64,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.2 migration guide (Serial): CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE has been deprecated. (only in files this build doesn't use: boards/native_sim.conf)",
-   "action": "Read MG-4.2-0089 and update the lines listed.",
+   "action": "In boards/native_sim.conf:11: read MG-4.2-0089 and update the lines listed.",
    "files": "boards/native_sim.conf"
   },
   {
@@ -72,7 +72,7 @@
    "severity": "info",
    "confidence": "high",
    "kind": "images-summary",
-   "title": "1 image at 636ad05950bb: app (app, 63 compiled files changed)",
+   "title": "1 image at 636ad05950bb35792fdc214b3f5fb3e106254f38: app (app, 63 compiled files changed)",
    "action": "Per-image findings follow, grouped by image.",
    "files": ""
   },
@@ -81,7 +81,7 @@
    "severity": "info",
    "confidence": "high",
    "kind": "default-changed",
-   "title": "5 Kconfig symbols: other symbols resolve to a different value in 636ad05950bb",
+   "title": "5 Kconfig symbols: other symbols resolve to a different value in 636ad05950bb35792fdc214b3f5fb3e106254f38",
    "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
    "files": ""
   },
@@ -90,8 +90,8 @@
    "severity": "info",
    "confidence": "high",
    "kind": "dependency-expression-changed",
-   "title": "1 Kconfig symbol your build sets or reads changed their depends/selects/implies in 636ad05950bb",
-   "action": "Value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
+   "title": "1 Kconfig symbol your build sets or reads changed their depends/selects/implies in 636ad05950bb35792fdc214b3f5fb3e106254f38",
+   "action": "In boards/bms_16s100_sc.conf:13: value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
    "files": "boards/bms_16s100_sc.conf"
   },
   {
@@ -99,7 +99,7 @@
    "severity": "info",
    "confidence": "high",
    "kind": "newly-set",
-   "title": "23 Kconfig symbols: symbols are newly enabled or set in 636ad05950bb",
+   "title": "23 Kconfig symbols: symbols are newly enabled or set in 636ad05950bb35792fdc214b3f5fb3e106254f38",
    "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
    "files": ""
   },
@@ -108,7 +108,7 @@
    "severity": "info",
    "confidence": "high",
    "kind": "no-longer-set",
-   "title": "20 Kconfig symbols: symbols set before are absent in 636ad05950bb",
+   "title": "20 Kconfig symbols: symbols set before are absent in 636ad05950bb35792fdc214b3f5fb3e106254f38",
    "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
    "files": ""
   },
@@ -127,7 +127,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits) (only in files this build doesn't compile)",
-   "action": "Review the API changes in that header against your calls.",
+   "action": "In src/oled.c:16: review the API changes in that header against your calls.",
    "files": "src/oled.c"
   },
   {
@@ -136,7 +136,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/drivers/gpio.h>, which your code includes, changed upstream (+116/-40 lines in 7 commits); none of the declarations your code uses from it changed",
-   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "action": "In src/button.c:10, src/leds.c:15: libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
    "files": "src/button.c src/leds.c"
   },
   {
@@ -145,7 +145,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/device.h>, which your code includes, changed upstream (+244/-74 lines in 17 commits); none of the declarations your code uses from it changed",
-   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "action": "In src/button.c:9, src/main.c:7: libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
    "files": "src/button.c src/main.c"
   },
   {
@@ -154,7 +154,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/drivers/hwinfo.h>, which your code includes, changed upstream (+4/-0 lines in 2 commits); none of the declarations your code uses from it changed",
-   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "action": "In src/data_objects.c:11: libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
    "files": "src/data_objects.c"
   },
   {
@@ -163,7 +163,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/sys/crc.h>, which your code includes, changed upstream (+33/-2 lines in 2 commits); none of the declarations your code uses from it changed",
-   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "action": "In src/data_objects.c:12: libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
    "files": "src/data_objects.c"
   },
   {
@@ -172,7 +172,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/display/cfb.h>, which your code includes, changed upstream (+12/-1 lines in 2 commits) (only in files this build doesn't compile)",
-   "action": "Review the API changes in that header against your calls.",
+   "action": "In src/oled.c:14, src/oled_font.h:8: review the API changes in that header against your calls.",
    "files": "src/oled.c src/oled_font.h"
   },
   {
@@ -181,7 +181,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+453/-101 lines in 28 commits); none of the declarations your code uses from it changed",
-   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "action": "In src/button.c:11, src/data_objects.c:9, src/leds.c:16, …: libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
    "files": "src/button.c src/data_objects.c src/leds.c src/main.c"
   },
   {

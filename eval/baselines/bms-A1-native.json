@@ -1,7 +1,7 @@
 {
  "config": "bms-A1-native",
- "scored": "DOGFOOD-7 (zmig aa95a10)",
- "schema_version": "1.4",
+ "scored": "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)",
+ "schema_version": "1.5",
  "verdict": "direct-ok",
  "findings": [
   {
@@ -10,7 +10,7 @@
    "confidence": "high",
    "kind": "device-missing",
    "title": "Your code takes the device for /uart_1 (chosen thingset,serial), which has no device at 636ad05950bb35792fdc214b3f5fb3e106254f38 (status 'disabled', was 'okay')",
-   "action": "Enable the node in an overlay (status = \"okay\") or point the code (or the chosen property) at the node that replaced it.",
+   "action": "In boards/native_sim.overlay, thingset-sdk/src/serial.c:28, add `&uart1 { status = \"okay\"; };` (devicetree: the node is disabled at the target; high confidence). Enable the node in an overlay (status = \"okay\") or point the code (or the chosen property) at the node that replaced it.",
    "files": "thingset-sdk/src/serial.c"
   },
   {
@@ -19,7 +19,7 @@
    "confidence": "high",
    "kind": "target-build-failed",
    "title": "The target build fails: 1 error (compiler)",
-   "action": "The Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
+   "action": "In thingset-sdk/src/serial.c:28: the Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
    "files": "thingset-sdk/src/serial.c"
   },
   {
@@ -46,7 +46,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.2 migration guide (Serial): CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE has been deprecated.",
-   "action": "Read MG-4.2-0089 and update the lines listed.",
+   "action": "In boards/native_sim.conf:11: read MG-4.2-0089 and update the lines listed.",
    "files": "boards/native_sim.conf"
   },
   {
@@ -55,7 +55,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.1 migration guide (Bluetooth Audio): The following Kconfig options are not longer automatically enabled by the LE Audio Kconfig options and may need to be enabled manually : CONFIG_BT_GATT_CLIENT C",
-   "action": "Read MG-4.1-0079 and update the lines listed.",
+   "action": "In boards/bms_16s100_sc_esp32c3.conf:13, boards/bms_c1.conf:23, boards/native_sim.conf:46: read MG-4.1-0079 and update the lines listed.",
    "files": "boards/bms_16s100_sc_esp32c3.conf boards/bms_c1.conf boards/native_sim.conf"
   },
   {
@@ -64,7 +64,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.1 migration guide (Networking): The CONFIG_NET_L2_OPENTHREAD symbol no longer implies the CONFIG_NVS Kconfig option. (only in files this build doesn't use: boards/bms_16s100_sc.conf, boards/bms_16s100_sc_esp32c3.conf, boards/bms_c1.conf)",
-   "action": "Read MG-4.1-0091 and update the lines listed.",
+   "action": "In boards/bms_16s100_sc.conf:13, boards/bms_16s100_sc_esp32c3.conf:5, boards/bms_c1.conf:15: read MG-4.1-0091 and update the lines listed.",
    "files": "boards/bms_16s100_sc.conf boards/bms_16s100_sc_esp32c3.conf boards/bms_c1.conf"
   },
   {
@@ -73,7 +73,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.2 migration guide (Architectures): Moved CONFIG_SRAM_VECTOR_TABLE from zephyr/Kconfig.zephyr to zephyr/arch/Kconfig and added dependency to CONFIG_XIP, CONFIG_ARCH_HAS_VECTOR_TABLE_RELOCATION and",
-   "action": "Read MG-4.2-0142 and update the lines listed.",
+   "action": "In sysbuild/mcuboot/boards/bms_c1.conf:19: read MG-4.2-0142 and update the lines listed.",
    "files": "sysbuild/mcuboot/boards/bms_c1.conf"
   },
   {
@@ -100,7 +100,7 @@
    "confidence": "medium",
    "kind": "dependency-changed",
    "title": "CONFIG_UART_NATIVE_POSIX, which your configuration of CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE relies on, changed from y to n in 636ad05950bb35792fdc214b3f5fb3e106254f38",
-   "action": "CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE depends on CONFIG_UART_NATIVE_POSIX. Check that CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE still does what your app expects. Its definition changed in 636ad05950bb35792fdc214b3f5fb3e106254f38: depends on UART_NATIVE_POSIX && SERIAL -> (UART_NATIVE_PTY || UART_NATIVE_POSIX) && SERIAL; selects nothing -> DEPRECATED.",
+   "action": "In boards/native_sim.conf:11: CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE depends on CONFIG_UART_NATIVE_POSIX. Check that CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE still does what your app expects. Its definition changed in 636ad05950bb35792fdc214b3f5fb3e106254f38: depends on UART_NATIVE_POSIX && SERIAL -> (UART_NATIVE_PTY || UART_NATIVE_POSIX) && SERIAL; selects nothing -> DEPRECATED.",
    "files": "boards/native_sim.conf"
   },
   {
@@ -109,7 +109,7 @@
    "confidence": "medium",
    "kind": "dependency-changed",
    "title": "CONFIG_DT_HAS_ZEPHYR_NATIVE_POSIX_UART_ENABLED, which your configuration of CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE relies on, changed from y to unset in 636ad05950bb35792fdc214b3f5fb3e106254f38",
-   "action": "CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE depends on CONFIG_UART_NATIVE_POSIX; CONFIG_UART_NATIVE_POSIX depends on CONFIG_DT_HAS_ZEPHYR_NATIVE_POSIX_UART_ENABLED. Check that CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE still does what your app expects. Its definition changed in 636ad05950bb35792fdc214b3f5fb3e106254f38: depends on UART_NATIVE_POSIX && SERIAL -> (UART_NATIVE_PTY || UART_NATIVE_POSIX) && SERIAL; selects nothing -> DEPRECATED.",
+   "action": "In boards/native_sim.conf:11: CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE depends on CONFIG_UART_NATIVE_POSIX; CONFIG_UART_NATIVE_POSIX depends on CONFIG_DT_HAS_ZEPHYR_NATIVE_POSIX_UART_ENABLED. Check that CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE still does what your app expects. Its definition changed in 636ad05950bb35792fdc214b3f5fb3e106254f38: depends on UART_NATIVE_POSIX && SERIAL -> (UART_NATIVE_PTY || UART_NATIVE_POSIX) && SERIAL; selects nothing -> DEPRECATED.",
    "files": "boards/native_sim.conf"
   },
   {
@@ -118,7 +118,7 @@
    "confidence": "high",
    "kind": "dependency-expression-changed",
    "title": "2 Kconfig symbols your build sets or reads changed their depends/selects/implies in 636ad05950bb35792fdc214b3f5fb3e106254f38",
-   "action": "Value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
+   "action": "In boards/native_sim.conf:8: value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
    "files": "boards/native_sim.conf"
   },
   {
@@ -145,7 +145,7 @@
    "confidence": "high",
    "kind": "symbol-deprecated",
    "title": "CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE is deprecated in 636ad05950bb35792fdc214b3f5fb3e106254f38",
-   "action": "Move off it before the release that removes it.",
+   "action": "In boards/native_sim.conf:11: move off it before the release that removes it.",
    "files": "boards/native_sim.conf"
   },
   {
@@ -154,7 +154,7 @@
    "confidence": "high",
    "kind": "symbol-deprecated",
    "title": "CONFIG_NATIVE_UART_0_ON_STDINOUT is deprecated in 636ad05950bb35792fdc214b3f5fb3e106254f38",
-   "action": "Move off it before the release that removes it.",
+   "action": "In boards/native_sim.conf:8, change `CONFIG_NATIVE_UART_0_ON_STDINOUT=y` to `CONFIG_UART_NATIVE_PTY_0_ON_STDINOUT=y` (kconfig: the deprecated NATIVE_UART_0_ON_STDINOUT's help text says to use UART_NATIVE_PTY_0_ON_STDINOUT; medium confidence). Move off it before the release that removes it.",
    "files": "boards/native_sim.conf"
   },
   {
@@ -163,7 +163,7 @@
    "confidence": "high",
    "kind": "value-not-taken",
    "title": "CONFIG_LOG_BACKEND_NATIVE_POSIX=y has no effect (it gets n); already not taken at 4ebecae78ad969f2801e1dfcf453dc9dd2b288d3",
-   "action": "The source configure printed the same warning, so the migration doesn't change it. Drop the assignment, or meet its dependencies: (!LOG_MODE_MINIMAL) (=n).",
+   "action": "In boards/native_sim.conf:14: the source configure printed the same warning, so the migration doesn't change it. Drop the assignment, or meet its dependencies: (!LOG_MODE_MINIMAL) (=n).",
    "files": "boards/native_sim.conf"
   },
   {

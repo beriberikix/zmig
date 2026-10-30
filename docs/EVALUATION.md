@@ -66,9 +66,12 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ | ″ | 9 | tuned (audit fixes, re-run at `aa95a10`) | 9 (100%) | 9 (100%) | 8/8 (100%) | 8/9 | — | — | DOGFOOD-6 |
 | **ardep** `samples/uds` (ardep) | v4.3.0 → v4.4.0 | 6 | **clean**: DOGFOOD-8 baseline | 0 | 3 (50%) | 4/5 (80%) | 0 (fix-actionable 0) | configure failed (`board.yml`) | unknown (low) | DOGFOOD-8 §2 |
 | ″ | ″ | 6 | **clean**: after Phase 0 (DOGFOOD-9) | 0 | 3 (50%) | 4/5 (80%) | **2** (fix-actionable 0) | ″ | ″ | DOGFOOD-9 §3 |
+| ″ | ″ | 6 | **clean**: change database, steps 1–4 (`eval/runs/step4`) | **2 (33%)** | **5 (83%)** | 8/10 (80%) | **4** (fix-actionable **2**) | ″ | ″ | DOGFOOD-11 §2 |
+| ″ | ″ | 6 | tuned: + `hostap` fix and B3 `va_start` (`eval/runs/b3vb`) | 2 (33%) | 5 (83%) | **8/8 (100%)** | 4 (fix-actionable 2) | ″ | ″ | DOGFOOD-11 §2 |
 | **RIT FSW** `sensor_module` | v4.1.0 → v4.2.0 | 3 | **clean**: DOGFOOD-8 baseline | 0 | 1 (33%) | 3/6 (50%) | 0 (fix-actionable 0) | configure failed (Kconfig) | unknown (low) | DOGFOOD-8 §2 |
 | ″ | ″ | 3 | **clean**: after Phase 0 (DOGFOOD-9) | 0 | 1 (33%) | 3/6 (50%) | 0 (fix-actionable 0) | ″ | ″ | DOGFOOD-9 §3 |
 | ″ | ″ | 3 | tuned: after the detection fixes (DOGFOOD-10) | 0 | 1 (33%) | **3/3 (100%)** | **1** (fix-actionable 0) | ″ | ″ | DOGFOOD-10 §2 |
+| ″ | ″ | 3 | tuned: change database (DOGFOOD-11) | **2 (67%)** | **2 (67%)** | 7/7 (100%) | **2** (fix-actionable **2**) | ″ | ″ | DOGFOOD-11 §2 |
 | **CoffeeCaller** (native_sim) | v4.2.0 → v4.4.0 | 4 | **clean**: DOGFOOD-8 baseline | 0 | 2 (50%) | 3/4 (75%) | 0 (fix-actionable 0) | build failed (devicetree aliases) | direct-ok (low) | DOGFOOD-8 §2 |
 | ″ | ″ | 4 | tuned: after Phase 0 (DOGFOOD-9) | 0 | 2 (50%) | 3/4 (75%) | **1** (fix-actionable **1**) | ″ | ″ | DOGFOOD-9 §3 |
 | ″ | ″ | 4 | tuned: after the detection fixes (DOGFOOD-10) | **1 (25%)** | 2 (50%) | **8/8 (100%)** | **2** (fix-actionable 1) | ″ | ″ | DOGFOOD-10 §2 |
@@ -85,9 +88,11 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | OpenDeck plan (patches) | 9 | 6 (67%) | 9 (100%) | 8/15 (53%) | 0 |
 | Held-out 2026-10-30 (ardep, RIT FSW, CoffeeCaller; DOGFOOD-8) | 13 | 0 | 6 (46%) | 10/15 (67%) | 0 (fix-actionable 0) |
 | ″ after Phase 0, clean part only (ardep, RIT FSW; DOGFOOD-9) | 9 | 0 | 4 (44%) | 7/11 (64%) | **2** (fix-actionable 0) |
+| ″ after the change database, clean part only (ardep; DOGFOOD-11) | 6 | **2 (33%)** | 5 (83%) | 8/10 (80%) | **4** (fix-actionable **2**) |
 
 Across every clean scan result, zmig names *what* breaks more often than *where to fix it*:
-**actionable was 0 on every clean measurement.** The only non-zero actionable figures are
+**actionable was 0 on every clean measurement** until Phase 0 (ardep 2, DOGFOOD-9) and the
+change database (ardep 4, fix-actionable 2, DOGFOOD-11). The only non-zero actionable figures are
 tuned: ZMK 1/18, OpenDeck plan 8/9, OpenDeck scan 1/5, and, since the `module-required` action names the user's
 `west.yml` (`ddf6b2b`), bms A1 1/2, A1-native 1/5, A1-oled 1/3 and CANnectivity C1, C2 1/3
 (DOGFOOD-6 and DOGFOOD-7 corrections, 2026-10-30).

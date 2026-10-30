@@ -1,7 +1,7 @@
 {
  "config": "cannectivity-C2",
- "scored": "DOGFOOD-6 (zmig aa95a10)",
- "schema_version": "1.4",
+ "scored": "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)",
+ "schema_version": "1.5",
  "verdict": "direct-ok",
  "findings": [
   {
@@ -10,7 +10,7 @@
    "confidence": "high",
    "kind": "callback-type-changed",
    "title": "Callbacks your code provides no longer match the type Zephyr expects at 30de5e8a2ceef99177c6c96785a8888b978154f0: const state_execution",
-   "action": "Change their signatures to match (incompatible function pointer types initializing 'const state_execution' (aka 'enum smf_state_result (*const)(void *)') with an expression of type 'void (void *)').",
+   "action": "In src/led.c:192, change led_state_normal_run's type from `void (void *)` to `enum smf_state_result (void *)` (api: the type Zephyr expects; high confidence). Change their signatures to match (incompatible function pointer types initializing 'const state_execution' (aka 'enum smf_state_result (*const)(void *)') with an expression of type 'void (void *)').",
    "files": "src/led.c"
   },
   {
@@ -19,7 +19,7 @@
    "confidence": "high",
    "kind": "function-removed",
    "title": "Function smf_set_handled, which your code uses, no longer exists in 30de5e8a2ceef99177c6c96785a8888b978154f0",
-   "action": "Find its replacement in the migration guides.",
+   "action": "In src/led.c:225: find its replacement in the migration guides.",
    "files": "src/led.c"
   },
   {
@@ -28,7 +28,7 @@
    "confidence": "high",
    "kind": "new-warning",
    "title": "New compiler warning at 30de5e8a2ceef99177c6c96785a8888b978154f0: initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'",
-   "action": "Check whether it points at a real problem.",
+   "action": "In src/led.c:349: check whether it points at a real problem.",
    "files": "src/led.c"
   },
   {
@@ -37,7 +37,7 @@
    "confidence": "high",
    "kind": "new-warning",
    "title": "New compiler warning at 30de5e8a2ceef99177c6c96785a8888b978154f0: implicit declaration of function 'smf_set_handled'",
-   "action": "Check whether it points at a real problem.",
+   "action": "In src/led.c:225: check whether it points at a real problem.",
    "files": "src/led.c"
   },
   {
@@ -46,16 +46,16 @@
    "confidence": "high",
    "kind": "target-build-failed",
    "title": "The target build fails: 2 errors (linker)",
-   "action": "The Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
+   "action": "In src/led.c:225: the Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
    "files": "src/led.c"
   },
   {
-   "id": "DEVICETREE-NODE-CHANGED-4a30b254",
-   "severity": "risky",
+   "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-d2e5cc9e",
+   "severity": "info",
    "confidence": "high",
-   "kind": "node-changed",
-   "title": "&zephyr_udc0 (/soc/usb@40005c00) changed: clocks, maximum-speed",
-   "action": "Check these property changes against how your code uses the node.",
+   "kind": "node-properties-new_props",
+   "title": "&zephyr_udc0 (/soc/usb@40005c00) has new properties in 30de5e8a2ceef99177c6c96785a8888b978154f0: maximum-speed",
+   "action": "In src/usb.c:126: new hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
    "files": "src/usb.c"
   },
   {
@@ -63,7 +63,7 @@
    "severity": "info",
    "confidence": "high",
    "kind": "other-nodes",
-   "title": "13 nodes your app doesn't reference changed, disappeared or appeared; 1 more node only changed binding",
+   "title": "0 nodes your app doesn't reference changed, disappeared or appeared; 1 more node only changed binding",
    "action": "None needed unless you start using them.",
    "files": ""
   },
@@ -82,7 +82,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.2 migration guide (State Machine Framework): smf_set_handled has been removed. [smf_set_handled]",
-   "action": "Read MG-4.2-0137 and update the lines listed.",
+   "action": "In src/led.c:225: read MG-4.2-0137 and update the lines listed.",
    "files": "src/led.c"
   },
   {

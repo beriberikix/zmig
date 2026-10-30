@@ -1,7 +1,7 @@
 {
  "config": "golioth-B-native",
- "scored": "DOGFOOD-7 (zmig aa95a10)",
- "schema_version": "1.4",
+ "scored": "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)",
+ "schema_version": "1.5",
  "verdict": "direct-ok",
  "findings": [
   {
@@ -37,7 +37,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.2 migration guide (Modem): Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU. (only in files this build doesn't use: boards/rak5010_nrf52840.conf)",
-   "action": "Read MG-4.2-0074 and update the lines listed.",
+   "action": "In boards/rak5010_nrf52840.conf:27: read MG-4.2-0074 and update the lines listed.",
    "files": "boards/rak5010_nrf52840.conf"
   },
   {
@@ -46,7 +46,7 @@
    "confidence": "medium",
    "kind": "entry-match",
    "title": "4.2 migration guide (Ethernet): ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecate",
-   "action": "Read MG-4.2-0046 and update the lines listed.",
+   "action": "In socs/native.conf:3, socs/native_64.conf:3: read MG-4.2-0046 and update the lines listed.",
    "files": "socs/native.conf socs/native_64.conf"
   },
   {
@@ -73,7 +73,7 @@
    "confidence": "high",
    "kind": "dependency-expression-changed",
    "title": "3 Kconfig symbols your build sets or reads changed their depends/selects/implies in v4.2.0",
-   "action": "Value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
+   "action": "In socs/native.conf:3: value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
    "files": "socs/native.conf"
   },
   {
@@ -100,7 +100,7 @@
    "confidence": "high",
    "kind": "symbol-deprecated",
    "title": "CONFIG_ETH_NATIVE_POSIX is deprecated in v4.2.0",
-   "action": "Move off it before the release that removes it.",
+   "action": "In socs/native.conf:3, change `CONFIG_ETH_NATIVE_POSIX=n` to `CONFIG_ETH_NATIVE_TAP=n` (kconfig: the deprecated ETH_NATIVE_POSIX's help text says to use ETH_NATIVE_TAP; medium confidence). Move off it before the release that removes it.",
    "files": "socs/native.conf"
   },
   {
@@ -109,7 +109,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits); none of the declarations your code uses from it changed",
-   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "action": "In src/main.c:7: libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
    "files": "src/main.c"
   },
   {
@@ -118,7 +118,7 @@
    "confidence": "high",
    "kind": "header-changed",
    "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+195/-37 lines in 14 commits); none of the declarations your code uses from it changed",
-   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "action": "In src/main.c:13: libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
    "files": "src/main.c"
   },
   {
