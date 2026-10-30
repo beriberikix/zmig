@@ -169,3 +169,15 @@ So the change predates the audit fixes, and P2 kept the label. ORACLE-RULES §2 
 (the right cause, evidence elsewhere) since P2, which makes ZMK's strict recall 5/18 rather than 6/18. Lenient recall is
 unchanged. This is left for the maintainer to decide; the published numbers stand until
 then.
+
+### Resolved (2026-10-30): partly (c)
+
+The maintainer left the call to the scorer. ORACLE-RULES §2 makes the evidence the test for
+location, and `src/ble.c:22` hasn't been in the evidence since P2. The cause is still stated
+(the `hci_err.h` error in the finding's raw list), so the label is **partly (c)**, not
+missed. This applies from P2 on, the same strict reading as A1-native's precision
+correction.
+
+ZMK strict recall is **5/18 (28%)** from P2 on, not 6/18. Lenient stays 13/18. The P2
+row in EVALUATION.md stays as published; the `aa95a10` row carries the corrected value.
+

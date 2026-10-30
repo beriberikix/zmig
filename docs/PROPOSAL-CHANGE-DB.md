@@ -1,6 +1,15 @@
 # Proposal: say where the fix goes and what it is (actions, a change database, mined fixes)
 
 Status: **proposal, not implemented** (2026-10-30). Nothing here has been built.
+
+**Decisions (2026-10-30), on §9's questions:**
+
+1. Fix-actionable is adopted (ORACLE-RULES §5).
+2. Phase 0 adds the `fix` finding field (schema 1.5).
+3. The curated change data lives in the repo.
+4. The held-out projects are chosen by the implementer, and their oracles are frozen before
+   Phase 0 (§6).
+5. ZMK #3 is partly (c) from P2 on (DOGFOOD-7).
 Measurements are from the evaluation harness (`eval/`) and from read-only probes of the
 Zephyr mirror.
 

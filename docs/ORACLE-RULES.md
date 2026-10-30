@@ -148,3 +148,21 @@ For each project and upgrade pair:
 - wall-clock time, split into first run (cold caches) and repeat run when both exist;
 - the field-upgrade verdict and its confidence;
 - which known limitations affected the result.
+
+## 5. Actionable and fix-actionable (added 2026-10-30)
+
+These are reported next to recall, and replace neither. Evidence is never changed to
+improve them: the evidence is what proves the hazard.
+
+- **Actionable** (DOGFOOD-3 §7.1): an in-scope item where some finding scored for it (caught
+  or partly) has an `action` that names a file the maintainers edited for that item, by
+  path or basename.
+- **Fix-actionable**: an actionable item where that action also states the edit the
+  maintainers made in that file, as the old → new text or construct. It must be close
+  enough that applying it would build or configure the way their edit did; formatting
+  differences don't matter. A `fix` field (PROPOSAL-CHANGE-DB §3) counts as part of the
+  action.
+
+Both are scored by hand, per item, against the oracle. Every report gives the counts and
+the items behind them.
+

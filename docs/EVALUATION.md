@@ -16,6 +16,8 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
   is checked against both refs; unverifiable findings count against it.
 - **Actionable:** items where some scored finding's *action* names a file the maintainers
   edited (DOGFOOD-3 §7.1).
+- **Fix-actionable** (from 2026-10-30): actionable items whose action also states the
+  maintainers' edit (old → new). See ORACLE-RULES §5.
 - **Clean vs tuned.** A result is **clean** only if no zmig change was informed by that
   project before it was measured. From the first fix a project's output inspired, its later
   numbers are **tuned**, even when the fix was an allowed misleading-output fix, or one the
@@ -26,7 +28,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | Project / configuration | Upgrade | Items in scope | Clean? | Strict | Lenient | Precision | Actionable | Target build | Field-upgrade verdict | Source |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **ZMK** corne ∪ niceview | v3.2 → v3.5 | 18 | **tuned** (the development project) | 6 (33%) | 13 (72%) | 11/22 (50%) → 12/22 (55%) → 15/28 (54%) | 1/18 | configure failed (salvaged) | unknown (medium) | DOGFOOD-2-baseline §1, DOGFOOD-2 §2, DOGFOOD-3 §2–3, §7.1 |
-| ″ | ″ | 18 | tuned (audit fixes, re-run at `aa95a10`) | 6 (33%) | 13 (72%) | **15/21 (71%)** | 1/18 | configure failed (salvaged) | unknown (low) | DOGFOOD-7 |
+| ″ | ″ | 18 | tuned (audit fixes, re-run at `aa95a10`) | **5 (28%)** (P2 corrected too, 2026-10-30) | 13 (72%) | **15/21 (71%)** | 1/18 | configure failed (salvaged) | unknown (low) | DOGFOOD-7 |
 | **smp_svr** (nrf52840dk, MCUboot, BLE DFU) | v4.2.2 → v4.3.0 | 1 field-upgrade hazard | **tuned** | caught after fixes | — | before the fixes, 4 spurious remedies and a spurious storage pin | — | ok | needs-changes (medium): MCUboot mode mismatch, remedy config-pin | DOGFOOD-1 §1, "Verdict honesty" |
 | **Golioth B** nucleo_h563zi | v4.1.0 → v4.2.0 | 2 | clean: DOGFOOD-2 baseline | 0 (0%) | 1 (50%) | 0/9 (0%) | — | ok | direct-ok (medium) | DOGFOOD-2-baseline §3–4 |
 | ″ | ″ | 2 | tuned (Step 2, P2) | 1 (50%) | 1 (50%) | 2/6 (33%) → 5/9 (56%) | 0 | ok | direct-ok (medium) | DOGFOOD-2 §3, DOGFOOD-3 §2–3 |
