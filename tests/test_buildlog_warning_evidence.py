@@ -179,3 +179,53 @@ def test_project_inputs_the_source_applied_and_the_target_does_not() -> None:
     ]
     # The target never reached Kconfig or devicetree: nothing can be judged.
     assert inputs_not_applied(old, LogFacts(), old_roots, new_roots, target_dts=False) == []
+
+
+def test_a_symbol_a_header_stopped_providing_names_the_include_to_add(tmp_path: Path) -> None:
+    """DOGFOOD-12 E4, ble-copro B1/B2: at v4.4.2 `stream_client.c` fails with implicit
+    declarations of socket()/LOG_ERR() and LOG_MODULE_REGISTER defaulting to int. At v4.3.0
+    the file got zephyr/posix/sys/socket.h and zephyr/logging/log.h only through
+    net/socket.h and net_core.h (ninja's records); it includes neither itself. The remedy
+    is the include, at the file's include block."""
+    from zmig.analyzers.buildlog import BuildError, missing_includes
+
+    inc = tmp_path / "zephyr" / "include" / "zephyr"
+    for rel, text in {
+        "net/socket.h": "#include <zephyr/posix/sys/socket.h>\nint zsock_socket(int f);\n"
+                        "static inline int zsock_x(void) { return socket(1, 2, 3); }\n",
+        "posix/sys/socket.h": "int socket(int family, int type, int proto);\n"
+                              "ssize_t send(int sock, const void *buf,\n\tsize_t len, int flags);\n",
+        "logging/log.h": "#define LOG_ERR(...) Z_LOG(1, __VA_ARGS__)\n#define LOG_MODULE_REGISTER(...)\n",
+    }.items():  # fmt: skip
+        (inc / rel).parent.mkdir(parents=True, exist_ok=True)
+        (inc / rel).write_text(text)
+    app = tmp_path / "app"
+    (app / "src").mkdir(parents=True)
+    f = app / "src" / "stream_client.c"
+    f.write_text(
+        "#include <zephyr/kernel.h>\n#include <zephyr/net/socket.h>\n\nLOG_MODULE_REGISTER(x);\n"
+    )
+    tgt = "/tgt/app/src/stream_client.c"
+
+    def err(line: int, msg: str) -> BuildError:
+        return BuildError("compiler", msg, tgt, line)
+
+    errors = [
+        err(4, "type defaults to 'int' in declaration of 'LOG_MODULE_REGISTER' [-Wimplicit-int]"),
+        err(188, "implicit declaration of function 'socket'; did you mean 'socklen_t'?"),
+        err(304, "implicit declaration of function 'send' [-Wimplicit-function-declaration]"),
+        err(190, "implicit declaration of function 'LOG_ERR' [-Wimplicit-function-declaration]"),
+        err(200, "'x' undeclared (first use in this function)"),  # declared nowhere: no finding
+    ]
+    deps = {"stream_client.c.obj": [str(f), *(str(inc / r) for r in
+            ("net/socket.h", "posix/sys/socket.h", "logging/log.h"))]}  # fmt: skip
+    found = missing_includes(errors, deps, {str(app): ""}, {"/tgt/app": ""})
+    assert [(m.file, m.line, m.header, m.symbols) for m in found] == [
+        ("src/stream_client.c", 2, "zephyr/logging/log.h", ("LOG_ERR", "LOG_MODULE_REGISTER")),
+        ("src/stream_client.c", 2, "zephyr/posix/sys/socket.h", ("send", "socket")),
+    ]
+    # A header the file includes itself isn't one it lost.
+    f.write_text("#include <zephyr/logging/log.h>\n#include <zephyr/net/socket.h>\n")
+    assert [m.header for m in missing_includes(errors, deps, {str(app): ""}, {"/tgt/app": ""})] == [
+        "zephyr/posix/sys/socket.h"
+    ]

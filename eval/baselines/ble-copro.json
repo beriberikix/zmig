@@ -1,6 +1,6 @@
 {
  "config": "ble-copro",
- "scored": "DOGFOOD-12 §7 (E1-E3; tuned)",
+ "scored": "DOGFOOD-12 §8 (E1-E4; tuned)",
  "schema_version": "1.5",
  "verdict": "needs-changes",
  "findings": [
@@ -30,6 +30,33 @@
    "title": "Persisted Bluetooth definitions changed: struct bt_keys",
    "action": "Bonds stored with the old layout may not load; test re-loading bonds made by the source firmware, or plan for re-pairing.",
    "files": "<zephyr v4.3.0>/subsys/bluetooth/host/keys.h <zephyr v4.4.2>/subsys/bluetooth/host/keys.h"
+  },
+  {
+   "id": "BUILD-INCLUDE-MISSING-20d4e9f6",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "include-missing",
+   "title": "src/stream_client.c no longer gets LOG_DBG, LOG_ERR, LOG_INF, LOG_MODULE_REGISTER, LOG_WRN at v4.4.2: it needs #include <zephyr/logging/log.h>",
+   "action": "In src/stream_client.c:8, add `#include <zephyr/logging/log.h>` (build: the source build's include chain; medium confidence). Include <zephyr/logging/log.h> in src/stream_client.c itself. At v4.3.0 it came only through other headers, which no longer include it.",
+   "files": "src/stream_client.c"
+  },
+  {
+   "id": "BUILD-INCLUDE-MISSING-a963db41",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "include-missing",
+   "title": "src/stream_client.c no longer gets close at v4.4.2: it needs #include <zephyr/posix/unistd.h>",
+   "action": "In src/stream_client.c:8, add `#include <zephyr/posix/unistd.h>` (build: the source build's include chain; medium confidence). Include <zephyr/posix/unistd.h> in src/stream_client.c itself. At v4.3.0 it came only through other headers, which no longer include it.",
+   "files": "src/stream_client.c"
+  },
+  {
+   "id": "BUILD-INCLUDE-MISSING-ef59be30",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "include-missing",
+   "title": "src/stream_client.c no longer gets connect, recv, send, socket at v4.4.2: it needs #include <zephyr/posix/sys/socket.h>",
+   "action": "In src/stream_client.c:8, add `#include <zephyr/posix/sys/socket.h>` (build: the source build's include chain; medium confidence). Include <zephyr/posix/sys/socket.h> in src/stream_client.c itself. At v4.3.0 it came only through other headers, which no longer include it.",
+   "files": "src/stream_client.c"
   },
   {
    "id": "BUILD-NEW-WARNING-2376cb7f",

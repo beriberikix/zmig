@@ -82,6 +82,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | **ble-copro** (nrf52840dk) | v4.3.0 → v4.4.2 | 2 | **clean**: DOGFOOD-12 baseline | 0 | 2 (100%) | 5/23 (22%) | 2 (fix-actionable 0) | build failed (`stream_client.c`) | needs-changes | DOGFOOD-12 §2 |
 | ″ | ″ | 2 | tuned: E2 (compatibility macros) | 0 | 2 (100%) | **5/10 (50%)** | 2 (fix-actionable 0) | ″ | ″ | DOGFOOD-12 §5 |
 | ″ | ″ | 2 | tuned: E3 (guide vendor sections, struct members) | 0 | 2 (100%) | **5/7 (71%)** | 2 (fix-actionable 0) | ″ | ″ | DOGFOOD-12 §7 |
+| ″ | ″ | 2 | tuned: E4 (`include-missing` from the source include chain) | **2 (100%)** | 2 (100%) | **8/10 (80%)** | 2 (fix-actionable **2**) | ″ | ″ | DOGFOOD-12 §8 |
 | **proves** (`proves_flight_control_board_v5e`, F´) | v4.3.0 → v4.4.1 | 5 | **clean**: DOGFOOD-12 baseline | 1 (20%) | 4 (80%) | 20/24 (83%) | 2 (fix-actionable 0) | configure failed (Mbed TLS module, after Kconfig) | unknown | DOGFOOD-12 §2 |
 | ″ | ″ | 5 | tuned: E1 (configure failed after Kconfig) | **2 (40%)** | 4 (80%) | **21/25 (84%)** | **3** (fix-actionable **1**) | ″ | ″ | DOGFOOD-12 §5 |
 | ″ | ″ | 5 | tuned: E3 (guide vendor sections, struct members) | 2 (40%) | 4 (80%) | **21/21 (100%)** | 3 (fix-actionable 1) | ″ | ″ | DOGFOOD-12 §7 |

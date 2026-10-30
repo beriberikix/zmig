@@ -270,7 +270,7 @@ sha = "edee97c18006802ce387229c9c49ab2f9e1a18d7"  # base of PR #3 (Zephyr v4.3.0
 
 [configs.ble-copro]
 oracle = "docs/oracles/ble-copro.md"
-scored = "DOGFOOD-12 §7 (E1-E3; tuned)"
+scored = "DOGFOOD-12 §8 (E1-E4; tuned)"
 app = "{src:ble-copro}"
 board = "nrf52840dk/nrf52840"
 from = "v4.3.0"

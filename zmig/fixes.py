@@ -174,6 +174,9 @@ def _derive(f: Finding, by_id: dict[str, Finding], ctx: ScanContext) -> JSON | N
             conf = _cap(f.confidence, Confidence(c["confidence"]))
             renamed = quoted.sub(f'"{c["symbol"]}"', at[2])
             return _fix(at, at[2], renamed, f"bindings: {c['why']}", conf)
+    elif f.kind == "include-missing" and new.get("header"):
+        return _fix(place, None, f"#include <{new['header']}>",
+                    "build: the source build's include chain", f.confidence)  # fmt: skip
     elif f.kind == "entry-match" and (r := _guide_rename(f)):
         # Only a line that contains the old name can take the edit (DOGFOOD-9 D1: RIT's
         # `DEVICE_DT_GET(DT_ALIAS(thermometer))` is where the node is used, not named).

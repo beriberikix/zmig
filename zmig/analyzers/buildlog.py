@@ -37,7 +37,7 @@ from zmig.findings import (
 )
 from zmig.scan import ScanContext
 from zmig.size import footprint
-from zmig.snapshots import kconfig_symbols
+from zmig.snapshots import build_dependencies, kconfig_symbols
 from zmig.tools import find_tool
 
 MAX_ERRORS = 5
@@ -206,6 +206,103 @@ def error_evidence(
         if len(ev) == MAX_ERRORS:
             break
     return ev
+
+
+_UNDECLARED = re.compile(
+    r"implicit declaration of function '(\w+)'|'(\w+)' undeclared|"
+    r"type defaults to 'int' in declaration of '(\w+)'|unknown type name '(\w+)'"
+)
+_INCLUDE_LINE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]')
+
+
+@dataclass(frozen=True)
+class MissingInclude:
+    """A header a project file must now include itself: it declares symbols the target
+    build reports undeclared, and the source build reached it only through other headers."""
+
+    file: str  # as evidence shows it
+    line: int  # the file's last #include line (0: none)
+    text: str  # that line
+    header: str  # include path, e.g. zephyr/logging/log.h
+    symbols: tuple[str, ...]
+
+
+def _declares(text: str, sym: str) -> bool:
+    """Whether a header declares `sym`: a #define, or a line declaring or defining it with
+    a type before it (not a call: `ret = sym(`, `return sym(`)."""
+    s = re.escape(sym)
+    return bool(
+        re.search(rf"(?m)^\s*#\s*define\s+{s}\b", text)
+        or re.search(rf"(?m)^[ \t]*(?!return\b)(?:[A-Za-z_]\w*[ \t*]+)+\**{s}\s*\(", text)
+    )
+
+
+def _include_name(path: str) -> str | None:
+    """How a header is included: the part after its last include/ directory."""
+    norm = path.replace(os.sep, "/")
+    i = norm.rfind("/include/")
+    return norm[i + len("/include/") :] if i >= 0 else None
+
+
+def missing_includes(
+    errors: list[BuildError],
+    src_deps: dict[str, list[str]],
+    old_roots: dict[str, str],
+    new_roots: dict[str, str],
+) -> list[MissingInclude]:
+    """For a target build's "undeclared" errors in project files: the header, in that
+    file's include chain at the source (ninja's records), that declares the symbols, when
+    the file doesn't include it itself. It got them through another header, which no longer
+    provides them (regression: ble-copro's socket()/LOG_ERR(), whose zephyr/posix and
+    logging/log.h stopped coming through net/socket.h and net_core.h, DOGFOOD-12 E4)."""
+    from zmig.usage import SOURCE_SUFFIXES
+
+    wanted: dict[str, set[str]] = {}
+    for e in errors:
+        if e.kind != "compiler" or not (m := _UNDECLARED.search(e.message)):
+            continue
+        if shown := project_path(os.path.normpath(e.file), new_roots):
+            wanted.setdefault(shown, set()).add(next(g for g in m.groups() if g))
+    chains: dict[str, tuple[str, list[str]]] = {}
+    for files in src_deps.values():
+        src = next((f for f in files if f.endswith(SOURCE_SUFFIXES)), None)
+        if src and (shown := project_path(os.path.normpath(src), old_roots)):
+            chains.setdefault(shown, (src, [f for f in files if f != src]))
+    texts: dict[str, str] = {}
+
+    def read(path: str) -> str:
+        if path not in texts:
+            try:
+                texts[path] = Path(path).read_text(errors="replace")
+            except OSError:
+                texts[path] = ""
+        return texts[path]
+
+    out = []
+    for shown, syms in sorted(wanted.items()):
+        if shown not in chains:
+            continue
+        src, headers = chains[shown]
+        lines = read(src).splitlines()
+        direct = {m[1] for ln in lines if (m := _INCLUDE_LINE.match(ln))}
+        last = max((i for i, ln in enumerate(lines, 1) if _INCLUDE_LINE.match(ln)), default=0)
+        providers: dict[str, set[str]] = {}
+        for sym in sorted(syms):
+            names = {n for h in headers if (n := _include_name(h)) and _declares(read(h), sym)}
+            if names and not names & direct:
+                providers[sym] = names
+        by_header: dict[str, set[str]] = {}
+        for sym, names in providers.items():
+            # The header that provides the most of this file's missing symbols, then the
+            # shortest include path.
+            best = min(names, key=lambda n: (-sum(n in v for v in providers.values()), len(n), n))
+            by_header.setdefault(best, set()).add(sym)
+        text = lines[last - 1].strip() if last else ""
+        out += [
+            MissingInclude(shown, last, text, h, tuple(sorted(by_header[h])))
+            for h in sorted(by_header)
+        ]
+    return out
 
 
 def kconfig_abort_causes(log: str, roots: dict[str, str]) -> list[tuple[str, int, str]]:
@@ -502,6 +599,31 @@ class BuildlogAnalyzer:
             proj = project_roots(ctx.new, ctx.new_img.dir)
             errors = build_errors(log)
             ev = error_evidence(errors, proj, ctx.runner.redact)
+            # Symbols a header stopped providing: the include to add (DOGFOOD-12 E4).
+            src_deps = build_dependencies(ctx.old_img, ctx.runner) or {}
+            old_roots = project_roots(ctx.old, ctx.old_img.dir)
+            for m in missing_includes(errors, src_deps, old_roots, proj):
+                names = ", ".join(m.symbols)
+                add(
+                    "include-missing",
+                    f"{m.file}:{m.header}",
+                    f"{m.file} no longer gets {names} at {ctx.new_spec}: it needs "
+                    f"#include <{m.header}>",
+                    Severity.BREAKING,
+                    f"Include <{m.header}> in {m.file} itself. At {ctx.old_spec} it came only "
+                    f"through other headers, which no longer include it.",
+                    (
+                        file_line(m.file, m.line or 1, m.text),
+                        tool_output(
+                            "source build's include chain (ninja deps)",
+                            f"at {ctx.old_spec}, {m.file} reached {m.header}, which declares "
+                            f"{names}, without including it",
+                        ),
+                    ),
+                    new={"header": m.header, "symbols": list(m.symbols)},
+                    conf=Confidence.MEDIUM,
+                    heuristics=("buildlog.source-include-chain",),
+                )
             kinds = sorted({e.kind for e in errors})
             images = sorted({e.image for e in errors if e.image})
             add(

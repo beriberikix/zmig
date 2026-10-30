@@ -220,3 +220,40 @@ The guide analyzer's gate demotes a match to info, saying why, in two more cases
 | Precision | 5/10 → **5/7** | 21/25 → **21/21** | 26/35 → **26/28 (93%)** |
 
 Recall, actionable and fix-actionable are unchanged.
+
+## 8. Addendum (2026-10-30): E4 fixed (tuned)
+
+**New breaking finding `include-missing` (buildlog, medium confidence).** When the target
+build reports a symbol undeclared in a project file ("implicit declaration of function",
+"undeclared", "type defaults to 'int' in declaration of", "unknown type name"), zmig
+checks the **source** build's include chain for that file (ninja deps).
+- If a header there declares the symbol, and the file doesn't include that header itself,
+  the finding names the header and the symbols.
+- It sits at the file's last `#include` line.
+- Its `fix` is the `#include` to add.
+
+**ble-copro** gains three findings, each at `src/stream_client.c:8`, the end of its include
+block:
+
+| Finding | Symbols | Fix | Item |
+|---|---|---|---|
+| `BUILD-INCLUDE-MISSING-ef59be30` | `connect`, `recv`, `send`, `socket` | `#include <zephyr/posix/sys/socket.h>` | B1 |
+| `BUILD-INCLUDE-MISSING-a963db41` | `close` | `#include <zephyr/posix/unistd.h>` | B1 |
+| `BUILD-INCLUDE-MISSING-20d4e9f6` | `LOG_DBG`, `LOG_ERR`, `LOG_INF`, `LOG_MODULE_REGISTER`, `LOG_WRN` | `#include <zephyr/logging/log.h>` | B2 |
+
+- **All three are true, and they are the maintainers' three added lines.**
+- **B1 and B2: partly (c) → caught, and fix-actionable.**
+- **Judgement call on location:** the maintainers put the includes in the Zephyr group
+  (`:1-5`); zmig points at the end of the same include block (`:8`), and an include
+  placed there compiles the same.
+
+**Re-scan** (`eval/runs/e4`, all 16 configurations; OpenDeck scan and plan): nothing else
+changed.
+
+| | ble-copro, tuned | Second set (7), tuned |
+|---|---|---|
+| Strict | 0 → **2** | 2 → **4 (57%)** |
+| Lenient | 2 | 6 |
+| Precision | 5/7 → **8/10** | 26/28 → **29/31 (94%)** |
+| Actionable | 2 | 5 |
+| Fix-actionable | 0 → **2** | 1 → **3** |

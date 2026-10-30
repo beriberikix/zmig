@@ -219,3 +219,21 @@ def test_a_read_of_a_removed_symbol_gets_the_rename() -> None:
         "#ifdef CONFIG_OLD",
         "#ifdef CONFIG_NEW",
     )
+
+
+def test_a_missing_include_is_an_include_to_add() -> None:
+    """DOGFOOD-12 E4: the fix for `include-missing` is the #include line, at the file's
+    include block (ble-copro B1/B2's edit)."""
+    from zmig.findings import Category, Confidence, Finding, Severity, file_line
+    from zmig.fixes import apply_fixes
+
+    f = Finding(Category.BUILD, "include-missing", "src/stream_client.c:zephyr/logging/log.h",
+                "t", Severity.BREAKING, Confidence.MEDIUM, "Include it.", "buildlog", ("s",),
+                evidence=(file_line("src/stream_client.c", 4, "#include <zephyr/net/socket.h>"),),
+                new={"header": "zephyr/logging/log.h", "symbols": ["LOG_ERR"]})  # fmt: skip
+    (fixed,) = apply_fixes([f], None)  # type: ignore[arg-type]
+    assert fixed.fix["file"] == "src/stream_client.c" and fixed.fix["line"] == 4
+    assert fixed.fix["old"] is None and fixed.fix["new"] == "#include <zephyr/logging/log.h>"
+    assert fixed.action.startswith(
+        "In src/stream_client.c:4, add `#include <zephyr/logging/log.h>`"
+    )
