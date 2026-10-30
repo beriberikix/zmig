@@ -244,3 +244,21 @@ cmake_args = [
     "-DZEPHYR_EXTRA_MODULES={src:rit-fsw}",
     "-DFSW_ROOT={src:rit-fsw}",
 ]
+
+[sources.coffeecaller]
+kind = "git"
+url = "https://github.com/Alicipy/CoffeeCaller"
+sha = "2b0a8f25b168680b883ab0df4d4ec87264c367cd"  # 0aefa36^1, parent of PR #16 (Zephyr 4.4 upgrade)
+
+# bridle is deliberately not a source: the native_sim build doesn't use it, and bridle v4.2.1
+# (d12204cf20b8c1039337f0afe67d64291c0674e4) breaks both builds when added (docs/oracles/coffeecaller.md).
+
+[configs.coffeecaller-native]
+oracle = "docs/oracles/coffeecaller.md"
+scored = "not yet run"
+app = "{src:coffeecaller}/applications/coffeecaller"
+board = "native_sim"
+from = "v4.2.0"
+to = "v4.4.0"
+modules = []
+cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:coffeecaller}"]
