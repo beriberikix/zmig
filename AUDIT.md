@@ -513,3 +513,10 @@ precision (d0f9e03). None was re-measured.
   a "not checked" gap, and the guide analyzer is `partial` (1275465). In `watch` that gap
   blocks until it is accepted. Hard-coded file names and section titles, and dropped
   directive bodies, remain open.
+
+## Response (2026-10-30): history rewritten before publication
+
+The repository's history was rewritten before it was made public (an author address and
+a quoted home directory). Commit SHAs cited above, and in the documents this audit led
+to, are the pre-rewrite ones; [docs/SHA-REMAP.md](docs/SHA-REMAP.md) maps each to its new
+SHA. Nothing in this file above this note was changed.
