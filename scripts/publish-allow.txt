@@ -4,6 +4,8 @@
 # Commit identities
 email 178376+beriberikix@users.noreply.github.com
 email noreply@anthropic.com
+# GitHub's own committer identity on merges made in its web UI
+email noreply@github.com
 # Test identities and placeholders
 email t@example.com
 email fixture@example.com
