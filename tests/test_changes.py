@@ -395,7 +395,10 @@ def test_an_empty_symbol_table_is_an_error_not_no_changes(monkeypatch: pytest.Mo
     from zmig import changes as mod
     from zmig.errors import ZmigError
 
-    monkeypatch.setattr(mod, "symbol_table", lambda m, r, sha: {} if sha == "bad" else {"A": "x:1"})
+    monkeypatch.setattr(
+        mod, "definitions", lambda m, r, sha: {} if sha == "bad" else {"A": ["x:1"]}
+    )
+    monkeypatch.setattr(mod, "glue_references", lambda m, r, sha: "")
     monkeypatch.setattr(mod, "binding_table", lambda m, r, sha: {"v,a": "y:1"})
     with pytest.raises(ZmigError, match="no Kconfig symbols"):
         mod.build(SimpleNamespace(path="m"), SimpleNamespace(), "good", "bad")  # type: ignore[arg-type]
@@ -549,3 +552,46 @@ def test_a_node_gone_at_the_target_is_not_an_unbound_compatible(
     assert [
         f for f in dt.DevicetreeAnalyzer().analyze(ctx).findings if f.kind == "compatible-unbound"
     ] == []
+
+
+def test_glue_paths_and_symbols_moved_into_a_modules_glue() -> None:
+    """DESIGN-CHANGE-DB §2.4. ardep A6: at v4.4.0 the mbedtls glue builds paths into
+    tf-psa-crypto (a mere variable pass-through, like MLDSA_NATIVE_DIR, isn't a use).
+    RIT FSW F2: HAS_CMSIS_CORE_M moved from modules/cmsis/ to modules/cmsis_6/ at v4.2.0."""
+    from zmig.changes import glue_paths, moved_into_glue, parse_definitions
+
+    grep = (
+        "v4.4.0:modules/mbedtls/CMakeLists.txt:40:    add_subdirectory(${ZEPHYR_MBEDTLS_MODULE_DIR}/x)\n"
+        'v4.4.0:modules/mbedtls/legacy_support.cmake:18:  set(P "${ZEPHYR_TF_PSA_CRYPTO_MODULE_DIR}/drivers")\n'
+        'v4.4.0:modules/mbedtls/legacy_support.cmake:33:  set(Q "${ZEPHYR_TF_PSA_CRYPTO_MODULE_DIR}/src")\n'
+    )
+    assert glue_paths(grep) == {
+        "mbedtls": {"TF_PSA_CRYPTO": "modules/mbedtls/legacy_support.cmake:18"}
+    }
+    src = parse_definitions(
+        "v4.1.0:modules/cmsis/Kconfig:21:config HAS_CMSIS_CORE_M\n"
+        "v4.1.0:modules/cmsis/Kconfig:7:config HAS_CMSIS_CORE\n"
+        "v4.1.0:modules/cmsis_6/Kconfig:5:config ZEPHYR_CMSIS_6_MODULE\n"
+        "v4.1.0:drivers/x/Kconfig:3:config STAYS\n"
+    )
+    tgt = parse_definitions(
+        "v4.2.0:modules/cmsis_6/Kconfig:14:config HAS_CMSIS_CORE_M\n"
+        "v4.2.0:modules/cmsis/Kconfig:7:config HAS_CMSIS_CORE\n"
+        "v4.2.0:modules/cmsis_6/Kconfig:8:config HAS_CMSIS_CORE\n"
+        "v4.2.0:modules/cmsis_6/Kconfig:5:config ZEPHYR_CMSIS_6_MODULE\n"
+        "v4.2.0:modules/foo/Kconfig:3:config STAYS\n"
+    )
+    # HAS_CMSIS_CORE is still defined in modules/cmsis/; ZEPHYR_*_MODULE is generated;
+    # STAYS moved into foo's glue too.
+    assert moved_into_glue(src, tgt) == {
+        "HAS_CMSIS_CORE_M": {
+            "dir": "cmsis_6",
+            "defined_at": "modules/cmsis_6/Kconfig:14",
+            "was": "modules/cmsis/Kconfig:21",
+        },
+        "STAYS": {
+            "dir": "foo",
+            "defined_at": "modules/foo/Kconfig:3",
+            "was": "drivers/x/Kconfig:3",
+        },
+    }

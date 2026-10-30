@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from zmig.manifest import ProjectInfo
 from zmig.modulecheck import diagnose, manifest_changes, module_var
 
@@ -194,3 +196,112 @@ def test_modules_the_source_build_needs_too(tmp_path: Path) -> None:
     assert needed_at_source("", zephyr, manifest, set(), ["littlefs"]) == []
     # Active at the source: the source didn't lack it.
     assert needed_at_source(LITTLEFS_LOG, zephyr, manifest, {"littlefs"}, ["littlefs"]) == []
+
+
+def test_modules_the_zephyr_tree_says_the_target_needs() -> None:
+    """DESIGN-CHANGE-DB §2.4/§6, from the tree alone. ardep A6: the source build compiles
+    mbedtls, whose v4.4.0 glue uses files of tf-psa-crypto. RIT FSW F2: the source build
+    enables HAS_CMSIS_CORE_M, which v4.2.0 defines only in cmsis_6's glue, and compiles
+    nothing from cmsis_6. A module the source build already uses isn't reported."""
+    from zmig.modulecheck import tree_needs
+
+    db = {
+        "glue_paths": {
+            "mbedtls": {"TF_PSA_CRYPTO": "modules/mbedtls/legacy_support.cmake:18",
+                        "HOSTAP": "modules/mbedtls/legacy_support.cmake:45"},
+            "hal_x": {"HAL_Y": "modules/hal_x/CMakeLists.txt:3"},
+        },
+        "kconfig_moved": {
+            "HAS_CMSIS_CORE_M": {"dir": "cmsis_6", "defined_at": "modules/cmsis_6/Kconfig:14",
+                                 "was": "modules/cmsis/Kconfig:21"},
+            "HAS_MCUX": {"dir": "hal_nxp", "defined_at": "modules/hal_nxp/Kconfig:1", "was": "m:1"},
+            "OFF": {"dir": "hal_z", "defined_at": "modules/hal_z/Kconfig:1", "was": "m:1"},
+        },
+    }  # fmt: skip
+    paths = {"mbedtls": "/m/mbedtls", "cmsis": "/m/cmsis", "cmsis_6": "/m/cmsis_6",
+             "hal_nxp": "/m/hal_nxp", "hal_y": "/m/hal_y"}  # fmt: skip
+    used = ["/m/mbedtls/library/aes.c", "/m/cmsis/CMSIS/Core/Include/core_cm4.h",
+            "/m/hal_nxp/x.h", "/app/src/main.c"]  # fmt: skip
+    config = {"HAS_CMSIS_CORE_M": "y", "HAS_MCUX": "y", "OFF": "n"}
+    projects = {"mbedtls", "tf-psa-crypto", "cmsis", "cmsis_6", "hal_nxp", "hal_y", "hal_z",
+                "hostap"}  # fmt: skip
+    # Glue paths count only into a project new in Zephyr's manifest (DESIGN-CHANGE-DB
+    # §2.4): v4.4.0's mbedtls glue also sets a path into hostap, unconditionally, but
+    # hostap (in the manifest before) isn't needed (regression: ardep and OpenDeck).
+    source_projects = projects - {"tf-psa-crypto"}
+    needs = {n.module: n for n in tree_needs(db, config, used, paths, projects, source_projects)}
+    assert sorted(needs) == ["cmsis_6", "tf-psa-crypto"]
+    assert needs["tf-psa-crypto"].site == "modules/mbedtls/legacy_support.cmake:18"
+    assert "mbedtls" in needs["tf-psa-crypto"].why
+    assert needs["cmsis_6"].site == "modules/cmsis_6/Kconfig:14"
+    assert "CONFIG_HAS_CMSIS_CORE_M" in needs["cmsis_6"].why
+
+
+def test_user_allowlist(tmp_path: Path) -> None:
+    from zmig.modulecheck import user_allowlist
+
+    m = tmp_path / "west.yml"
+    m.write_text(
+        "manifest:\n  projects:\n    - name: zephyr\n      revision: v4.1.0\n"
+        "      import:\n        name-allowlist:\n          - cmsis\n          - hal_stm32\n"
+    )
+    assert user_allowlist(m) == {"cmsis", "hal_stm32"}
+    m.write_text("manifest:\n  projects:\n    - name: zephyr\n      import: true\n")
+    assert user_allowlist(m) is None  # imports everything
+
+
+def test_tree_needs_become_module_required_or_module_not_in_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ardep A6: tf-psa-crypto isn't in the scan's module set and the target never reached
+    Kconfig -> module-required, the ID the target build's own diagnosis would give it. RIT
+    FSW F2: cmsis_6 was given to the scan but the user's allowlist lacks it ->
+    module-not-in-manifest at the allowlist line. A target that configured without a module
+    didn't need it."""
+    from types import SimpleNamespace
+    from typing import Any
+
+    from zmig.analyzers import modules
+    from zmig.findings import Category, make_id
+    from zmig.modulecheck import ModuleNeed
+
+    manifest = tmp_path / "west.yml"
+    manifest.write_text(
+        "manifest:\n  projects:\n    - name: zephyr\n      import:\n"
+        "        name-allowlist:\n          - cmsis\n"
+    )
+    monkeypatch.setattr(modules, "load_manifest", lambda root: {})
+    monkeypatch.setattr(modules, "manifest_changes", lambda *a: [])
+    monkeypatch.setattr(modules, "user_manifest", lambda app: (manifest, 5, "the name-allowlist"))
+    needs = [
+        ModuleNeed("tf-psa-crypto", "glue of mbedtls uses it", "modules/mbedtls/x.cmake:18"),
+        ModuleNeed("cmsis_6", "CONFIG_HAS_CMSIS_CORE_M moved", "modules/cmsis_6/Kconfig:14"),
+    ]
+    monkeypatch.setattr(
+        modules.ModulesAnalyzer, "_tree_needs", staticmethod(lambda ctx, m, o: needs)
+    )
+
+    def run(target_config: bool) -> Any:
+        ws = SimpleNamespace(
+            zephyr=tmp_path / "zephyr", root=tmp_path,
+            modules=lambda runner: [SimpleNamespace(name="cmsis_6"), SimpleNamespace(name="cmsis")],
+        )  # fmt: skip
+        ctx = SimpleNamespace(
+            module_needs=(), modules_added=(), modules_at_source=(),
+            old=SimpleNamespace(workspace=ws, spec=SimpleNamespace(app=tmp_path), src=tmp_path),
+            new=SimpleNamespace(workspace=ws),
+            old_img=SimpleNamespace(has=lambda a: True, dir=tmp_path / "b"),
+            new_img=SimpleNamespace(has=lambda a: target_config),
+            runner=SimpleNamespace(redact=lambda s: s),
+            old_spec="v4.3.0", new_spec="v4.4.0", scope=("s",),
+        )  # fmt: skip
+        return {f.kind: f for f in modules.ModulesAnalyzer().analyze(ctx).findings}
+
+    found = run(target_config=False)
+    req = found["module-required"]
+    assert req.id == make_id(Category.MANIFEST, "module-required", "tf-psa-crypto", ("s",))
+    assert req.evidence[0]["path"] == "west.yml" and req.evidence[0]["line"] == 5
+    assert "changes.lexical" in req.heuristics
+    gap = found["module-not-in-manifest"]
+    assert gap.subject == "cmsis_6" and "west.yml:5" in gap.action
+    assert set(run(target_config=True)) == {"module-not-in-manifest"}

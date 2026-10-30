@@ -13,13 +13,19 @@ A module is diagnosed as required from what the target build itself said:
 
 Only modules declared in the target ref's west.yml are proposed; each comes with where it
 is required (the build's own message) and where the manifest declares it.
+
+When the target build stops before any of that, the Zephyr tree at the target says the
+same lexically (zmig.changes, `tree_needs`): the glue of a module the source build uses
+builds paths into M, or a symbol the source build enables is now defined only in M's glue.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from zmig.manifest import ProjectInfo
 
@@ -97,6 +103,73 @@ def user_manifest(app: Path) -> tuple[Path, int, str] | None:
             if re.match(pattern, line):
                 return found, i, what
     return found, 1, "the manifest"
+
+
+def user_allowlist(manifest: Path) -> set[str] | None:
+    """The `name-allowlist` of the user manifest's import of Zephyr: the only Zephyr
+    projects `west update` fetches. None when the import has none (it fetches them all)."""
+    import yaml
+
+    try:
+        data = yaml.safe_load(manifest.read_text(errors="replace")) or {}
+    except yaml.YAMLError:
+        return None
+    for proj in (data.get("manifest") or {}).get("projects") or []:
+        imp = proj.get("import") if isinstance(proj, dict) else None
+        if isinstance(imp, dict) and "name-allowlist" in imp:
+            names = imp["name-allowlist"]
+            return {names} if isinstance(names, str) else {str(n) for n in names or []}
+    return None
+
+
+def tree_needs(
+    db: dict[str, Any],
+    config: dict[str, str],
+    used_files: Iterable[str],
+    module_paths: dict[str, str],
+    projects: Iterable[str],
+    source_projects: Iterable[str] = (),
+) -> list[ModuleNeed]:
+    """Modules the target needs by the Zephyr tree alone (the change database's `modules`
+    part), for a source build with this .config that used these files (ninja's records),
+    with its modules at `module_paths` ({name: path}). A module the source build already
+    used isn't reported: whatever provides it today keeps doing so. `projects` are the
+    target manifest's; only those are proposed. A glue path counts only into a project
+    new since `source_projects` (DESIGN-CHANGE-DB §2.4): glue also sets paths into
+    existing modules it merely supports (v4.4.0 mbedtls -> hostap, regression: ardep and
+    OpenDeck)."""
+    used_files = list(used_files)
+    by_var = {module_var(n): n for n in projects}
+    new_vars = {v for v, n in by_var.items() if n not in set(source_projects)}
+    src_by_var = {module_var(n): n for n in module_paths}
+
+    def used(name: str) -> bool:
+        root = module_paths.get(name)
+        return root is not None and any(f.startswith(root.rstrip("/") + "/") for f in used_files)
+
+    needs: dict[str, ModuleNeed] = {}
+
+    def add(var: str, why: str, site: str) -> None:
+        name = by_var.get(var)
+        if name and name not in needs and not used(name):
+            needs[name] = ModuleNeed(name, why, site)
+
+    for glue, refs in sorted(db.get("glue_paths", {}).items()):
+        x = src_by_var.get(module_var(glue))
+        if x is None or not used(x):
+            continue
+        for var, site in sorted(refs.items()):
+            if var not in new_vars:
+                continue
+            name = by_var.get(var, var)
+            add(var, f"Zephyr's glue for {x}, which the source build compiles, uses files "
+                     f"of {name} at the target", site)  # fmt: skip
+    for sym, moved in sorted(db.get("kconfig_moved", {}).items()):
+        if config.get(sym) == "y":
+            add(module_var(moved["dir"]), f"CONFIG_{sym}, which the source build enables, is "
+                f"defined only in zephyr/modules/{moved['dir']}/ at the target (was "
+                f"{moved['was']})", moved["defined_at"])  # fmt: skip
+    return list(needs.values())
 
 
 def manifest_line(zephyr: Path, name: str) -> str:

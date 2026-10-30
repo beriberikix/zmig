@@ -1,14 +1,25 @@
 """The Zephyr modules the build needs: modules the target build turned out to require that
 the scan's module set lacked (zmig.modulecheck, diagnosed by the scan before analyzers
-run), and how the modules the source build used changed in Zephyr's manifest."""
+run), and how the modules the source build used changed in Zephyr's manifest.
+
+From the Zephyr tree alone (the change database, zmig.modulecheck.tree_needs), modules
+the target needs although the target build never got far enough to say so:
+
+  missing from the scan's module set, target has no .config   module-required (same ID)
+  in the scan's module set, missing from the user's allowlist module-not-in-manifest
+
+(docs/DESIGN-CHANGE-DB.md §2.4, §6: ardep A6 tf-psa-crypto; RIT FSW F2 cmsis_6.)"""
 
 from __future__ import annotations
 
 import os
-from typing import ClassVar, Literal
+from dataclasses import replace
+from pathlib import Path
+from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
-from zmig.buildctx import Artifact
+from zmig.buildctx import Artifact, project_path, project_roots
+from zmig.errors import ZmigError
 from zmig.findings import (
     JSON,
     Category,
@@ -20,8 +31,16 @@ from zmig.findings import (
     tool_output,
 )
 from zmig.manifest import load_manifest
-from zmig.modulecheck import manifest_changes, user_manifest
+from zmig.modulecheck import (
+    ModuleNeed,
+    manifest_changes,
+    manifest_line,
+    tree_needs,
+    user_allowlist,
+    user_manifest,
+)
 from zmig.scan import ScanContext
+from zmig.snapshots import build_dependencies
 
 
 class ModulesAnalyzer:
@@ -35,7 +54,8 @@ class ModulesAnalyzer:
 
         def add(kind: str, subject: str, title: str, sev: Severity, action: str,
                 ev: tuple[JSON, ...], old: object = None, new: object = None,
-                introduced: bool = True) -> None:  # fmt: skip
+                introduced: bool = True, conf: Confidence = Confidence.HIGH,
+                heuristics: tuple[str, ...] = ()) -> None:  # fmt: skip
             findings.append(
                 Finding(
                     category=Category.MANIFEST,
@@ -43,7 +63,8 @@ class ModulesAnalyzer:
                     subject=subject,
                     title=title,
                     severity=sev,
-                    confidence=Confidence.HIGH,
+                    confidence=conf,
+                    heuristics=heuristics,
                     action=action,
                     analyzer=self.name,
                     scope=ctx.scope,
@@ -55,7 +76,14 @@ class ModulesAnalyzer:
             )
 
         zephyr = str(ctx.new.workspace.zephyr) + "/"
-        for need in ctx.module_needs:
+        mine = _user_manifest(ctx)
+
+        def required(
+            need: ModuleNeed,
+            source: str = "target build",
+            conf: Confidence = Confidence.HIGH,
+            heuristics: tuple[str, ...] = (),
+        ) -> None:
             added = need.module in ctx.modules_added
             # Needed at both refs: the scan's module set lacked it, the migration didn't
             # change anything (AUDIT.md §5.2 run 1; docs/DESIGN-P1.md §2.3).
@@ -63,7 +91,7 @@ class ModulesAnalyzer:
             site = need.site.replace(zephyr, "zephyr/")
             ev: list[JSON] = [
                 tool_output(
-                    "target build",
+                    source,
                     ctx.runner.redact(f"{site}: {need.why}" if site else need.why),
                 )
             ]
@@ -71,13 +99,9 @@ class ModulesAnalyzer:
                 ev.append(
                     tool_output("target manifest", f"zephyr/{need.declared} declares {need.module}")
                 )
-            app = ctx.old.spec.app.resolve()
-            mine = user_manifest(app)
             in_manifest = ""
             if mine is not None:
-                path, line, what = mine
-                rel = os.path.relpath(path, app).replace(os.sep, "/")
-                text = path.read_text(errors="replace").splitlines()[line - 1].strip()
+                rel, line, what, text, _ = mine
                 ev.insert(0, file_line(rel, line, text))
                 in_manifest = f" in {rel}:{line} ({what})"
             add(
@@ -116,13 +140,66 @@ class ModulesAnalyzer:
                     "required_at_source": at_source,
                 },
                 introduced=not at_source,
+                conf=conf,
+                heuristics=heuristics,
             )
+
+        for need in ctx.module_needs:
+            required(need)
+
+        new_manifest = load_manifest(ctx.new.workspace.root)
+        have = {m.name for m in ctx.new.workspace.modules(ctx.runner)}
+        diagnosed = {n.module for n in ctx.module_needs}
+        allow = user_allowlist(mine[4]) if mine is not None else None
+        old_manifest = load_manifest(ctx.old.workspace.root)
+        for need in self._tree_needs(ctx, new_manifest, old_manifest):
+            if need.module in diagnosed:
+                continue
+            need = replace(need, declared=manifest_line(ctx.new.workspace.zephyr, need.module))
+            if need.module not in have:
+                # A target that configured without it didn't need it (or failed for a
+                # reason the build itself names, diagnosed above).
+                if not ctx.new_img.has(Artifact.CONFIG):
+                    required(need, "Zephyr tree at the target", Confidence.MEDIUM,
+                             ("changes.lexical",))  # fmt: skip
+            elif mine is not None and allow is not None and need.module not in allow:
+                rel, line, what, text, _ = mine
+                declared = (
+                    [
+                        tool_output(
+                            "target manifest", f"zephyr/{need.declared} declares {need.module}"
+                        )
+                    ]
+                    if need.declared
+                    else []
+                )
+                add(
+                    "module-not-in-manifest",
+                    need.module,
+                    f"The target needs module {need.module}, which your manifest's "
+                    f"name-allowlist doesn't list",
+                    Severity.BREAKING,
+                    f"Add {need.module} to {rel}:{line} ({what}) and run `west update`. "
+                    f"zmig was given it, so the target build had it; `west update` with "
+                    f"your manifest won't fetch it.",
+                    (
+                        file_line(rel, line, text),
+                        tool_output(
+                            "Zephyr tree at the target",
+                            ctx.runner.redact(f"{need.site}: {need.why}"),
+                        ),
+                        *declared,
+                    ),
+                    new={"module": need.module, "why": need.why, "site": need.site},
+                    conf=Confidence.MEDIUM,
+                    heuristics=("changes.lexical",),
+                )
 
         used = [m.name for m in ctx.old.workspace.modules(ctx.runner)]
         changes = manifest_changes(
             used,
-            load_manifest(ctx.old.workspace.root),
-            load_manifest(ctx.new.workspace.root),
+            old_manifest,
+            new_manifest,
             ctx.old.workspace.zephyr,
             ctx.new.workspace.zephyr,
         )
@@ -168,3 +245,51 @@ class ModulesAnalyzer:
         )
         checked = Checked("module set", "found" if needs or removed else "clean", detail, self.name)
         return AnalyzerResult(findings, checked=[checked])
+
+    @staticmethod
+    def _tree_needs(
+        ctx: ScanContext, new_manifest: dict[str, Any], old_manifest: dict[str, Any]
+    ) -> list[ModuleNeed]:
+        """Modules the Zephyr tree at the target says the source build's configuration
+        needs; none without the source build's dependency records or the database."""
+        from zmig.analyzers.changes import database
+
+        if not ctx.old_img.has(Artifact.CONFIG):
+            return []
+        deps = build_dependencies(ctx.old_img, ctx.runner)
+        modules = ctx.old_img.dir / Artifact.MODULES.value
+        if deps is None or not modules.is_file():
+            return []
+        try:
+            db = database(ctx).get("modules", {})
+        except ZmigError:
+            return []
+        paths = {}
+        for ln in modules.read_text().splitlines():
+            parts = [p.strip('"') for p in ln.split('":"')]
+            if len(parts) >= 2:
+                paths[parts[0]] = parts[1]
+        used = {f for fs in deps.values() for f in fs}
+        return tree_needs(db, ctx.old_config, used, paths, new_manifest, old_manifest)
+
+
+def _user_manifest(ctx: ScanContext) -> tuple[str, int, str, str, Path] | None:
+    """The user's manifest (zmig.modulecheck.user_manifest) as (path shown, line, what the
+    line is, its text, file): above the app, else in one of the project's own modules (a
+    project whose manifest repository is an extra module; the app a copy elsewhere,
+    regression: RIT FSW's patched app copy)."""
+    app = ctx.old.spec.app.resolve()
+    found = user_manifest(app)
+    shown = None
+    if found is None:
+        roots = project_roots(ctx.old, ctx.old_img.dir)
+        for root, prefix in sorted(roots.items()):
+            if prefix and (found := user_manifest(Path(root))) is not None:
+                shown = project_path(str(found[0]), roots)
+                break
+    if found is None:
+        return None
+    path, line, what = found
+    rel = shown or os.path.relpath(path, app).replace(os.sep, "/")
+    text = path.read_text(errors="replace").splitlines()[line - 1].strip()
+    return rel, line, what, text, path

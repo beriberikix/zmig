@@ -17,6 +17,14 @@ Devicetree bindings, the same way: every `compatible:` line under dts/bindings a
 ref, removed compatibles, and their replacements from the commits that removed them (a
 binding file renamed with its compatible, `ti,tmp116.yaml` -> `ti,tmp11x.yaml`).
 
+Modules (Zephyr's glue in modules/<dir>/ at the target), facts a scan turns into "module
+M is needed" for what its source build uses (zmig.modulecheck.tree_needs):
+
+  glue paths     the other modules a glue directory builds paths into
+                 (`${ZEPHYR_<M>_MODULE_DIR}/...`; mbedtls -> tf-psa-crypto at v4.4.0)
+  kconfig moved  symbols defined at the target only in one module's glue, and outside it
+                 at the source (HAS_CMSIS_CORE_M: modules/cmsis/ -> modules/cmsis_6/, v4.2.0)
+
 Computed once per (source SHA, target SHA) and cached as JSON.
 """
 
@@ -35,7 +43,7 @@ if TYPE_CHECKING:
     from zmig.refs import Mirror
     from zmig.tools import Runner
 
-CHANGES_VERSION = 3
+CHANGES_VERSION = 4
 _DEF = re.compile(r"^\s*(?:menu)?config\s+([A-Z0-9_]+)\s*$")
 _DEF_GREP = r"^\s*(menu)?config\s+[A-Z0-9_]+\s*$"
 _KCONFIG_PATHS = ("*Kconfig*",)
@@ -43,6 +51,10 @@ _KCONFIG_PATHS = ("*Kconfig*",)
 COMPAT = re.compile(r'^compatible:\s*"?([\w,.+-]+)"?\s*(?:#.*)?$')
 _COMPAT_GREP = r"^compatible:"
 _BINDING_PATHS = ("dts/bindings",)
+# A path into another module: `${ZEPHYR_TF_PSA_CRYPTO_MODULE_DIR}/drivers/...`.
+_GLUE_PATH = re.compile(r"\$\{ZEPHYR_([A-Z0-9_]+)_MODULE_DIR\}/")
+_GLUE_GREP = r"\$\{ZEPHYR_[A-Z0-9_]+_MODULE_DIR\}/"
+_GLUE_DIR = re.compile(r"^modules/([^/]+)/")
 # Symbols Zephyr generates at configure time; a lexical table can't speak for them.
 _GENERATED = re.compile(r"^(DT_HAS_\w+_ENABLED|ZEPHYR_\w+_MODULE(_BLOBS)?)$")
 _KEYWORD = re.compile(
@@ -87,6 +99,50 @@ def parse_table(grep_out: str, pattern: re.Pattern[str] = _DEF) -> dict[str, str
         if m:
             table.setdefault(m[1], f"{parts[1]}:{parts[2]}")
     return table
+
+
+def parse_definitions(grep_out: str) -> dict[str, list[str]]:
+    """`git grep -n` output of `config` lines -> {symbol: every "path:line" defining it}."""
+    defs: dict[str, list[str]] = {}
+    for line in grep_out.splitlines():
+        parts = line.split(":", 3)
+        if len(parts) == 4 and (m := _DEF.match(parts[3])):
+            defs.setdefault(m[1], []).append(f"{parts[1]}:{parts[2]}")
+    return defs
+
+
+def glue_paths(grep_out: str) -> dict[str, dict[str, str]]:
+    """`git grep -n` of glue lines under modules/ -> {glue dir: {module variable stem: first
+    "path:line" building a path into that module}}, the glue's own module left out."""
+    out: dict[str, dict[str, str]] = {}
+    for line in grep_out.splitlines():
+        parts = line.split(":", 3)
+        if len(parts) < 4 or not (d := _GLUE_DIR.match(parts[1])):
+            continue
+        own = re.sub(r"[^A-Za-z0-9_]", "_", d[1]).upper()
+        for var in _GLUE_PATH.findall(parts[3]):
+            if var != own:
+                out.setdefault(d[1], {}).setdefault(var, f"{parts[1]}:{parts[2]}")
+    return out
+
+
+def moved_into_glue(
+    source: dict[str, list[str]], target: dict[str, list[str]]
+) -> dict[str, dict[str, str]]:
+    """Symbols the target defines only in one module's glue (modules/<dir>/), that the
+    source defined outside it: a build enabling one needs that module at the target."""
+    out: dict[str, dict[str, str]] = {}
+    for sym, locs in sorted(target.items()):
+        if sym not in source or _GENERATED.match(sym):
+            continue
+        dirs = {m[1] if (m := _GLUE_DIR.match(loc)) else None for loc in locs}
+        if len(dirs) != 1 or None in dirs:
+            continue
+        (d,) = dirs
+        before = [loc for loc in source[sym] if not loc.startswith(f"modules/{d}/")]
+        if len(before) == len(source[sym]):
+            out[sym] = {"dir": str(d), "defined_at": locs[0], "was": before[0]}
+    return out
 
 
 def parse_pairs(log: str, pattern: re.Pattern[str] = _DEF) -> dict[str, list[tuple[str, str, str]]]:
@@ -365,10 +421,14 @@ def _git(mirror: Mirror, runner: Runner, *args: str) -> str:
     return str(proc.stdout)
 
 
-def symbol_table(mirror: Mirror, runner: Runner, sha: str) -> dict[str, str]:
-    return parse_table(
+def definitions(mirror: Mirror, runner: Runner, sha: str) -> dict[str, list[str]]:
+    return parse_definitions(
         _git(mirror, runner, "grep", "-n", "-E", _DEF_GREP, sha, "--", *_KCONFIG_PATHS)
     )
+
+
+def glue_references(mirror: Mirror, runner: Runner, sha: str) -> str:
+    return _git(mirror, runner, "grep", "-n", "-E", _GLUE_GREP, sha, "--", "modules")
 
 
 def binding_table(mirror: Mirror, runner: Runner, sha: str) -> dict[str, str]:
@@ -379,8 +439,8 @@ def binding_table(mirror: Mirror, runner: Runner, sha: str) -> dict[str, str]:
 
 
 def build(mirror: Mirror, runner: Runner, old_sha: str, new_sha: str) -> dict[str, Any]:
-    source = symbol_table(mirror, runner, old_sha)
-    target = symbol_table(mirror, runner, new_sha)
+    defs = definitions(mirror, runner, old_sha), definitions(mirror, runner, new_sha)
+    source, target = ({s: locs[0] for s, locs in d.items()} for d in defs)
     compats = binding_table(mirror, runner, old_sha), binding_table(mirror, runner, new_sha)
     for what, sha, table in (
         ("Kconfig symbols", old_sha, source),
@@ -414,6 +474,10 @@ def build(mirror: Mirror, runner: Runner, old_sha: str, new_sha: str) -> dict[st
             source, target, parse_pairs(log(*_KCONFIG_PATHS)), reader(new_sha), reader(old_sha)
         ),
         "devicetree": compat_changes(*compats, parse_pairs(log(*_BINDING_PATHS), COMPAT)),
+        "modules": {
+            "glue_paths": glue_paths(glue_references(mirror, runner, new_sha)),
+            "kconfig_moved": moved_into_glue(*defs),
+        },
     }
 
 
