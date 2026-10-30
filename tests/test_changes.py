@@ -336,6 +336,7 @@ def _ctx(tmp_path: Path, target_configured: bool, prior: list[Any] | None = None
         ),
         new_spec="v4.4.0", scope=("s",), prior=prior or [],
         runner=SimpleNamespace(redact=lambda s: s),
+        shared={"module_definitions": (set(), set())},
     )  # fmt: skip
 
 
@@ -490,6 +491,7 @@ def _dt_ctx(tmp_path: Path, target_edt: bool) -> Any:
         ),
         build_files=set(), old_spec="v4.1.0", new_spec="v4.2.0", scope=("s",), prior=[],
         runner=SimpleNamespace(redact=lambda s: s),
+        shared={"module_definitions": (set(), set())},
     )  # fmt: skip
 
 
@@ -595,3 +597,68 @@ def test_glue_paths_and_symbols_moved_into_a_modules_glue() -> None:
             "was": "drivers/x/Kconfig:3",
         },
     }
+
+
+def test_a_symbol_or_compatible_a_module_defines_at_the_target_is_not_removed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DESIGN-CHANGE-DB §2.1 (DOGFOOD-11 gap 1): the database covers Zephyr's tree only. A
+    symbol (or compatible) that moved into a module the scan uses still exists at the
+    target, so it isn't reported removed. The project's own re-declaration (ardep A1) is
+    in the project's module, not a workspace module, and doesn't count."""
+    from zmig.analyzers import changes as mod
+
+    monkeypatch.setattr(mod, "database", lambda ctx: DB)
+    monkeypatch.setattr(mod, "project_roots", lambda b, d: {str(tmp_path / "ardep"): "ardep/"})
+    monkeypatch.setattr(mod, "module_definitions", lambda ctx: ({"TMP116", "GONE_READ"}, set()))
+    kinds = {(f.kind, f.subject) for f in mod.ChangesAnalyzer().analyze(
+        _ctx(tmp_path, target_configured=False)).findings}  # fmt: skip
+    assert kinds == {("kconfig-override-orphaned", "CONFIG_CAN_MAX_STD_ID_FILTER")}
+
+    monkeypatch.setattr(mod, "database", lambda ctx: DT_DB)
+    monkeypatch.setattr(mod, "module_definitions", lambda ctx: (set(), {"ti,tmp116"}))
+    assert mod.ChangesAnalyzer().analyze(_dt_ctx(tmp_path / "2", False)).findings == []
+
+
+def test_module_definitions_from_the_target_workspace(tmp_path: Path) -> None:
+    import subprocess
+    from types import SimpleNamespace
+
+    from zmig.analyzers.changes import module_definitions
+
+    m = tmp_path / "hal_x"
+    (m / "zephyr" / "dts" / "bindings").mkdir(parents=True)
+    (m / "zephyr" / "Kconfig").write_text("config MOVED_SYM\n\tbool\n")
+    (m / "zephyr" / "dts" / "bindings" / "v,x.yaml").write_text('compatible: "vnd,moved"\n')
+    (m / "notes.txt").write_text("config NOT_KCONFIG\n")
+    for cmd in (["init", "-q"], ["add", "."], ["-c", "user.email=a@b", "-c", "user.name=a",
+                                               "commit", "-qm", "x"]):  # fmt: skip
+        subprocess.run(["git", "-C", str(m), *cmd], check=True)
+    from zmig.tools import Runner
+
+    ws = SimpleNamespace(modules=lambda runner: [SimpleNamespace(name="hal_x", path=m)])
+    ctx = SimpleNamespace(new=SimpleNamespace(workspace=ws), runner=Runner(log_dir=None, redactions={}),
+                          shared={})  # fmt: skip
+    assert module_definitions(ctx) == ({"MOVED_SYM"}, {"vnd,moved"})  # type: ignore[arg-type]
+
+
+def test_a_change_database_that_cant_be_built_is_reported_not_silent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DOGFOOD-11 gap 2: without the database the devicetree analyzer still reports
+    `compatible-unbound` (from the EDTs), but without a replacement, and says why under
+    "not checked" instead of nothing."""
+    from zmig.analyzers import changes as ch
+    from zmig.analyzers import devicetree as dt
+    from zmig.errors import ZmigError
+
+    def fail(ctx: Any) -> Any:
+        raise ZmigError("no Kconfig symbols found at 0123456789ab in /mirror")
+
+    monkeypatch.setattr(ch, "database", fail)
+    res = dt.DevicetreeAnalyzer().analyze(_dt_ctx(tmp_path, True))
+    (f,) = [f for f in res.findings if f.kind == "compatible-unbound"]
+    assert f.new is None
+    assert [(n.area, "0123456789ab" in n.reason) for n in res.not_checked] == [
+        ("change database", True)
+    ]

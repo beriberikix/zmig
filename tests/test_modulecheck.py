@@ -278,7 +278,7 @@ def test_tree_needs_become_module_required_or_module_not_in_manifest(
         ModuleNeed("cmsis_6", "CONFIG_HAS_CMSIS_CORE_M moved", "modules/cmsis_6/Kconfig:14"),
     ]
     monkeypatch.setattr(
-        modules.ModulesAnalyzer, "_tree_needs", staticmethod(lambda ctx, m, o: needs)
+        modules.ModulesAnalyzer, "_tree_needs", staticmethod(lambda ctx, m, o: (needs, None))
     )
 
     def run(target_config: bool) -> Any:

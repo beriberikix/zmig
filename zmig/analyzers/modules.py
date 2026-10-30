@@ -26,6 +26,7 @@ from zmig.findings import (
     Checked,
     Confidence,
     Finding,
+    NotChecked,
     Severity,
     file_line,
     tool_output,
@@ -152,7 +153,19 @@ class ModulesAnalyzer:
         diagnosed = {n.module for n in ctx.module_needs}
         allow = user_allowlist(mine[4]) if mine is not None else None
         old_manifest = load_manifest(ctx.old.workspace.root)
-        for need in self._tree_needs(ctx, new_manifest, old_manifest):
+        tree, db_error = self._tree_needs(ctx, new_manifest, old_manifest)
+        not_checked = (
+            [
+                NotChecked(
+                    "change database",
+                    f"modules the Zephyr tree says the target needs weren't checked: {db_error}",
+                    self.name,
+                )
+            ]
+            if db_error
+            else []
+        )
+        for need in tree:
             if need.module in diagnosed:
                 continue
             need = replace(need, declared=manifest_line(ctx.new.workspace.zephyr, need.module))
@@ -244,33 +257,34 @@ class ModulesAnalyzer:
             )
         )
         checked = Checked("module set", "found" if needs or removed else "clean", detail, self.name)
-        return AnalyzerResult(findings, checked=[checked])
+        return AnalyzerResult(findings, checked=[checked], not_checked=not_checked)
 
     @staticmethod
     def _tree_needs(
         ctx: ScanContext, new_manifest: dict[str, Any], old_manifest: dict[str, Any]
-    ) -> list[ModuleNeed]:
+    ) -> tuple[list[ModuleNeed], str | None]:
         """Modules the Zephyr tree at the target says the source build's configuration
-        needs; none without the source build's dependency records or the database."""
+        needs; none without the source build's dependency records or the database (then
+        with the database's error, reported under "not checked")."""
         from zmig.analyzers.changes import database
 
         if not ctx.old_img.has(Artifact.CONFIG):
-            return []
+            return [], None
         deps = build_dependencies(ctx.old_img, ctx.runner)
         modules = ctx.old_img.dir / Artifact.MODULES.value
         if deps is None or not modules.is_file():
-            return []
+            return [], None
         try:
             db = database(ctx).get("modules", {})
-        except ZmigError:
-            return []
+        except ZmigError as e:
+            return [], str(e)
         paths = {}
         for ln in modules.read_text().splitlines():
             parts = [p.strip('"') for p in ln.split('":"')]
             if len(parts) >= 2:
                 paths[parts[0]] = parts[1]
         used = {f for fs in deps.values() for f in fs}
-        return tree_needs(db, ctx.old_config, used, paths, new_manifest, old_manifest)
+        return tree_needs(db, ctx.old_config, used, paths, new_manifest, old_manifest), None
 
 
 def _user_manifest(ctx: ScanContext) -> tuple[str, int, str, str, Path] | None:

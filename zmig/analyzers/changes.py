@@ -14,6 +14,10 @@ Likewise the devicetree analyzer's `compatible-unbound`, when the target has no
 devicetree: a compatible the app or the project's own DTS uses (zmig.usage, project_dts),
 bound by a binding at the source, whose binding the Zephyr tree no longer has.
 
+The database covers Zephyr's tree only. A symbol or compatible that a module of the target
+workspace defines (it moved into a module) isn't removed, and isn't reported
+(DESIGN-CHANGE-DB §2.1, `module_definitions`).
+
 Same category, kind and subject as those analyzers, so a finding has the same ID whether
 or not the target configured. Each part runs only when the target lacks the artifact its
 analyzer needs, and skips a subject an earlier analyzer already reported. Kconfig
@@ -27,10 +31,40 @@ from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact, project_path, project_roots
-from zmig.changes import choose, load_or_build
+from zmig.changes import (
+    _COMPAT_GREP,
+    _DEF,
+    _DEF_GREP,
+    COMPAT,
+    choose,
+    load_or_build,
+    parse_table,
+)
 from zmig.findings import JSON, Category, Confidence, Finding, Severity, file_line, tool_output
 from zmig.scan import ScanContext
 from zmig.usage import Loc, dt_token
+
+
+def module_definitions(ctx: ScanContext) -> tuple[set[str], set[str]]:
+    """(Kconfig symbols, binding compatibles) the modules of the target workspace define:
+    Zephyr's west projects, not the project's own extra modules (whose re-declarations,
+    ardep A1, are what's being reported). One `git grep` per module, cached per scan."""
+    if "module_definitions" not in ctx.shared:
+        symbols: set[str] = set()
+        compats: set[str] = set()
+        for m in ctx.new.workspace.modules(ctx.runner):
+            for pattern, grep, paths, into in (
+                (_DEF, _DEF_GREP, ["*Kconfig*"], symbols),
+                (COMPAT, _COMPAT_GREP, [":(glob)**/dts/bindings/**/*.yaml"], compats),
+            ):
+                proc = ctx.runner.run(
+                    ["git", "-C", str(m.path), "grep", "-n", "-E", grep, "HEAD", "--", *paths],
+                    check=False,
+                )
+                into.update(parse_table(str(proc.stdout), pattern))
+        ctx.shared["module_definitions"] = (symbols, compats)
+    found: tuple[set[str], set[str]] = ctx.shared["module_definitions"]
+    return found
 
 
 def database(ctx: ScanContext) -> dict[str, Any]:
@@ -63,11 +97,15 @@ class ChangesAnalyzer:
             return AnalyzerResult.skipped(f"the source build has no {what}")
         db = database(ctx)
         reported = {(f.kind, f.subject) for f in ctx.prior}
+        in_modules, compats_in_modules = module_definitions(ctx)
         findings: list[Finding] = []
         if kconfig:
-            findings += self._kconfig(ctx, db["kconfig"]["removed"], reported)
+            removed = {s: v for s, v in db["kconfig"]["removed"].items() if s not in in_modules}
+            findings += self._kconfig(ctx, removed, reported)
         if dts:
-            gone = db["devicetree"]["removed"]
+            gone = {
+                c: v for c, v in db["devicetree"]["removed"].items() if c not in compats_in_modules
+            }
             for token, locs in sorted(ctx.usage.dt_compats.items()):
                 compat = bound_compatible(ctx.old_edt, token)
                 if compat and compat in gone and ("compatible-unbound", token) not in reported:

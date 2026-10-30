@@ -163,3 +163,19 @@ one `git log` per file class, not one per symbol.
   - gap 1 (module-defined symbols), before relying on this beyond the measured set;
   - gap 2 (make a missing database visible);
   - A3: the board schema diff names `full_name`.
+
+## 8. Addendum (2026-10-30): gaps 1 and 2 closed
+
+- **Gap 1:** the `changes` analyzer reads what the target workspace's modules define, with
+  one `git grep` per module for `config` lines and binding `compatible:` lines.
+  - A removed symbol or compatible that a module defines isn't reported.
+  - The project's own extra modules don't count, so ardep A1's re-declaration is still
+    reported.
+- **Gap 2:** when the database can't be built, the devicetree and modules analyzers
+  report it under "not checked" (area "change database"), with the error.
+
+**Re-scan** (`eval/runs/gaps`, all 14 configurations; OpenDeck scan and plan), against
+`b3vb`: no finding changed, no analyzer errored, and `compare` exits 0. Gap 1's safeguard
+removed nothing on the measured set, so §2's numbers stand.
+
+Gaps 3–6 are still open.

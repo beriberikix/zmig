@@ -21,6 +21,7 @@ from zmig.findings import (
     Category,
     Confidence,
     Finding,
+    NotChecked,
     Severity,
     artifact_diff,
     file_line,
@@ -78,14 +79,15 @@ def spec_changes(old: dict[str, Any], new: dict[str, Any], prop: str) -> list[tu
 
 
 def _compat_database(ctx: ScanContext) -> dict[str, Any]:
-    """The change database, for a removed binding's replacement; without it (a ref the
-    mirror can't build it for) the finding stands without one."""
+    """The change database, for a removed binding's replacement. Without it (a ref the
+    mirror can't build it for) the finding stands without one, and "error" says why
+    (reported under "not checked", DOGFOOD-11 gap 2)."""
     from zmig.analyzers.changes import database
 
     try:
         return database(ctx)
-    except ZmigError:
-        return {"devicetree": {"removed": {}}}
+    except ZmigError as e:
+        return {"devicetree": {"removed": {}}, "error": str(e)}
 
 
 class DevicetreeAnalyzer:
@@ -436,7 +438,19 @@ class DevicetreeAnalyzer:
             and token in listed
             and not bound_compatible(new, token)
         ]
-        removed = _compat_database(ctx)["devicetree"]["removed"] if unbound else {}
+        db = _compat_database(ctx) if unbound else {"devicetree": {"removed": {}}}
+        removed = db["devicetree"]["removed"]
+        not_checked = (
+            [
+                NotChecked(
+                    "change database",
+                    f"replacements for unbound compatibles weren't looked up: {db['error']}",
+                    self.name,
+                )
+            ]
+            if "error" in db
+            else []
+        )
         for token, compat, locs in unbound:
             findings.append(unbound_compatible(ctx, token, compat, locs, removed, self.name))
 
@@ -475,7 +489,7 @@ class DevicetreeAnalyzer:
                     "binding_changed": binding_only,
                 },
             )
-        return AnalyzerResult(findings)
+        return AnalyzerResult(findings, not_checked=not_checked)
 
 
 _APP_COPY = re.compile(r"^(?:.*/)?apps/[0-9a-f]+/[^/]+/")
