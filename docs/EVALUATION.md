@@ -68,8 +68,10 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ | ″ | 6 | **clean**: after Phase 0 (DOGFOOD-9) | 0 | 3 (50%) | 4/5 (80%) | **2** (fix-actionable 0) | ″ | ″ | DOGFOOD-9 §3 |
 | **RIT FSW** `sensor_module` | v4.1.0 → v4.2.0 | 3 | **clean**: DOGFOOD-8 baseline | 0 | 1 (33%) | 3/6 (50%) | 0 (fix-actionable 0) | configure failed (Kconfig) | unknown (low) | DOGFOOD-8 §2 |
 | ″ | ″ | 3 | **clean**: after Phase 0 (DOGFOOD-9) | 0 | 1 (33%) | 3/6 (50%) | 0 (fix-actionable 0) | ″ | ″ | DOGFOOD-9 §3 |
+| ″ | ″ | 3 | tuned: after the detection fixes (DOGFOOD-10) | 0 | 1 (33%) | **3/3 (100%)** | **1** (fix-actionable 0) | ″ | ″ | DOGFOOD-10 §2 |
 | **CoffeeCaller** (native_sim) | v4.2.0 → v4.4.0 | 4 | **clean**: DOGFOOD-8 baseline | 0 | 2 (50%) | 3/4 (75%) | 0 (fix-actionable 0) | build failed (devicetree aliases) | direct-ok (low) | DOGFOOD-8 §2 |
 | ″ | ″ | 4 | tuned: after Phase 0 (DOGFOOD-9) | 0 | 2 (50%) | 3/4 (75%) | **1** (fix-actionable **1**) | ″ | ″ | DOGFOOD-9 §3 |
+| ″ | ″ | 4 | tuned: after the detection fixes (DOGFOOD-10) | **1 (25%)** | 2 (50%) | **8/8 (100%)** | **2** (fix-actionable 1) | ″ | ″ | DOGFOOD-10 §2 |
 | **P1 fixtures** (`tests/fixtures/p1-layout`, `p1-mode`, `p1-rename`, `p1-ble`, `xapp*`) | v4.2.2 → v4.3.0 (constructed) | — | **tuned by construction** (written to exercise P1) | — | — | — | — | | each fixture's expected verdict (layout hazard, MCUboot mode, rename, BLE clean; cross-image) is asserted by `tests/test_p1_fixture.py`, `test_cross_fixture.py` | DESIGN-P1 §11 |
 
 ### Clean results only
