@@ -24,13 +24,22 @@ env -u PYTHONPATH .venv/bin/python eval/run.py scan --out /tmp/ev-old --zmig <co
   - `compare` diffs findings by ID against the baselines.
   - `snapshot` makes a new baseline from a scored report.
 - **`baselines/<config>.json`:** the scored run's findings, as ID, severity, confidence, kind
-  and title. There are no paths or environment details, so they can be checked in.
+  title, action and evidence files. Evidence paths are project-relative (or `<…>` for
+  Zephyr's), with no machine paths or environment details, so they can be checked in.
 
 ## What `compare` does and doesn't do
 
 It lists, per configuration, the breaking/risky findings that are new, gone, or changed
 severity, matched by finding ID (ORACLE-RULES §3: one ID is one finding). It exits 1 when a
 breaking/risky finding needs a verdict.
+
+For breaking/risky findings whose ID and severity are unchanged, it also lists changes to
+the **action text** and the **evidence files**:
+- the action decides actionable (DOGFOOD-3 §7.1);
+- the evidence decides recall's location condition.
+
+Both can change while the ID stays the same. DOGFOOD-6 and DOGFOOD-7 missed exactly that,
+and were corrected on 2026-10-30.
 
 It doesn't score. Verdicts and recall stay a person's job, against the oracle
 (ORACLE-RULES §2–3):

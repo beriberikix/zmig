@@ -172,9 +172,17 @@ def scan(configs: dict[str, Any], names: list[str], out: Path, ref: str | None) 
 
 
 def summarize(report: dict[str, Any]) -> list[dict[str, str]]:
-    """What a baseline keeps of a report: no paths or environment, only what scoring needs."""
-    keep = ("id", "severity", "confidence", "kind", "title")
-    return sorted(({k: str(f[k]) for k in keep} for f in report["findings"]), key=lambda f: f["id"])
+    """What a baseline keeps of a report: only what scoring needs, and no machine paths.
+
+    Besides ID and severity, it keeps the action (actionable: does it name a file the
+    maintainers edited) and the project files the evidence points at (recall's location
+    condition): both can change while ID and severity don't (DOGFOOD-7 corrections)."""
+    keep = ("id", "severity", "confidence", "kind", "title", "action")
+    out = []
+    for f in report["findings"]:
+        files = sorted({str(e["path"]) for e in f["evidence"] if e.get("type") == "file_line"})
+        out.append({**{k: str(f[k]) for k in keep}, "files": " ".join(files)})
+    return sorted(out, key=lambda f: f["id"])
 
 
 def snapshot(configs: dict[str, Any], name: str, report: Path) -> None:
@@ -211,6 +219,14 @@ def compare(configs: dict[str, Any], names: list[str], out: Path) -> int:
             if a != b and (a in GATED or b in GATED):
                 lines.append(f"- changed {a} → {b}: `{i}` {now[i]['title'][:100]}")
                 needs += b in GATED and a not in GATED
+            elif a in GATED and b in GATED:
+                # Same ID and severity, but what a scorer reads may differ.
+                for key, what in (("action", "action"), ("files", "evidence files")):
+                    if key in base[i] and base[i][key] != now[i][key]:
+                        lines.append(
+                            f"- {what} changed (recheck actionable/location): `{i}`\n"
+                            f"  - was: {base[i][key][:160]}\n  - now: {now[i][key][:160]}"
+                        )
         for i in sorted(now.keys() - base.keys()):
             if now[i]["severity"] in GATED:
                 sev, title = now[i]["severity"], now[i]["title"][:100]

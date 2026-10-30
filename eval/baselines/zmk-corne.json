@@ -1,7 +1,7 @@
 {
  "config": "zmk-corne",
- "scored": "DOGFOOD-3 P2 (zmig 6f0bf46)",
- "schema_version": "1.2",
+ "scored": "DOGFOOD-7 (zmig aa95a10)",
+ "schema_version": "1.4",
  "verdict": "unknown",
  "findings": [
   {
@@ -9,539 +9,729 @@
    "severity": "breaking",
    "confidence": "high",
    "kind": "callback-type-changed",
-   "title": "Callbacks your code provides no longer match the type Zephyr expects at zephyr-to@339570e2393b: int (*)(void)"
+   "title": "Callbacks your code provides no longer match the type Zephyr expects at zephyr-to@339570e2393b: int (*)(void)",
+   "action": "Change their signatures to match (incompatible function pointer types initializing 'int (*)(void)' with an expression of type 'int (const struct device *)').",
+   "files": "src/activity.c src/battery.c src/ble.c src/endpoints.c src/hog.c src/split/bluetooth/central.c src/usb.c src/usb_hid.c src/workqueue.c"
   },
   {
    "id": "API-ENUM-CHANGED-1caaeabf",
    "severity": "risky",
    "confidence": "high",
    "kind": "enum-changed",
-   "title": "Enum constant SENSOR_CHAN_GAUGE_VOLTAGE, which your code uses, changed: = 39 → = 40"
+   "title": "Enum constant SENSOR_CHAN_GAUGE_VOLTAGE, which your code uses, changed: = 39 → = 40",
+   "action": "Its value changed and your code compared it: check stored, transmitted or compared values.",
+   "files": "module/drivers/sensor/battery/battery_common.c module/drivers/sensor/battery/battery_nrf_vddh.c"
   },
   {
    "id": "API-ENUM-CHANGED-357124a0",
    "severity": "risky",
    "confidence": "high",
    "kind": "enum-changed",
-   "title": "Enum constant SENSOR_CHAN_ALL, which your code uses, changed: = 57 → = 58"
+   "title": "Enum constant SENSOR_CHAN_ALL, which your code uses, changed: = 57 → = 58",
+   "action": "Its value changed and your code compared it: check stored, transmitted or compared values.",
+   "files": "module/drivers/sensor/battery/battery_nrf_vddh.c"
   },
   {
    "id": "API-ENUM-CHANGED-7f1fd970",
    "severity": "risky",
    "confidence": "high",
    "kind": "enum-changed",
-   "title": "Enum constant SENSOR_CHAN_GAUGE_STATE_OF_CHARGE, which your code uses, changed: = 44 → = 45"
+   "title": "Enum constant SENSOR_CHAN_GAUGE_STATE_OF_CHARGE, which your code uses, changed: = 44 → = 45",
+   "action": "Its value changed and your code compared, passed it: check stored, transmitted or compared values.",
+   "files": "module/drivers/sensor/battery/battery_common.c module/drivers/sensor/battery/battery_nrf_vddh.c src/battery.c"
+  },
+  {
+   "id": "API-FUNCTION-BECAME-MACRO-44afb137",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "function-became-macro",
+   "title": "Function sprintf, which your code uses, is a macro in zephyr-to@339570e2393b",
+   "action": "Calls keep working; code that takes its address or #undefs it doesn't.",
+   "files": "src/ble.c"
+  },
+  {
+   "id": "API-FUNCTION-BECAME-MACRO-5da9ab6f",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "function-became-macro",
+   "title": "Function snprintf, which your code uses, is a macro in zephyr-to@339570e2393b",
+   "action": "Calls keep working; code that takes its address or #undefs it doesn't.",
+   "files": "src/endpoints.c src/ext_power_generic.c"
+  },
+  {
+   "id": "API-FUNCTION-BECAME-MACRO-a09b7307",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "function-became-macro",
+   "title": "Function memset, which your code uses, is a macro in zephyr-to@339570e2393b",
+   "action": "Calls keep working; code that takes its address or #undefs it doesn't.",
+   "files": "src/hid.c src/split/bluetooth/central.c"
+  },
+  {
+   "id": "API-FUNCTION-BECAME-MACRO-c38f14be",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "function-became-macro",
+   "title": "Function memcpy, which your code uses, is a macro in zephyr-to@339570e2393b",
+   "action": "Calls keep working; code that takes its address or #undefs it doesn't.",
+   "files": "src/ble.c src/hog.c src/stdlib.c"
   },
   {
    "id": "API-SYSCALLS-NOT-GENERATED-47f7b545",
    "severity": "breaking",
    "confidence": "high",
    "kind": "syscalls-not-generated",
-   "title": "include/drivers/behavior.h declares system calls (behavior_get_binding, behavior_keymap_binding_convert_central_state_dependent_params, behavior_get_locality, behavior_keymap_binding_pressed, ...) that zephyr-to@339570e2393b no longer generates; files including it fail on the missing syscalls/behavior.h"
+   "title": "include/drivers/behavior.h declares system calls (behavior_get_binding, behavior_keymap_binding_convert_central_state_dependent_params, behavior_get_locality, behavior_keymap_binding_pressed, ...) that zephyr-to@339570e2393b no longer generates; files including it fail on the missing syscalls/behavior.h",
+   "action": "Zephyr at the target only scans registered headers for __syscall: register it in your CMakeLists.txt with zephyr_syscall_header(<path>/include/drivers/behavior.h) and set CONFIG_APPLICATION_DEFINED_SYSCALL=y.",
+   "files": "include/drivers/behavior.h"
   },
   {
    "id": "API-SYSCALLS-NOT-GENERATED-ca8024d7",
    "severity": "breaking",
    "confidence": "high",
    "kind": "syscalls-not-generated",
-   "title": "include/drivers/ext_power.h declares system calls (ext_power_enable, ext_power_disable, ext_power_get) that zephyr-to@339570e2393b no longer generates; files including it fail on the missing syscalls/ext_power.h"
+   "title": "include/drivers/ext_power.h declares system calls (ext_power_enable, ext_power_disable, ext_power_get) that zephyr-to@339570e2393b no longer generates; files including it fail on the missing syscalls/ext_power.h",
+   "action": "Zephyr at the target only scans registered headers for __syscall: register it in your CMakeLists.txt with zephyr_syscall_header(<path>/include/drivers/ext_power.h) and set CONFIG_APPLICATION_DEFINED_SYSCALL=y.",
+   "files": "include/drivers/ext_power.h"
   },
   {
    "id": "BUILD-KCONFIG-NAME-COLLISION-7c2cfcbc",
    "severity": "breaking",
    "confidence": "high",
    "kind": "kconfig-name-collision",
-   "title": "CONFIG_MAX17048 is defined by the app (module/drivers/sensor/max17048/Kconfig:6) and, from zephyr-to@339570e2393b on, by Zephyr (drivers/fuel_gauge/max17048/Kconfig:7); the two definitions form a dependency loop"
+   "title": "CONFIG_MAX17048 is defined by the app (module/drivers/sensor/max17048/Kconfig:6) and, from zephyr-to@339570e2393b on, by Zephyr (drivers/fuel_gauge/max17048/Kconfig:7); the two definitions form a dependency loop",
+   "action": "Rename the app's symbol (and the devicetree compatible if it has one), or switch to the upstream driver.",
+   "files": "module/drivers/sensor/max17048/Kconfig"
   },
   {
    "id": "BUILD-KCONFIG-OVERRIDE-ORPHANED-06da6565",
    "severity": "breaking",
    "confidence": "high",
    "kind": "kconfig-override-orphaned",
-   "title": "The app overrides CONFIG_SSD1306_REVERSE_MODE (boards/shields/corne/Kconfig.defconfig:24, boards/shields/elephant42/Kconfig.defconfig:27, boards/shields/jorne/Kconfig.defconfig:25 (+41)), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure"
+   "title": "The app overrides CONFIG_SSD1306_REVERSE_MODE (boards/shields/corne/Kconfig.defconfig:24, boards/shields/elephant42/Kconfig.defconfig:27, boards/shields/jorne/Kconfig.defconfig:25 (+41)), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure",
+   "action": "Find what replaced CONFIG_SSD1306_REVERSE_MODE at the target (Kconfig findings and migration guide entries name candidates) and update or remove the override.",
+   "files": "boards/shields/corne/Kconfig.defconfig boards/shields/elephant42/Kconfig.defconfig boards/shields/jorne/Kconfig.defconfig boards/shields/knob_goblin/Kconfig.defconfig boards/shields/kyria/Kconfig.defconfig boards/shields/leeloo/Kconfig.defconfig"
   },
   {
    "id": "BUILD-KCONFIG-OVERRIDE-ORPHANED-4440a398",
    "severity": "breaking",
    "confidence": "high",
    "kind": "kconfig-override-orphaned",
-   "title": "The app overrides CONFIG_BT_LL_SW_LLCP_IMPL (Kconfig:175), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure"
+   "title": "The app overrides CONFIG_BT_LL_SW_LLCP_IMPL (Kconfig:175), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure",
+   "action": "Find what replaced CONFIG_BT_LL_SW_LLCP_IMPL at the target (Kconfig findings and migration guide entries name candidates) and update or remove the override.",
+   "files": "Kconfig"
   },
   {
    "id": "BUILD-KCONFIG-OVERRIDE-ORPHANED-8baa1c47",
    "severity": "breaking",
    "confidence": "high",
    "kind": "kconfig-override-orphaned",
-   "title": "The app overrides CONFIG_LV_Z_MEM_POOL_MAX_SIZE (src/display/Kconfig:35), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure"
+   "title": "The app overrides CONFIG_LV_Z_MEM_POOL_MAX_SIZE (src/display/Kconfig:35), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure",
+   "action": "Find what replaced CONFIG_LV_Z_MEM_POOL_MAX_SIZE at the target (Kconfig findings and migration guide entries name candidates) and update or remove the override.",
+   "files": "src/display/Kconfig"
   },
   {
    "id": "BUILD-KCONFIG-OVERRIDE-ORPHANED-c4fb7621",
    "severity": "breaking",
    "confidence": "high",
    "kind": "kconfig-override-orphaned",
-   "title": "The app overrides CONFIG_LV_Z_MEM_POOL_MIN_SIZE (src/display/Kconfig:32), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure"
+   "title": "The app overrides CONFIG_LV_Z_MEM_POOL_MIN_SIZE (src/display/Kconfig:32), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure",
+   "action": "Find what replaced CONFIG_LV_Z_MEM_POOL_MIN_SIZE at the target (Kconfig findings and migration guide entries name candidates) and update or remove the override.",
+   "files": "src/display/Kconfig"
   },
   {
    "id": "BUILD-KCONFIG-OVERRIDE-ORPHANED-c7ef6f3a",
    "severity": "breaking",
    "confidence": "high",
    "kind": "kconfig-override-orphaned",
-   "title": "The app overrides CONFIG_LV_Z_DPI (boards/shields/corne/Kconfig.defconfig:34, boards/shields/elephant42/Kconfig.defconfig:37, boards/shields/jorne/Kconfig.defconfig:35 (+39)), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure"
+   "title": "The app overrides CONFIG_LV_Z_DPI (boards/shields/corne/Kconfig.defconfig:34, boards/shields/elephant42/Kconfig.defconfig:37, boards/shields/jorne/Kconfig.defconfig:35 (+39)), but the symbol is not defined at zephyr-to@339570e2393b; Kconfig rejects the configure",
+   "action": "Find what replaced CONFIG_LV_Z_DPI at the target (Kconfig findings and migration guide entries name candidates) and update or remove the override.",
+   "files": "boards/shields/corne/Kconfig.defconfig boards/shields/elephant42/Kconfig.defconfig boards/shields/jorne/Kconfig.defconfig boards/shields/knob_goblin/Kconfig.defconfig boards/shields/kyria/Kconfig.defconfig boards/shields/leeloo/Kconfig.defconfig"
   },
   {
    "id": "BUILD-NEW-WARNING-adbded30",
    "severity": "risky",
    "confidence": "high",
    "kind": "new-warning",
-   "title": "New compiler warning at zephyr-to@339570e2393b: initialization of 'int (*)(void)' from incompatible pointer type 'int (*)(const struct device *)'"
+   "title": "New compiler warning at zephyr-to@339570e2393b: initialization of 'int (*)(void)' from incompatible pointer type 'int (*)(const struct device *)'",
+   "action": "Check whether it points at a real problem.",
+   "files": "src/activity.c src/battery.c src/endpoints.c src/hog.c src/split/bluetooth/central.c src/usb.c src/usb_hid.c src/workqueue.c"
   },
   {
    "id": "BUILD-TARGET-BUILD-FAILED-f5607720",
    "severity": "breaking",
    "confidence": "high",
    "kind": "target-build-failed",
-   "title": "The target build fails (after salvage): 24 errors (compiler)"
+   "title": "The target build fails (after salvage): 24 errors (compiler)",
+   "action": "The Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
+   "files": "include/drivers/behavior.h include/drivers/ext_power.h"
   },
   {
    "id": "BUILD-WARNINGS-RESOLVED-50d7d868",
    "severity": "info",
    "confidence": "high",
    "kind": "warnings-resolved",
-   "title": "Warnings from zephyr-from@1ae0eb5ce8ad that no longer appear: 1"
+   "title": "Warnings from zephyr-from@1ae0eb5ce8ad that no longer appear: 1",
+   "action": "None needed.",
+   "files": ""
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-03da51f8",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&spi3 (/soc/spi@4002f000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto"
+   "title": "&spi3 (/soc/spi@4002f000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/ckp/ckp.dtsi boards/arm/glove80/glove80_lh.dts boards/arm/glove80/glove80_rh.dts boards/arm/nice60/nice60.dts boards/shields/chalice/boards/nice_nano.overlay boards/shields/chalice/boards/nice_nano_v2.overlay boards/shields/corne/boards/nice_nano.overlay boards/shields/corne/boards/nice_nano_v2.overlay boards/shields/elephant42/boards/nice_nano.overlay boards/shields/elephant42/boards/nice_nano_v2.overlay boards/shields/eternal_keypad/boards/nice_nano.overlay boards/shields/eternal_keypad/boards/nice_nano_v2.overlay boards/shields/helix/boards/nice_nano.overlay boards/shields/helix/boards/nice_nano_v2.overlay boards/shields/jorne/boards/nice_nano.overlay boards/shields/jorne/boards/nice_nano_v2.overlay boards/shields/kyria/boards/nice_nano.overlay boards/shields/kyria/boards/nice_nano_v2.overlay boards/shields/leeloo/boards/nice_nano_v2.overlay boards/shields/leeloo_micro/boards/nice_nano_v2.overlay boards/shields/lily58/boards/nice_nano.overlay boards/shields/lily58/boards/nice_nano_v2.overlay boards/shields/microdox/boards/nice_nano.overlay boards/shields/microdox/boards/nice_nano_v2.overlay boards/shields/murphpad/boards/nice_nano.overlay boards/shields/murphpad/boards/nice_nano_v2.overlay boards/shields/nibble/boards/nice_nano.overlay boards/shields/nibble/boards/nice_nano_v2.overlay boards/shields/redox/boards/nice_nano.overlay boards/shields/redox/boards/nice_nano_v2.overlay boards/shields/reviung34/boards/nice_nano_v2.overlay boards/shields/reviung41/boards/nice_nano.overlay boards/shields/reviung41/boards/nice_nano_v2.overlay boards/shields/reviung53/boards/nice_nano.overlay boards/shields/reviung53/boards/nice_nano_v2.overlay boards/shields/romac_plus/boards/nice_nano.overlay boards/shields/romac_plus/boards/nice_nano_v2.overlay boards/shields/snap/boards/nice_nano.overlay boards/shields/snap/boards/nice_nano_v2.overlay boards/shields/sofle/boards/nice_nano.overlay boards/shields/sofle/boards/nice_nano_v2.overlay boards/shields/sofle/boards/nrfmicro_11.overlay boards/shields/sofle/boards/nrfmicro_13.overlay boards/shields/splitkb_aurora_corne/boards/nice_nano.overlay boards/shields/splitkb_aurora_corne/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_helix/boards/nice_nano.overlay boards/shields/splitkb_aurora_helix/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_lily58/boards/nice_nano.overlay boards/shields/splitkb_aurora_lily58/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_sofle/boards/nice_nano.overlay boards/shields/splitkb_aurora_sofle/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_sweep/boards/nice_nano.overlay boards/shields/splitkb_aurora_sweep/boards/nice_nano_v2.overlay boards/shields/tg4x/boards/nice_nano.overlay boards/shields/tg4x/boards/nice_nano_v2.overlay boards/shields/tidbit/boards/nice_nano.overlay boards/shields/tidbit/boards/nice_nano_v2.overlay boards/shields/two_percent_milk/boards/nice_nano.overlay boards/shields/two_percent_milk/boards/nice_nano_v2.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-15df8189",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&i2c1 (/soc/i2c@40004000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&i2c1 (/soc/i2c@40004000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/proton_c/arduino_pro_micro_pins.dtsi boards/arm/proton_c/proton_c.dts boards/blackpill_f401ce.overlay boards/blackpill_f411ce.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-2f3d616b",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&flash0 (/soc/flash-controller@4001e000/flash@0): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&flash0 (/soc/flash-controller@4001e000/flash@0): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/bdn9/bdn9_rev2.dts boards/arm/bluemicro840/bluemicro840_v1.dts boards/arm/bt60/bt60.dtsi boards/arm/ckp/ckp.dtsi boards/arm/corneish_zen/corneish_zen.dtsi boards/arm/dz60rgb/dz60rgb_rev1.dts boards/arm/ferris/ferris_rev02.dts boards/arm/glove80/glove80.dtsi boards/arm/kbdfans_tofu65/kbdfans_tofu65_v2.dts boards/arm/mikoto/mikoto_520.dts boards/arm/nice60/nice60.dts boards/arm/nice_nano/nice_nano.dtsi boards/arm/nrf52840_m2/nrf52840_m2.dts boards/arm/nrfmicro/nrfmicro_11.dts boards/arm/nrfmicro/nrfmicro_11_flipped.dts boards/arm/nrfmicro/nrfmicro_13.dts boards/arm/nrfmicro/nrfmicro_13_52833.dts boards/arm/pillbug/pillbug.dts boards/arm/planck/planck_rev6.dts boards/arm/preonic/preonic_rev3.dts boards/arm/proton_c/proton_c.dts boards/arm/puchi_ble/puchi_ble_v1.dts boards/arm/s40nc/s40nc.dts"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-4243406a",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&uart0 (/soc/uart@40002000): binding defaults changed, not set in the DTS: cts-pull-up, rx-pull-up, zephyr,pm-device-runtime-auto"
+   "title": "&uart0 (/soc/uart@40002000): binding defaults changed, not set in the DTS: cts-pull-up, rx-pull-up, zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/bluemicro840/arduino_pro_micro_pins.dtsi boards/arm/bluemicro840/bluemicro840_v1.dts boards/arm/bt60/bt60.dtsi boards/arm/glove80/glove80_lh.dts boards/arm/glove80/glove80_rh.dts boards/arm/mikoto/arduino_pro_micro_pins.dtsi boards/arm/mikoto/mikoto_520.dts boards/arm/nice_nano/arduino_pro_micro_pins.dtsi boards/arm/nice_nano/nice_nano.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins_52833.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins_flipped.dtsi boards/arm/nrfmicro/nrfmicro_11.dts boards/arm/nrfmicro/nrfmicro_11_flipped.dts boards/arm/nrfmicro/nrfmicro_13.dts boards/arm/nrfmicro/nrfmicro_13_52833.dts boards/arm/pillbug/blackpill_pins.dtsi boards/arm/pillbug/pillbug.dts boards/arm/puchi_ble/arduino_pro_micro_pins.dtsi boards/arm/puchi_ble/puchi_ble_v1.dts"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-47b1527c",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&pro_micro_i2c/ssd1306@3c (/soc/i2c@40003000/ssd1306@3c): binding defaults changed, not set in the DTS: inversion-on, ready-time-ms, zephyr,pm-device-runtime-auto"
+   "title": "&pro_micro_i2c/ssd1306@3c (/soc/i2c@40003000/ssd1306@3c): binding defaults changed, not set in the DTS: inversion-on, ready-time-ms, zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/shields/corne/corne.dtsi boards/shields/elephant42/elephant42.dtsi boards/shields/jorne/jorne.dtsi boards/shields/knob_goblin/knob_goblin.overlay boards/shields/kyria/kyria_common.dtsi boards/shields/leeloo/leeloo_common.dtsi boards/shields/leeloo_micro/leeloo_micro.dtsi boards/shields/lily58/lily58.dtsi boards/shields/lotus58/lotus58.dtsi boards/shields/microdox/microdox_common.dtsi boards/shields/murphpad/murphpad.overlay boards/shields/nibble/nibble.overlay boards/shields/snap/snap.dtsi boards/shields/sofle/sofle.dtsi boards/shields/splitkb_aurora_corne/splitkb_aurora_corne.dtsi boards/shields/splitkb_aurora_helix/splitkb_aurora_helix.dtsi boards/shields/splitkb_aurora_lily58/splitkb_aurora_lily58.dtsi boards/shields/splitkb_aurora_sofle/splitkb_aurora_sofle.dtsi boards/shields/splitkb_aurora_sweep/splitkb_aurora_sweep.dtsi boards/shields/tidbit/tidbit.dtsi boards/shields/waterfowl/waterfowl.dtsi boards/shields/zodiark/zodiark.dtsi"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-4e184bc9",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&spi3/ws2812@0 (/soc/spi@4002f000/ws2812@0): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&spi3/ws2812@0 (/soc/spi@4002f000/ws2812@0): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/ckp/ckp.dtsi boards/arm/glove80/glove80_lh.dts boards/arm/glove80/glove80_rh.dts boards/arm/nice60/nice60.dts boards/shields/chalice/boards/nice_nano.overlay boards/shields/chalice/boards/nice_nano_v2.overlay boards/shields/corne/boards/nice_nano.overlay boards/shields/corne/boards/nice_nano_v2.overlay boards/shields/elephant42/boards/nice_nano.overlay boards/shields/elephant42/boards/nice_nano_v2.overlay boards/shields/eternal_keypad/boards/nice_nano.overlay boards/shields/eternal_keypad/boards/nice_nano_v2.overlay boards/shields/helix/boards/nice_nano.overlay boards/shields/helix/boards/nice_nano_v2.overlay boards/shields/jorne/boards/nice_nano.overlay boards/shields/jorne/boards/nice_nano_v2.overlay boards/shields/kyria/boards/nice_nano.overlay boards/shields/kyria/boards/nice_nano_v2.overlay boards/shields/leeloo/boards/nice_nano_v2.overlay boards/shields/leeloo_micro/boards/nice_nano_v2.overlay boards/shields/lily58/boards/nice_nano.overlay boards/shields/lily58/boards/nice_nano_v2.overlay boards/shields/microdox/boards/nice_nano.overlay boards/shields/microdox/boards/nice_nano_v2.overlay boards/shields/murphpad/boards/nice_nano.overlay boards/shields/murphpad/boards/nice_nano_v2.overlay boards/shields/nibble/boards/nice_nano.overlay boards/shields/nibble/boards/nice_nano_v2.overlay boards/shields/redox/boards/nice_nano.overlay boards/shields/redox/boards/nice_nano_v2.overlay boards/shields/reviung34/boards/nice_nano_v2.overlay boards/shields/reviung41/boards/nice_nano.overlay boards/shields/reviung41/boards/nice_nano_v2.overlay boards/shields/reviung53/boards/nice_nano.overlay boards/shields/reviung53/boards/nice_nano_v2.overlay boards/shields/romac_plus/boards/nice_nano.overlay boards/shields/romac_plus/boards/nice_nano_v2.overlay boards/shields/snap/boards/nice_nano.overlay boards/shields/snap/boards/nice_nano_v2.overlay boards/shields/sofle/boards/nice_nano.overlay boards/shields/sofle/boards/nice_nano_v2.overlay boards/shields/sofle/boards/nrfmicro_11.overlay boards/shields/sofle/boards/nrfmicro_13.overlay boards/shields/splitkb_aurora_corne/boards/nice_nano.overlay boards/shields/splitkb_aurora_corne/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_helix/boards/nice_nano.overlay boards/shields/splitkb_aurora_helix/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_lily58/boards/nice_nano.overlay boards/shields/splitkb_aurora_lily58/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_sofle/boards/nice_nano.overlay boards/shields/splitkb_aurora_sofle/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_sweep/boards/nice_nano.overlay boards/shields/splitkb_aurora_sweep/boards/nice_nano_v2.overlay boards/shields/tg4x/boards/nice_nano.overlay boards/shields/tg4x/boards/nice_nano_v2.overlay boards/shields/tidbit/boards/nice_nano.overlay boards/shields/tidbit/boards/nice_nano_v2.overlay boards/shields/two_percent_milk/boards/nice_nano.overlay boards/shields/two_percent_milk/boards/nice_nano_v2.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-4f3d4759",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&pinctrl (/pin-controller): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&pinctrl (/pin-controller): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro-pinctrl.dtsi boards/arm/bluemicro840/bluemicro840_v1-pinctrl.dtsi boards/arm/ckp/ckp-pinctrl.dtsi boards/arm/corneish_zen/corneish_zen_v1_left.dts boards/arm/corneish_zen/corneish_zen_v1_right.dts boards/arm/corneish_zen/corneish_zen_v2_left.dts boards/arm/corneish_zen/corneish_zen_v2_right.dts boards/arm/glove80/glove80_lh-pinctrl.dtsi boards/arm/glove80/glove80_rh-pinctrl.dtsi boards/arm/mikoto/mikoto_520-pinctrl.dtsi boards/arm/nice60/nice60-pinctrl.dtsi boards/arm/nice_nano/nice_nano-pinctrl.dtsi boards/arm/nrfmicro/nrfmicro-flipped-pinctrl.dtsi boards/arm/nrfmicro/nrfmicro-pinctrl.dtsi boards/arm/pillbug/pillbug-pinctrl.dtsi boards/arm/puchi_ble/puchi_ble_v1-pinctrl.dtsi boards/shields/chalice/boards/nice_nano.overlay boards/shields/chalice/boards/nice_nano_v2.overlay boards/shields/corne/boards/nice_nano.overlay boards/shields/corne/boards/nice_nano_v2.overlay boards/shields/elephant42/boards/nice_nano.overlay boards/shields/elephant42/boards/nice_nano_v2.overlay boards/shields/eternal_keypad/boards/nice_nano.overlay boards/shields/eternal_keypad/boards/nice_nano_v2.overlay boards/shields/helix/boards/nice_nano.overlay boards/shields/helix/boards/nice_nano_v2.overlay boards/shields/jorne/boards/nice_nano.overlay boards/shields/jorne/boards/nice_nano_v2.overlay boards/shields/kyria/boards/nice_nano.overlay boards/shields/kyria/boards/nice_nano_v2.overlay boards/shields/kyria/boards/nrfmicro_11.overlay boards/shields/kyria/boards/nrfmicro_11_flipped.overlay boards/shields/kyria/boards/nrfmicro_13.overlay boards/shields/leeloo/boards/nice_nano_v2.overlay boards/shields/leeloo_micro/boards/nice_nano_v2.overlay boards/shields/lily58/boards/nice_nano.overlay boards/shields/lily58/boards/nice_nano_v2.overlay boards/shields/microdox/boards/nice_nano.overlay boards/shields/microdox/boards/nice_nano_v2.overlay boards/shields/murphpad/boards/nice_nano.overlay boards/shields/murphpad/boards/nice_nano_v2.overlay boards/shields/nibble/boards/nice_nano.overlay boards/shields/nibble/boards/nice_nano_v2.overlay boards/shields/nice_view_adapter/boards/bluemicro840_v1.overlay boards/shields/nice_view_adapter/boards/mikoto_520.overlay boards/shields/nice_view_adapter/boards/nice_nano.overlay boards/shields/nice_view_adapter/boards/nice_nano_v2.overlay boards/shields/nice_view_adapter/boards/nrfmicro_11.overlay boards/shields/nice_view_adapter/boards/nrfmicro_11_flipped.overlay boards/shields/nice_view_adapter/boards/nrfmicro_13.overlay boards/shields/nice_view_adapter/boards/puchi_ble_v1.overlay boards/shields/redox/boards/nice_nano.overlay boards/shields/redox/boards/nice_nano_v2.overlay boards/shields/reviung34/boards/nice_nano_v2.overlay boards/shields/reviung41/boards/nice_nano.overlay boards/shields/reviung41/boards/nice_nano_v2.overlay boards/shields/reviung53/boards/nice_nano.overlay boards/shields/reviung53/boards/nice_nano_v2.overlay boards/shields/romac_plus/boards/nice_nano.overlay boards/shields/romac_plus/boards/nice_nano_v2.overlay boards/shields/snap/boards/nice_nano.overlay boards/shields/snap/boards/nice_nano_v2.overlay boards/shields/sofle/boards/nice_nano.overlay boards/shields/sofle/boards/nice_nano_v2.overlay boards/shields/sofle/boards/nrfmicro_11.overlay boards/shields/sofle/boards/nrfmicro_13.overlay boards/shields/splitkb_aurora_corne/boards/nice_nano.overlay boards/shields/splitkb_aurora_corne/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_helix/boards/nice_nano.overlay boards/shields/splitkb_aurora_helix/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_lily58/boards/nice_nano.overlay boards/shields/splitkb_aurora_lily58/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_sofle/boards/nice_nano.overlay boards/shields/splitkb_aurora_sofle/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_sweep/boards/nice_nano.overlay boards/shields/splitkb_aurora_sweep/boards/nice_nano_v2.overlay boards/shields/tg4x/boards/nice_nano.overlay boards/shields/tg4x/boards/nice_nano_v2.overlay boards/shields/tidbit/boards/nice_nano.overlay boards/shields/tidbit/boards/nice_nano_v2.overlay boards/shields/two_percent_milk/boards/nice_nano.overlay boards/shields/two_percent_milk/boards/nice_nano_v2.overlay boards/shields/two_percent_milk/boards/nrfmicro_11.overlay boards/shields/two_percent_milk/boards/nrfmicro_11_flipped.overlay boards/shields/two_percent_milk/boards/nrfmicro_13.overlay boards/shields/zmk_uno/boards/nrf52840dk_nrf52840.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-54bbf762",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&spi0 (/soc/spi@40003000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto"
+   "title": "&spi0 (/soc/spi@40003000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/bluemicro840/arduino_pro_micro_pins.dtsi boards/arm/corneish_zen/corneish_zen_v2_left.dts boards/arm/corneish_zen/corneish_zen_v2_right.dts boards/arm/mikoto/arduino_pro_micro_pins.dtsi boards/arm/nice_nano/arduino_pro_micro_pins.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins_52833.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins_flipped.dtsi boards/arm/puchi_ble/arduino_pro_micro_pins.dtsi boards/shields/nice_view_adapter/boards/bluemicro840_v1.overlay boards/shields/nice_view_adapter/boards/mikoto_520.overlay boards/shields/nice_view_adapter/boards/nice_nano.overlay boards/shields/nice_view_adapter/boards/nice_nano_v2.overlay boards/shields/nice_view_adapter/boards/nrfmicro_11.overlay boards/shields/nice_view_adapter/boards/nrfmicro_11_flipped.overlay boards/shields/nice_view_adapter/boards/nrfmicro_13.overlay boards/shields/nice_view_adapter/boards/puchi_ble_v1.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-6566fa3a",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&adc (/soc/adc@40007000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&adc (/soc/adc@40007000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/bluemicro840/bluemicro840_v1.dts boards/arm/bt60/bt60.dtsi boards/arm/ckp/ckp.dtsi boards/arm/corneish_zen/corneish_zen.dtsi boards/arm/glove80/glove80.dtsi boards/arm/mikoto/mikoto_520.dts boards/arm/nice60/nice60.dts boards/arm/nice_nano/nice_nano.dtsi boards/arm/nrf52840_m2/nrf52840_m2.dts boards/arm/nrfmicro/nrfmicro_13.dts boards/arm/nrfmicro/nrfmicro_13_52833.dts boards/arm/pillbug/pillbug.dts boards/arm/puchi_ble/puchi_ble_v1.dts boards/arm/s40nc/s40nc.dts boards/seeeduino_xiao_ble.overlay module/drivers/sensor/battery/battery_nrf_vddh.c"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-7660af44",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&oled (/soc/i2c@40003000/ssd1306@3c): binding defaults changed, not set in the DTS: inversion-on, ready-time-ms, zephyr,pm-device-runtime-auto"
+   "title": "&oled (/soc/i2c@40003000/ssd1306@3c): binding defaults changed, not set in the DTS: inversion-on, ready-time-ms, zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/shields/microdox/microdox_right.overlay boards/shields/microdox/microdox_v2_right.overlay boards/shields/snap/snap_left.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-93057812",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&kscan0 (/kscan): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&kscan0 (/kscan): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/glove80/glove80_lh.dts boards/arm/glove80/glove80_rh.dts boards/shields/bfo9000/bfo9000_left.overlay boards/shields/bfo9000/bfo9000_right.overlay boards/shields/corne/corne_left.overlay boards/shields/corne/corne_right.overlay boards/shields/elephant42/elephant42_left.overlay boards/shields/elephant42/elephant42_right.overlay boards/shields/fourier/fourier_left.overlay boards/shields/fourier/fourier_right.overlay boards/shields/helix/helix_left.overlay boards/shields/helix/helix_right.overlay boards/shields/iris/iris_left.overlay boards/shields/iris/iris_right.overlay boards/shields/jian/jian_left.overlay boards/shields/jian/jian_right.overlay boards/shields/jiran/jiran_left.overlay boards/shields/jiran/jiran_right.overlay boards/shields/jorne/jorne_left.overlay boards/shields/jorne/jorne_right.overlay boards/shields/kyria/kyria.dtsi boards/shields/kyria/kyria_left.overlay boards/shields/kyria/kyria_rev2_left.overlay boards/shields/kyria/kyria_rev2_right.overlay boards/shields/kyria/kyria_rev3_left.overlay boards/shields/kyria/kyria_rev3_right.overlay boards/shields/kyria/kyria_right.overlay boards/shields/leeloo/leeloo_left.overlay boards/shields/leeloo/leeloo_rev2_left.overlay boards/shields/leeloo/leeloo_rev2_right.overlay boards/shields/leeloo/leeloo_right.overlay boards/shields/leeloo_micro/leeloo_micro_left.overlay boards/shields/leeloo_micro/leeloo_micro_right.overlay boards/shields/lily58/lily58_left.overlay boards/shields/lily58/lily58_right.overlay boards/shields/lotus58/lotus58_left.overlay boards/shields/lotus58/lotus58_right.overlay boards/shields/microdox/microdox_left.overlay boards/shields/microdox/microdox_right.overlay boards/shields/microdox/microdox_v2_left.overlay boards/shields/microdox/microdox_v2_right.overlay boards/shields/redox/redox_left.overlay boards/shields/redox/redox_right.overlay boards/shields/sofle/sofle_left.overlay boards/shields/sofle/sofle_right.overlay boards/shields/splitreus62/splitreus62_left.overlay boards/shields/splitreus62/splitreus62_right.overlay boards/shields/waterfowl/waterfowl_left.overlay boards/shields/waterfowl/waterfowl_right.overlay boards/shields/zodiark/zodiark_left.overlay boards/shields/zodiark/zodiark_right.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-9bdb3828",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&pro_micro_i2c (/soc/i2c@40003000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&pro_micro_i2c (/soc/i2c@40003000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/shields/corne/corne.dtsi boards/shields/elephant42/elephant42.dtsi boards/shields/jorne/jorne.dtsi boards/shields/knob_goblin/knob_goblin.overlay boards/shields/kyria/kyria_common.dtsi boards/shields/leeloo/leeloo_common.dtsi boards/shields/leeloo_micro/leeloo_micro.dtsi boards/shields/lily58/lily58.dtsi boards/shields/lotus58/lotus58.dtsi boards/shields/microdox/microdox_common.dtsi boards/shields/murphpad/murphpad.overlay boards/shields/nibble/nibble.overlay boards/shields/nice_view_adapter/boards/bluemicro840_v1.overlay boards/shields/nice_view_adapter/boards/mikoto_520.overlay boards/shields/nice_view_adapter/boards/nice_nano.overlay boards/shields/nice_view_adapter/boards/nice_nano_v2.overlay boards/shields/nice_view_adapter/boards/nrfmicro_11.overlay boards/shields/nice_view_adapter/boards/nrfmicro_11_flipped.overlay boards/shields/nice_view_adapter/boards/nrfmicro_13.overlay boards/shields/nice_view_adapter/boards/puchi_ble_v1.overlay boards/shields/snap/snap.dtsi boards/shields/sofle/sofle.dtsi boards/shields/splitkb_aurora_corne/splitkb_aurora_corne.dtsi boards/shields/splitkb_aurora_helix/splitkb_aurora_helix.dtsi boards/shields/splitkb_aurora_lily58/splitkb_aurora_lily58.dtsi boards/shields/splitkb_aurora_sofle/splitkb_aurora_sofle.dtsi boards/shields/splitkb_aurora_sweep/splitkb_aurora_sweep.dtsi boards/shields/tidbit/tidbit.dtsi boards/shields/waterfowl/waterfowl.dtsi boards/shields/zodiark/zodiark.dtsi"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-9d507064",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&gpiote (/soc/gpiote@40006000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&gpiote (/soc/gpiote@40006000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/bluemicro840/bluemicro840_v1.dts boards/arm/bt60/bt60.dtsi boards/arm/ckp/ckp.dtsi boards/arm/corneish_zen/corneish_zen.dtsi boards/arm/glove80/glove80.dtsi boards/arm/mikoto/mikoto_520.dts boards/arm/nice60/nice60.dts boards/arm/nice_nano/nice_nano.dtsi boards/arm/nrf52840_m2/nrf52840_m2.dts boards/arm/nrfmicro/nrfmicro_11.dts boards/arm/nrfmicro/nrfmicro_11_flipped.dts boards/arm/nrfmicro/nrfmicro_13.dts boards/arm/nrfmicro/nrfmicro_13_52833.dts boards/arm/pillbug/pillbug.dts boards/arm/puchi_ble/puchi_ble_v1.dts boards/arm/s40nc/s40nc.dts"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-a5c959da",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&pro_micro_serial (/soc/uart@40002000): binding defaults changed, not set in the DTS: cts-pull-up, rx-pull-up, zephyr,pm-device-runtime-auto"
+   "title": "&pro_micro_serial (/soc/uart@40002000): binding defaults changed, not set in the DTS: cts-pull-up, rx-pull-up, zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/adafruit_kb2040.overlay boards/boardsource_blok.overlay boards/sparkfun_pro_micro_rp2040.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-a6aae3b6",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&usbd (/soc/usbd@40027000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&usbd (/soc/usbd@40027000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/bluemicro840/bluemicro840_v1.dts boards/arm/bt60/bt60.dtsi boards/arm/ckp/ckp.dtsi boards/arm/corneish_zen/corneish_zen.dtsi boards/arm/glove80/glove80.dtsi boards/arm/kbdfans_tofu65/kbdfans_tofu65_v2.dts boards/arm/mikoto/mikoto_520.dts boards/arm/nice60/nice60.dts boards/arm/nice_nano/nice_nano.dtsi boards/arm/nrf52840_m2/nrf52840_m2.dts boards/arm/nrfmicro/nrfmicro_11.dts boards/arm/nrfmicro/nrfmicro_11_flipped.dts boards/arm/nrfmicro/nrfmicro_13.dts boards/arm/nrfmicro/nrfmicro_13_52833.dts boards/arm/pillbug/pillbug.dts boards/arm/puchi_ble/puchi_ble_v1.dts boards/arm/s40nc/s40nc.dts boards/seeeduino_xiao_ble.overlay boards/usb_console.dtsi"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-a9a49d33",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&spi2 (/soc/spi@40023000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto"
+   "title": "&spi2 (/soc/spi@40023000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/bdn9/bdn9_rev2.dts boards/arm/corneish_zen/corneish_zen_v1_left.dts boards/arm/corneish_zen/corneish_zen_v1_right.dts boards/arm/proton_c/arduino_pro_micro_pins.dtsi boards/arm/proton_c/proton_c.dts"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-ae15dd5f",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&qspi (/soc/qspi@40029000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&qspi (/soc/qspi@40029000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/seeeduino_xiao_ble.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-c51d6b7b",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "/kscan (/kscan): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "/kscan (/kscan): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro_left.dts boards/arm/adv360pro/adv360pro_right.dts boards/arm/bdn9/bdn9_rev2.dts boards/arm/corneish_zen/corneish_zen_v1_left.dts boards/arm/corneish_zen/corneish_zen_v1_right.dts boards/arm/corneish_zen/corneish_zen_v2_left.dts boards/arm/corneish_zen/corneish_zen_v2_right.dts boards/arm/dz60rgb/dz60rgb_rev1.dts boards/arm/ferris/ferris_rev02.dts boards/arm/glove80/glove80.dtsi boards/arm/kbdfans_tofu65/kbdfans_tofu65_v2.dts boards/arm/nice60/nice60.dts boards/arm/planck/planck_rev6.dts boards/arm/s40nc/s40nc.dts boards/native_posix.overlay boards/native_posix_64.overlay boards/nrf52_bsim.overlay boards/shields/a_dux/a_dux.dtsi boards/shields/bfo9000/bfo9000.dtsi boards/shields/boardsource3x4/boardsource3x4.overlay boards/shields/boardsource5x12/boardsource5x12.overlay boards/shields/clog/clog.dtsi boards/shields/corne/corne.dtsi boards/shields/cradio/cradio.dtsi boards/shields/elephant42/elephant42.dtsi boards/shields/ergodash/ergodash.dtsi boards/shields/eternal_keypad/eternal_keypad.dtsi boards/shields/fourier/fourier.dtsi boards/shields/helix/helix.dtsi boards/shields/iris/iris.dtsi boards/shields/jian/jian.dtsi boards/shields/jiran/jiran.dtsi boards/shields/jorne/jorne.dtsi boards/shields/knob_goblin/knob_goblin.overlay boards/shields/kyria/kyria_common.dtsi boards/shields/leeloo/leeloo_common.dtsi boards/shields/leeloo_micro/leeloo_micro.dtsi boards/shields/lily58/lily58.dtsi boards/shields/lotus58/lotus58.dtsi boards/shields/m60/m60.overlay boards/shields/microdox/microdox.dtsi boards/shields/microdox/microdox_v2.dtsi boards/shields/murphpad/murphpad.overlay boards/shields/nibble/nibble.overlay boards/shields/quefrency/quefrency_left.overlay boards/shields/quefrency/quefrency_right.overlay boards/shields/redox/redox.dtsi boards/shields/romac/romac.overlay boards/shields/romac_plus/romac_plus.dtsi boards/shields/romac_plus/romac_plus.overlay boards/shields/snap/snap.dtsi boards/shields/sofle/sofle.dtsi boards/shields/splitkb_aurora_corne/splitkb_aurora_corne_left.overlay boards/shields/splitkb_aurora_corne/splitkb_aurora_corne_right.overlay boards/shields/splitkb_aurora_helix/splitkb_aurora_helix_left.overlay boards/shields/splitkb_aurora_helix/splitkb_aurora_helix_right.overlay boards/shields/splitkb_aurora_lily58/splitkb_aurora_lily58_left.overlay boards/shields/splitkb_aurora_lily58/splitkb_aurora_lily58_right.overlay boards/shields/splitkb_aurora_sofle/splitkb_aurora_sofle_left.overlay boards/shields/splitkb_aurora_sofle/splitkb_aurora_sofle_right.overlay boards/shields/splitkb_aurora_sweep/splitkb_aurora_sweep_left.overlay boards/shields/splitkb_aurora_sweep/splitkb_aurora_sweep_right.overlay boards/shields/splitreus62/splitreus62.dtsi boards/shields/tg4x/tg4x.overlay boards/shields/tidbit/tidbit.dtsi boards/shields/two_percent_milk/two_percent_milk.overlay boards/shields/waterfowl/waterfowl.dtsi boards/shields/zodiark/zodiark.dtsi"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-c8fff941",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&usbd/cdc_acm_uart (/soc/usbd@40027000/cdc_acm_uart): binding defaults changed, not set in the DTS: rx-fifo-size, tx-fifo-size, zephyr,pm-device-runtime-auto"
+   "title": "&usbd/cdc_acm_uart (/soc/usbd@40027000/cdc_acm_uart): binding defaults changed, not set in the DTS: rx-fifo-size, tx-fifo-size, zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/bluemicro840/bluemicro840_v1.dts boards/arm/bt60/bt60.dtsi boards/arm/corneish_zen/corneish_zen.dtsi boards/arm/glove80/glove80.dtsi boards/arm/kbdfans_tofu65/kbdfans_tofu65_v2.dts boards/arm/mikoto/mikoto_520.dts boards/arm/nice60/nice60.dts boards/arm/nice_nano/nice_nano.dtsi boards/arm/nrf52840_m2/nrf52840_m2.dts boards/arm/nrfmicro/nrfmicro_11.dts boards/arm/nrfmicro/nrfmicro_11_flipped.dts boards/arm/nrfmicro/nrfmicro_13.dts boards/arm/nrfmicro/nrfmicro_13_52833.dts boards/arm/pillbug/pillbug.dts boards/arm/puchi_ble/puchi_ble_v1.dts boards/arm/s40nc/s40nc.dts boards/seeeduino_xiao_ble.overlay boards/usb_console.dtsi"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-d5034afa",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&pwm0 (/soc/pwm@4001c000): binding defaults changed, not set in the DTS: ch0-inverted, ch1-inverted, ch2-inverted, ch3-inverted, zephyr,pm-device-runtime-auto"
+   "title": "&pwm0 (/soc/pwm@4001c000): binding defaults changed, not set in the DTS: ch0-inverted, ch1-inverted, ch2-inverted, ch3-inverted, zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/ckp/ckp.dtsi boards/arm/glove80/glove80_lh.dts boards/arm/glove80/glove80_rh.dts"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-e28998a4",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&spi1 (/soc/spi@40004000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto"
+   "title": "&spi1 (/soc/spi@40004000): binding defaults changed, not set in the DTS: miso-pull-down, miso-pull-up, zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/pillbug/blackpill_pins.dtsi boards/arm/pillbug/pillbug.dts boards/blackpill_f401ce.overlay boards/blackpill_f411ce.overlay boards/shields/kyria/boards/nrfmicro_11.overlay boards/shields/kyria/boards/nrfmicro_11_flipped.overlay boards/shields/kyria/boards/nrfmicro_13.overlay boards/shields/two_percent_milk/boards/nrfmicro_11.overlay boards/shields/two_percent_milk/boards/nrfmicro_11_flipped.overlay boards/shields/two_percent_milk/boards/nrfmicro_13.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-e82fcbdc",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&gpio1 (/soc/gpio@50000300): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&gpio1 (/soc/gpio@50000300): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/bluemicro840/bluemicro840_v1.dts boards/arm/bt60/bt60.dtsi boards/arm/ckp/ckp.dtsi boards/arm/corneish_zen/corneish_zen.dtsi boards/arm/glove80/glove80.dtsi boards/arm/mikoto/mikoto_520.dts boards/arm/nice60/nice60.dts boards/arm/nice_nano/nice_nano.dtsi boards/arm/nrf52840_m2/nrf52840_m2.dts boards/arm/nrfmicro/nrfmicro_11.dts boards/arm/nrfmicro/nrfmicro_11_flipped.dts boards/arm/nrfmicro/nrfmicro_13.dts boards/arm/nrfmicro/nrfmicro_13_52833.dts boards/arm/pillbug/pillbug.dts boards/arm/puchi_ble/puchi_ble_v1.dts boards/arm/s40nc/s40nc.dts"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-f5b2c8d6",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&qdec0 (/soc/qdec@40012000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&qdec0 (/soc/qdec@40012000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/shields/zmk_uno/boards/nrf52840dk_nrf52840.overlay"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-f7857cf2",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&i2c0 (/soc/i2c@40003000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&i2c0 (/soc/i2c@40003000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/bluemicro840/arduino_pro_micro_pins.dtsi boards/arm/bluemicro840/bluemicro840_v1.dts boards/arm/bt60/bt60.dtsi boards/arm/corneish_zen/corneish_zen_v1_left.dts boards/arm/corneish_zen/corneish_zen_v1_right.dts boards/arm/mikoto/arduino_pro_micro_pins.dtsi boards/arm/mikoto/mikoto_520.dts boards/arm/nice_nano/arduino_pro_micro_pins.dtsi boards/arm/nice_nano/nice_nano.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins_52833.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins_flipped.dtsi boards/arm/nrfmicro/nrfmicro_11.dts boards/arm/nrfmicro/nrfmicro_11_flipped.dts boards/arm/nrfmicro/nrfmicro_13.dts boards/arm/nrfmicro/nrfmicro_13_52833.dts boards/arm/pillbug/blackpill_pins.dtsi boards/arm/pillbug/pillbug.dts boards/arm/puchi_ble/arduino_pro_micro_pins.dtsi boards/arm/puchi_ble/puchi_ble_v1.dts"
   },
   {
    "id": "DEVICETREE-NODE-BINDING-DEFAULTS-f83689ef",
    "severity": "info",
    "confidence": "high",
    "kind": "node-binding-defaults",
-   "title": "&gpio0 (/soc/gpio@50000000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto"
+   "title": "&gpio0 (/soc/gpio@50000000): binding defaults changed, not set in the DTS: zephyr,pm-device-runtime-auto",
+   "action": "Only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/bluemicro840/bluemicro840_v1.dts boards/arm/bt60/bt60.dtsi boards/arm/ckp/ckp.dtsi boards/arm/corneish_zen/corneish_zen.dtsi boards/arm/glove80/glove80.dtsi boards/arm/kbdfans_tofu65/kbdfans_tofu65_v2.dts boards/arm/mikoto/mikoto_520.dts boards/arm/nice60/nice60.dts boards/arm/nice_nano/nice_nano.dtsi boards/arm/nrf52840_m2/nrf52840_m2.dts boards/arm/nrfmicro/nrfmicro_11.dts boards/arm/nrfmicro/nrfmicro_11_flipped.dts boards/arm/nrfmicro/nrfmicro_13.dts boards/arm/nrfmicro/nrfmicro_13_52833.dts boards/arm/pillbug/pillbug.dts boards/arm/puchi_ble/puchi_ble_v1.dts boards/arm/s40nc/s40nc.dts"
   },
   {
    "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-0ceecc53",
    "severity": "info",
    "confidence": "high",
    "kind": "node-properties-new_props",
-   "title": "&i2c1 (/soc/i2c@40004000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+   "title": "&i2c1 (/soc/i2c@40004000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits",
+   "action": "New hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
+   "files": "boards/arm/proton_c/arduino_pro_micro_pins.dtsi boards/arm/proton_c/proton_c.dts boards/blackpill_f401ce.overlay boards/blackpill_f411ce.overlay"
   },
   {
    "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-32e860df",
    "severity": "info",
    "confidence": "high",
    "kind": "node-properties-new_props",
-   "title": "&spi0 (/soc/spi@40003000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+   "title": "&spi0 (/soc/spi@40003000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits",
+   "action": "New hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
+   "files": "boards/arm/bluemicro840/arduino_pro_micro_pins.dtsi boards/arm/corneish_zen/corneish_zen_v2_left.dts boards/arm/corneish_zen/corneish_zen_v2_right.dts boards/arm/mikoto/arduino_pro_micro_pins.dtsi boards/arm/nice_nano/arduino_pro_micro_pins.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins_52833.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins_flipped.dtsi boards/arm/puchi_ble/arduino_pro_micro_pins.dtsi boards/shields/nice_view_adapter/boards/bluemicro840_v1.overlay boards/shields/nice_view_adapter/boards/mikoto_520.overlay boards/shields/nice_view_adapter/boards/nice_nano.overlay boards/shields/nice_view_adapter/boards/nice_nano_v2.overlay boards/shields/nice_view_adapter/boards/nrfmicro_11.overlay boards/shields/nice_view_adapter/boards/nrfmicro_11_flipped.overlay boards/shields/nice_view_adapter/boards/nrfmicro_13.overlay boards/shields/nice_view_adapter/boards/puchi_ble_v1.overlay"
   },
   {
    "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-40ffd210",
    "severity": "info",
    "confidence": "high",
    "kind": "node-properties-new_props",
-   "title": "&spi1 (/soc/spi@40004000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+   "title": "&spi1 (/soc/spi@40004000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits",
+   "action": "New hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
+   "files": "boards/arm/pillbug/blackpill_pins.dtsi boards/arm/pillbug/pillbug.dts boards/blackpill_f401ce.overlay boards/blackpill_f411ce.overlay boards/shields/kyria/boards/nrfmicro_11.overlay boards/shields/kyria/boards/nrfmicro_11_flipped.overlay boards/shields/kyria/boards/nrfmicro_13.overlay boards/shields/two_percent_milk/boards/nrfmicro_11.overlay boards/shields/two_percent_milk/boards/nrfmicro_11_flipped.overlay boards/shields/two_percent_milk/boards/nrfmicro_13.overlay"
   },
   {
    "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-4bf5e3fc",
    "severity": "info",
    "confidence": "high",
    "kind": "node-properties-new_props",
-   "title": "&spi2 (/soc/spi@40023000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+   "title": "&spi2 (/soc/spi@40023000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits",
+   "action": "New hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
+   "files": "boards/arm/bdn9/bdn9_rev2.dts boards/arm/corneish_zen/corneish_zen_v1_left.dts boards/arm/corneish_zen/corneish_zen_v1_right.dts boards/arm/proton_c/arduino_pro_micro_pins.dtsi boards/arm/proton_c/proton_c.dts"
   },
   {
    "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-88925c31",
    "severity": "info",
    "confidence": "high",
    "kind": "node-properties-new_props",
-   "title": "&i2c0 (/soc/i2c@40003000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+   "title": "&i2c0 (/soc/i2c@40003000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits",
+   "action": "New hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
+   "files": "boards/arm/bluemicro840/arduino_pro_micro_pins.dtsi boards/arm/bluemicro840/bluemicro840_v1.dts boards/arm/bt60/bt60.dtsi boards/arm/corneish_zen/corneish_zen_v1_left.dts boards/arm/corneish_zen/corneish_zen_v1_right.dts boards/arm/mikoto/arduino_pro_micro_pins.dtsi boards/arm/mikoto/mikoto_520.dts boards/arm/nice_nano/arduino_pro_micro_pins.dtsi boards/arm/nice_nano/nice_nano.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins_52833.dtsi boards/arm/nrfmicro/arduino_pro_micro_pins_flipped.dtsi boards/arm/nrfmicro/nrfmicro_11.dts boards/arm/nrfmicro/nrfmicro_11_flipped.dts boards/arm/nrfmicro/nrfmicro_13.dts boards/arm/nrfmicro/nrfmicro_13_52833.dts boards/arm/pillbug/blackpill_pins.dtsi boards/arm/pillbug/pillbug.dts boards/arm/puchi_ble/arduino_pro_micro_pins.dtsi boards/arm/puchi_ble/puchi_ble_v1.dts"
   },
   {
    "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-9a7df621",
    "severity": "info",
    "confidence": "high",
    "kind": "node-properties-new_props",
-   "title": "&spi3 (/soc/spi@4002f000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+   "title": "&spi3 (/soc/spi@4002f000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits",
+   "action": "New hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
+   "files": "boards/arm/adv360pro/adv360pro.dtsi boards/arm/ckp/ckp.dtsi boards/arm/glove80/glove80_lh.dts boards/arm/glove80/glove80_rh.dts boards/arm/nice60/nice60.dts boards/shields/chalice/boards/nice_nano.overlay boards/shields/chalice/boards/nice_nano_v2.overlay boards/shields/corne/boards/nice_nano.overlay boards/shields/corne/boards/nice_nano_v2.overlay boards/shields/elephant42/boards/nice_nano.overlay boards/shields/elephant42/boards/nice_nano_v2.overlay boards/shields/eternal_keypad/boards/nice_nano.overlay boards/shields/eternal_keypad/boards/nice_nano_v2.overlay boards/shields/helix/boards/nice_nano.overlay boards/shields/helix/boards/nice_nano_v2.overlay boards/shields/jorne/boards/nice_nano.overlay boards/shields/jorne/boards/nice_nano_v2.overlay boards/shields/kyria/boards/nice_nano.overlay boards/shields/kyria/boards/nice_nano_v2.overlay boards/shields/leeloo/boards/nice_nano_v2.overlay boards/shields/leeloo_micro/boards/nice_nano_v2.overlay boards/shields/lily58/boards/nice_nano.overlay boards/shields/lily58/boards/nice_nano_v2.overlay boards/shields/microdox/boards/nice_nano.overlay boards/shields/microdox/boards/nice_nano_v2.overlay boards/shields/murphpad/boards/nice_nano.overlay boards/shields/murphpad/boards/nice_nano_v2.overlay boards/shields/nibble/boards/nice_nano.overlay boards/shields/nibble/boards/nice_nano_v2.overlay boards/shields/redox/boards/nice_nano.overlay boards/shields/redox/boards/nice_nano_v2.overlay boards/shields/reviung34/boards/nice_nano_v2.overlay boards/shields/reviung41/boards/nice_nano.overlay boards/shields/reviung41/boards/nice_nano_v2.overlay boards/shields/reviung53/boards/nice_nano.overlay boards/shields/reviung53/boards/nice_nano_v2.overlay boards/shields/romac_plus/boards/nice_nano.overlay boards/shields/romac_plus/boards/nice_nano_v2.overlay boards/shields/snap/boards/nice_nano.overlay boards/shields/snap/boards/nice_nano_v2.overlay boards/shields/sofle/boards/nice_nano.overlay boards/shields/sofle/boards/nice_nano_v2.overlay boards/shields/sofle/boards/nrfmicro_11.overlay boards/shields/sofle/boards/nrfmicro_13.overlay boards/shields/splitkb_aurora_corne/boards/nice_nano.overlay boards/shields/splitkb_aurora_corne/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_helix/boards/nice_nano.overlay boards/shields/splitkb_aurora_helix/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_lily58/boards/nice_nano.overlay boards/shields/splitkb_aurora_lily58/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_sofle/boards/nice_nano.overlay boards/shields/splitkb_aurora_sofle/boards/nice_nano_v2.overlay boards/shields/splitkb_aurora_sweep/boards/nice_nano.overlay boards/shields/splitkb_aurora_sweep/boards/nice_nano_v2.overlay boards/shields/tg4x/boards/nice_nano.overlay boards/shields/tg4x/boards/nice_nano_v2.overlay boards/shields/tidbit/boards/nice_nano.overlay boards/shields/tidbit/boards/nice_nano_v2.overlay boards/shields/two_percent_milk/boards/nice_nano.overlay boards/shields/two_percent_milk/boards/nice_nano_v2.overlay"
   },
   {
    "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-ba3f246b",
    "severity": "info",
    "confidence": "high",
    "kind": "node-properties-new_props",
-   "title": "&pro_micro_i2c (/soc/i2c@40003000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits"
+   "title": "&pro_micro_i2c (/soc/i2c@40003000) has new properties in zephyr-to@339570e2393b: easydma-maxcnt-bits",
+   "action": "New hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
+   "files": "boards/shields/corne/corne.dtsi boards/shields/elephant42/elephant42.dtsi boards/shields/jorne/jorne.dtsi boards/shields/knob_goblin/knob_goblin.overlay boards/shields/kyria/kyria_common.dtsi boards/shields/leeloo/leeloo_common.dtsi boards/shields/leeloo_micro/leeloo_micro.dtsi boards/shields/lily58/lily58.dtsi boards/shields/lotus58/lotus58.dtsi boards/shields/microdox/microdox_common.dtsi boards/shields/murphpad/murphpad.overlay boards/shields/nibble/nibble.overlay boards/shields/nice_view_adapter/boards/bluemicro840_v1.overlay boards/shields/nice_view_adapter/boards/mikoto_520.overlay boards/shields/nice_view_adapter/boards/nice_nano.overlay boards/shields/nice_view_adapter/boards/nice_nano_v2.overlay boards/shields/nice_view_adapter/boards/nrfmicro_11.overlay boards/shields/nice_view_adapter/boards/nrfmicro_11_flipped.overlay boards/shields/nice_view_adapter/boards/nrfmicro_13.overlay boards/shields/nice_view_adapter/boards/puchi_ble_v1.overlay boards/shields/snap/snap.dtsi boards/shields/sofle/sofle.dtsi boards/shields/splitkb_aurora_corne/splitkb_aurora_corne.dtsi boards/shields/splitkb_aurora_helix/splitkb_aurora_helix.dtsi boards/shields/splitkb_aurora_lily58/splitkb_aurora_lily58.dtsi boards/shields/splitkb_aurora_sofle/splitkb_aurora_sofle.dtsi boards/shields/splitkb_aurora_sweep/splitkb_aurora_sweep.dtsi boards/shields/tidbit/tidbit.dtsi boards/shields/waterfowl/waterfowl.dtsi boards/shields/zodiark/zodiark.dtsi"
   },
   {
    "id": "DEVICETREE-OTHER-NODES-1fe2419b",
    "severity": "info",
    "confidence": "high",
    "kind": "other-nodes",
-   "title": "16 nodes your app doesn't reference changed, disappeared or appeared; 33 more nodes only changed binding"
+   "title": "16 nodes your app doesn't reference changed, disappeared or appeared; 33 more nodes only changed binding",
+   "action": "None needed unless you start using them.",
+   "files": ""
   },
   {
    "id": "GUIDE-COVERAGE-34fba795",
    "severity": "info",
    "confidence": "high",
    "kind": "coverage",
-   "title": "Read 71 entries from 4 documents; 12 touch your app"
+   "title": "Read 71 entries from 4 documents; 12 touch your app",
+   "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+   "files": ""
   },
   {
    "id": "GUIDE-ENTRY-MATCH-04e4cb9c",
    "severity": "risky",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Recommended Changes): Device drivers should now be restricted to PRE_KERNEL_1, PRE_KERNEL_2 and POST_KERNEL initialization levels. [SYS_INIT]"
+   "title": "3.5 migration guide (Recommended Changes): Device drivers should now be restricted to PRE_KERNEL_1, PRE_KERNEL_2 and POST_KERNEL initialization levels. [SYS_INIT]",
+   "action": "Read MG-3.5-0040 and update the lines listed.",
+   "files": "boards/arm/mikoto/pinmux.c boards/arm/nrfmicro/pinmux.c boards/arm/puchi_ble/pinmux.c src/activity.c src/backlight.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-106b2d8e",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.3 release notes (Deprecated in this release): Deprecated <fcntl.h>, <sys/stat.h> header files in the minimal libc in favour of <zephyr/posix/fcntl.h> and <zephyr/posix/sys/stat.h>."
+   "title": "3.3 release notes (Deprecated in this release): Deprecated <fcntl.h>, <sys/stat.h> header files in the minimal libc in favour of <zephyr/posix/fcntl.h> and <zephyr/posix/sys/stat.h>. (only in files this build doesn't compile: tests/ble/central/src/main.c)",
+   "action": "Read RN-3.3-0020 and update the lines listed.",
+   "files": "tests/ble/central/src/main.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-14a743b0",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Recommended Changes): Random API header <zephyr/random/rand32.h> is deprecated in favor of <zephyr/random/random.h>."
+   "title": "3.5 migration guide (Recommended Changes): Random API header <zephyr/random/rand32.h> is deprecated in favor of <zephyr/random/random.h>. (only in files this build doesn't compile: boards/shields/nice_view/widgets/peripheral_status.c)",
+   "action": "Read MG-3.5-0043 and update the lines listed.",
+   "files": "boards/shields/nice_view/widgets/peripheral_status.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-213c7c7b",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.3 release notes (Deprecated in this release): SPI DT spi_is_ready function has been deprecated in favor of spi_is_ready_dt."
+   "title": "3.3 release notes (Deprecated in this release): SPI DT spi_is_ready function has been deprecated in favor of spi_is_ready_dt. (only in files this build doesn't compile: module/drivers/display/il0323.c)",
+   "action": "Read RN-3.3-0021 and update the lines listed.",
+   "files": "module/drivers/display/il0323.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-2c28c79f",
    "severity": "risky",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Recommended Changes): Note that these changes do not apply to initialization levels used in the context of the init.h API, e.g."
+   "title": "3.5 migration guide (Recommended Changes): Note that these changes do not apply to initialization levels used in the context of the init.h API, e.g.",
+   "action": "Read MG-3.5-0040 and update the lines listed.",
+   "files": "boards/arm/mikoto/pinmux.c boards/arm/nrfmicro/pinmux.c boards/arm/puchi_ble/pinmux.c module/drivers/display/il0323.c module/drivers/gpio/gpio_595.c module/drivers/gpio/gpio_max7318.c src/activity.c src/backlight.c src/battery.c src/behavior.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-39073cd9",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Recommended Changes): Device drivers should now be restricted to PRE_KERNEL_1, PRE_KERNEL_2 and POST_KERNEL initialization levels."
+   "title": "3.5 migration guide (Recommended Changes): Device drivers should now be restricted to PRE_KERNEL_1, PRE_KERNEL_2 and POST_KERNEL initialization levels. (only in files this build doesn't compile: module/drivers/display/il0323.c, module/drivers/gpio/gpio_595.c, module/drivers/gpio/gpio_max7318.c, ...)",
+   "action": "Read MG-3.5-0040 and update the lines listed.",
+   "files": "module/drivers/display/il0323.c module/drivers/gpio/gpio_595.c module/drivers/gpio/gpio_max7318.c module/drivers/kscan/kscan_composite.c module/drivers/kscan/kscan_gpio_demux.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-3f730cc9",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.3 release notes (Deprecated in this release): Deprecated <fcntl.h>, <sys/stat.h> header files in the minimal libc in favour of <zephyr/posix/fcntl.h> and <zephyr/posix/sys/stat.h>."
+   "title": "3.3 release notes (Deprecated in this release): Deprecated <fcntl.h>, <sys/stat.h> header files in the minimal libc in favour of <zephyr/posix/fcntl.h> and <zephyr/posix/sys/stat.h>. (only in files this build doesn't compile: tests/ble/central/src/main.c)",
+   "action": "Read RN-3.3-0020 and update the lines listed.",
+   "files": "tests/ble/central/src/main.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-5af82dd3",
    "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Kernel): CONTAINER_OF now performs type checking, this was very commonly misused to obtain user structure from k_work pointers without passing from k_work_delayable."
+   "title": "3.5 migration guide (Kernel): CONTAINER_OF now performs type checking, this was very commonly misused to obtain user structure from k_work pointers without passing from k_work_delayable.",
+   "action": "Read MG-3.5-0004 and update the lines listed.",
+   "files": "include/zmk/event_manager.h module/drivers/kscan/kscan_gpio_charlieplex.c module/drivers/kscan/kscan_gpio_demux.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-9754923b",
    "severity": "breaking",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Power Management): Multiple platforms no longer support powering the system off using pm_state_force."
+   "title": "3.5 migration guide (Power Management): Multiple platforms no longer support powering the system off using pm_state_force.",
+   "action": "Read MG-3.5-0025 and update the lines listed.",
+   "files": "src/activity.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-9f30bf3e",
    "severity": "info",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Device Drivers and Device Tree): The ti,bq274xx driver was using incorrect units for capacity and power channels, these have been fixed and scaled by x1000 factor from the previous implementati (only in files this build doesn't use: boards/arm/corneish_zen/corneish_zen_v1_left.dts, boards/arm/corneish_zen/corneish_zen_v1_right.dts)"
+   "title": "3.5 migration guide (Device Drivers and Device Tree): The ti,bq274xx driver was using incorrect units for capacity and power channels, these have been fixed and scaled by x1000 factor from the previous implementati (only in files this build doesn't use: boards/arm/corneish_zen/corneish_zen_v1_left.dts, boards/arm/corneish_zen/corneish_zen_v1_right.dts)",
+   "action": "Read MG-3.5-0012 and update the lines listed.",
+   "files": "boards/arm/corneish_zen/corneish_zen_v1_left.dts boards/arm/corneish_zen/corneish_zen_v1_right.dts"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-a7776724",
-   "severity": "breaking",
+   "severity": "info",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "3.5 migration guide (C Library): When using Picolibc, the default is 16kB with CONFIG_MMU or ARCH_POSIX, 2kB with CONFIG_USERSPACE and CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT."
+   "title": "3.5 migration guide (C Library): When using Picolibc, the default is 16kB with CONFIG_MMU or ARCH_POSIX, 2kB with CONFIG_USERSPACE and CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT. (only in files this build doesn't compile: tests/ble/central/src/main.c)",
+   "action": "Read MG-3.5-0005 and update the lines listed.",
+   "files": "tests/ble/central/src/main.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-b3668791",
    "severity": "breaking",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Device Drivers and Device Tree): The configuration options for the SSD1306 display driver can now be provided via the Devicetree binding solomon,ssd1306fb."
+   "title": "3.5 migration guide (Device Drivers and Device Tree): The configuration options for the SSD1306 display driver can now be provided via the Devicetree binding solomon,ssd1306fb.",
+   "action": "Read MG-3.5-0013 and update the lines listed.",
+   "files": "boards/shields/corne/corne.dtsi boards/shields/elephant42/elephant42.dtsi boards/shields/jorne/jorne.dtsi boards/shields/knob_goblin/knob_goblin.overlay boards/shields/kyria/kyria_common.dtsi boards/shields/leeloo/leeloo_common.dtsi boards/shields/leeloo_micro/leeloo_micro.dtsi boards/shields/lily58/lily58.dtsi boards/shields/lotus58/lotus58.dtsi boards/shields/microdox/microdox_common.dtsi"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-c190a045",
    "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Device Drivers and Device Tree): STM32 Ethernet driver was misusing hwinfo_get_device_id to generate last 3 bytes of mac address, resulting in a high risk of collision when using SoCs from the "
+   "title": "3.5 migration guide (Device Drivers and Device Tree): STM32 Ethernet driver was misusing hwinfo_get_device_id to generate last 3 bytes of mac address, resulting in a high risk of collision when using SoCs from the ",
+   "action": "Read MG-3.5-0015 and update the lines listed.",
+   "files": "boards/arm/glove80/usb_serial_number.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-e6c9b721",
    "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Kernel): CONTAINER_OF now performs type checking, this was very commonly misused to obtain user structure from k_work pointers without passing from k_work_delayable."
+   "title": "3.5 migration guide (Kernel): CONTAINER_OF now performs type checking, this was very commonly misused to obtain user structure from k_work pointers without passing from k_work_delayable.",
+   "action": "Read MG-3.5-0004 and update the lines listed.",
+   "files": "module/drivers/kscan/kscan_gpio_charlieplex.c module/drivers/kscan/kscan_gpio_demux.c module/drivers/kscan/kscan_gpio_direct.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-f4027fe3",
    "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Kernel): CONTAINER_OF now performs type checking, this was very commonly misused to obtain user structure from k_work pointers without passing from k_work_delayable."
+   "title": "3.5 migration guide (Kernel): CONTAINER_OF now performs type checking, this was very commonly misused to obtain user structure from k_work pointers without passing from k_work_delayable.",
+   "action": "Read MG-3.5-0004 and update the lines listed.",
+   "files": "include/zmk/display.h module/drivers/kscan/kscan_gpio_charlieplex.c module/drivers/kscan/kscan_gpio_demux.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-f6e35e8e",
    "severity": "breaking",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "3.4 release notes (Deprecated in this release): On nRF51 and nRF52-based boards, the behavior of the reset reason being provided to sys_reboot and being set in the GPREGRET register has been dropped."
+   "title": "3.4 release notes (Deprecated in this release): On nRF51 and nRF52-based boards, the behavior of the reset reason being provided to sys_reboot and being set in the GPREGRET register has been dropped.",
+   "action": "Read RN-3.4-0003 and update the lines listed.",
+   "files": "src/behaviors/behavior_reset.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-fca177c5",
-   "severity": "breaking",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "3.5 migration guide (Device Drivers and Device Tree): GPIO drivers not implementing IRQ related operations must now provide NULL to the relevant operations: pin_interrupt_configure, manage_callback, get_pending_int"
+   "title": "3.5 migration guide (Device Drivers and Device Tree): GPIO drivers not implementing IRQ related operations must now provide NULL to the relevant operations: pin_interrupt_configure, manage_callback, get_pending_int (only in files this build doesn't compile: module/drivers/gpio/gpio_max7318.c)",
+   "action": "Read MG-3.5-0014 and update the lines listed.",
+   "files": "module/drivers/gpio/gpio_max7318.c"
   },
   {
    "id": "IMAGES-IMAGES-SUMMARY-6d29427c",
    "severity": "info",
    "confidence": "high",
    "kind": "images-summary",
-   "title": "1 image at zephyr-to@339570e2393b: app (app)"
+   "title": "1 image at zephyr-to@339570e2393b: app (app)",
+   "action": "Per-image findings follow, grouped by image.",
+   "files": ""
   },
   {
    "id": "KCONFIG-DEFAULT-CHANGED-52fc981b",
    "severity": "info",
    "confidence": "high",
    "kind": "default-changed",
-   "title": "10 Kconfig symbols: other symbols resolve to a different value in zephyr-to@339570e2393b"
+   "title": "10 Kconfig symbols: other symbols resolve to a different value in zephyr-to@339570e2393b",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-NEWLY-SET-f23e9e57",
    "severity": "info",
    "confidence": "high",
    "kind": "newly-set",
-   "title": "154 Kconfig symbols: symbols are newly enabled or set in zephyr-to@339570e2393b"
+   "title": "154 Kconfig symbols: symbols are newly enabled or set in zephyr-to@339570e2393b",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-NO-LONGER-SET-523a72f1",
    "severity": "info",
    "confidence": "high",
    "kind": "no-longer-set",
-   "title": "48 Kconfig symbols: symbols set before are absent in zephyr-to@339570e2393b"
+   "title": "48 Kconfig symbols: symbols set before are absent in zephyr-to@339570e2393b",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-READ-SYMBOL-REMOVED-3f9ca014",
    "severity": "breaking",
    "confidence": "high",
    "kind": "read-symbol-removed",
-   "title": "Your code reads CONFIG_PINMUX, which no longer exists in zephyr-to@339570e2393b"
+   "title": "Your code reads CONFIG_PINMUX, which no longer exists in zephyr-to@339570e2393b",
+   "action": "#ifdef/IS_ENABLED() on it is now always false. Use its replacement (see the migration guides).",
+   "files": "boards/arm/mikoto/CMakeLists.txt boards/arm/nrfmicro/CMakeLists.txt boards/arm/puchi_ble/CMakeLists.txt"
   },
   {
    "id": "KCONFIG-SALVAGED-850c8b24",
    "severity": "info",
    "confidence": "high",
    "kind": "salvaged",
-   "title": "The target configure failed; zmig disabled 102 lines in a copy of your app to compare the rest"
+   "title": "The target configure failed; zmig disabled 102 lines in a copy of your app to compare the rest",
+   "action": "Everything else in this report compares against that salvaged build, so values that depended on the disabled lines (symbols they selected, for example) differ in it too. Fix the breaking findings and rerun.",
+   "files": "Kconfig boards/shields/corne/Kconfig.defconfig boards/shields/elephant42/Kconfig.defconfig boards/shields/jorne/Kconfig.defconfig boards/shields/knob_goblin/Kconfig.defconfig boards/shields/kyria/Kconfig.defconfig boards/shields/leeloo/Kconfig.defconfig boards/shields/leeloo_micro/Kconfig.defconfig boards/shields/lily58/Kconfig.defconfig boards/shields/lotus58/Kconfig.defconfig boards/shields/microdox/Kconfig.defconfig boards/shields/murphpad/Kconfig.defconfig boards/shields/nibble/Kconfig.defconfig boards/shields/nice_view/Kconfig.defconfig boards/shields/snap/Kconfig.defconfig boards/shields/sofle/Kconfig.defconfig boards/shields/splitkb_aurora_corne/Kconfig.defconfig boards/shields/splitkb_aurora_helix/Kconfig.defconfig boards/shields/splitkb_aurora_lily58/Kconfig.defconfig boards/shields/splitkb_aurora_sofle/Kconfig.defconfig boards/shields/splitkb_aurora_sweep/Kconfig.defconfig boards/shields/tidbit/Kconfig.defconfig boards/shields/waterfowl/Kconfig.defconfig boards/shields/zodiark/Kconfig.defconfig module/drivers/sensor/max17048/Kconfig src/display/Kconfig"
   },
   {
    "id": "MANIFEST-MODULE-REPINNED-37a938ba",
    "severity": "info",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module lvgl, which the build uses, moves from 70a7849726be to 8a6a2d1d29d1"
+   "title": "Module lvgl, which the build uses, moves from 70a7849726be to 8a6a2d1d29d1",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
   },
   {
    "id": "MANIFEST-MODULE-REPINNED-74dd89d6",
    "severity": "info",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module hal_nordic, which the build uses, moves from 249199ec5a5c to d054a315eb88"
+   "title": "Module hal_nordic, which the build uses, moves from 249199ec5a5c to d054a315eb88",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
   },
   {
    "id": "MANIFEST-MODULE-REPINNED-810b0bba",
    "severity": "info",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module cmsis, which the build uses, moves from 093de61c2a7d to 5a00331455dd"
+   "title": "Module cmsis, which the build uses, moves from 093de61c2a7d to 5a00331455dd",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
   },
   {
    "id": "STORAGE-BACKEND-OPTIONS-CHANGED-a4fbe3a1",
    "severity": "info",
    "confidence": "high",
    "kind": "backend-options-changed",
-   "title": "Storage backend settings options changed: CONFIG_SETTINGS_NVS_NAME_CACHE unset → n"
+   "title": "Storage backend settings options changed: CONFIG_SETTINGS_NVS_NAME_CACHE unset → n",
+   "action": "The backend stays enabled; review these options.",
+   "files": ""
   },
   {
    "id": "WIRE-ALLOWLIST-ENTRY-NOT-FOUND-d895b4f9",
    "severity": "info",
    "confidence": "high",
    "kind": "allowlist-entry-not-found",
-   "title": "3 allowlist entries not found at the compared refs: WIRE-SMP-ORIGINAL (CONFIG_MCUMGR_SMP_SUPPORT_ORIGINAL_PROTOCOL not defined at zephyr-from@1ae0eb5ce8ad); WIRE-SMP-NETBUF (CONFIG_MCUMGR_TRANSPORT_NETBUF_SIZE not defined at zephyr-from@1ae0eb5ce8ad); WIRE-SMP-BT-REASSEMBLY (CONFIG_MCUMGR_TRANSPORT_BT_REASSEMBLY not defined at zephyr-from@1ae0eb5ce8ad)"
+   "title": "3 allowlist entries not found at the compared refs: WIRE-SMP-ORIGINAL (CONFIG_MCUMGR_SMP_SUPPORT_ORIGINAL_PROTOCOL not defined at zephyr-from@1ae0eb5ce8ad); WIRE-SMP-NETBUF (CONFIG_MCUMGR_TRANSPORT_NETBUF_SIZE not defined at zephyr-from@1ae0eb5ce8ad); WIRE-SMP-BT-REASSEMBLY (CONFIG_MCUMGR_TRANSPORT_BT_REASSEMBLY not defined at zephyr-from@1ae0eb5ce8ad)",
+   "action": "Update the entry (the option may have been renamed) or drop it.",
+   "files": ""
   }
  ]
 }

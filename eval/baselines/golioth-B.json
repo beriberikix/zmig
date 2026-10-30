@@ -9,154 +9,198 @@
    "severity": "risky",
    "confidence": "high",
    "kind": "field-changed",
-   "title": "Field net_mgmt_event_callback.<anonymous>.event_mask, which your code uses, changed: unsigned int at bit offset 0 → unsigned long long at bit offset 0"
+   "title": "Field net_mgmt_event_callback.<anonymous>.event_mask, which your code uses, changed: unsigned int at bit offset 0 → unsigned long long at bit offset 0",
+   "action": "Check the code that uses it.",
+   "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
    "id": "API-MACRO-CHANGED-ecad1e6d",
    "severity": "breaking",
    "confidence": "high",
    "kind": "macro-changed",
-   "title": "Macro NET_EVENT_IPV4_ADDR_ADD, which your code uses, changed: (unsigned long, 4 bytes) = 3758358529 → (unsigned long long, 8 bytes) = 16154411863377969153"
+   "title": "Macro NET_EVENT_IPV4_ADDR_ADD, which your code uses, changed: (unsigned long, 4 bytes) = 3758358529 → (unsigned long long, 8 bytes) = 16154411863377969153",
+   "action": "Its type got wider and your code stores it in a narrower type, which changes the value (see the lines listed); widen those.",
+   "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
    "id": "API-TYPEDEF-CHANGED-6363121e",
    "severity": "breaking",
    "confidence": "high",
    "kind": "typedef-changed",
-   "title": "Typedef net_mgmt_event_handler_t, which your code uses, changed: void (*)(struct net_mgmt_event_callback *, unsigned int, struct net_if *) → void (*)(struct net_mgmt_event_callback *, unsigned long long, struct net_if *)"
+   "title": "Typedef net_mgmt_event_handler_t, which your code uses, changed: void (*)(struct net_mgmt_event_callback *, unsigned int, struct net_if *) → void (*)(struct net_mgmt_event_callback *, unsigned long long, struct net_if *)",
+   "action": "Update the code that calls, implements or stores it (your callbacks no longer match it).",
+   "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
    "id": "BUILD-FOOTPRINT-263db9aa",
    "severity": "info",
    "confidence": "high",
    "kind": "footprint",
-   "title": "ROM 251306 → 258936 bytes (+7630), RAM 92222 → 90959 bytes (-1263)"
+   "title": "ROM 251306 → 258936 bytes (+7630), RAM 92222 → 90959 bytes (-1263)",
+   "action": "The symbols that grew or shrank most are listed; check them against your memory budget.",
+   "files": ""
   },
   {
    "id": "BUILD-NEW-WARNING-3ce9e193",
    "severity": "risky",
    "confidence": "high",
    "kind": "new-warning",
-   "title": "New compiler warning at v4.2.0: conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1'"
+   "title": "New compiler warning at v4.2.0: conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1'",
+   "action": "Check whether it points at a real problem.",
+   "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
    "id": "BUILD-NEW-WARNING-fca02eb3",
    "severity": "risky",
    "confidence": "high",
    "kind": "new-warning",
-   "title": "New compiler warning at v4.2.0: assignment to 'net_mgmt_event_handler_t' {aka 'void (*)(struct net_mgmt_event_callback *, long long unsigned int, struct net_if *)'} from in"
+   "title": "New compiler warning at v4.2.0: assignment to 'net_mgmt_event_handler_t' {aka 'void (*)(struct net_mgmt_event_callback *, long long unsigned int, struct net_if *)'} from in",
+   "action": "Check whether it points at a real problem.",
+   "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
    "id": "DEVICETREE-NODE-CHANGED-d62a0c73",
    "severity": "info",
    "confidence": "high",
    "kind": "node-changed",
-   "title": "&zephyr_udc0 (/soc/usb@40016000) changed: clocks, maximum-speed (no device for it in hello image)"
+   "title": "&zephyr_udc0 (/soc/usb@40016000) changed: clocks, maximum-speed (no device for it in hello image)",
+   "action": "Nothing in this image instantiates the node; it matters only where a driver for it is built.",
+   "files": "boards/rak5010_nrf52840.overlay"
   },
   {
    "id": "DEVICETREE-OTHER-NODES-8b0874b9",
    "severity": "info",
    "confidence": "high",
    "kind": "other-nodes",
-   "title": "45 nodes your app doesn't reference changed, disappeared or appeared; 2 more nodes only changed binding"
+   "title": "45 nodes your app doesn't reference changed, disappeared or appeared; 2 more nodes only changed binding",
+   "action": "None needed unless you start using them.",
+   "files": ""
   },
   {
    "id": "GUIDE-COVERAGE-25b6980c",
    "severity": "info",
    "confidence": "high",
    "kind": "coverage",
-   "title": "Read 160 entries from 2 documents; 2 touch your app"
+   "title": "Read 160 entries from 2 documents; 2 touch your app",
+   "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+   "files": ""
   },
   {
    "id": "GUIDE-ENTRY-MATCH-7613c10e",
    "severity": "info",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.2 migration guide (Ethernet): ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecate (only in files this build doesn't use: socs/native.conf, socs/native_64.conf)"
+   "title": "4.2 migration guide (Ethernet): ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecate (only in files this build doesn't use: socs/native.conf, socs/native_64.conf)",
+   "action": "Read MG-4.2-0046 and update the lines listed.",
+   "files": "socs/native.conf socs/native_64.conf"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-f0ba680d",
    "severity": "info",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.2 migration guide (Modem): Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU. (only in files this build doesn't use: boards/rak5010_nrf52840.conf)"
+   "title": "4.2 migration guide (Modem): Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU. (only in files this build doesn't use: boards/rak5010_nrf52840.conf)",
+   "action": "Read MG-4.2-0074 and update the lines listed.",
+   "files": "boards/rak5010_nrf52840.conf"
   },
   {
    "id": "IMAGES-IMAGES-SUMMARY-c75d0ac8",
    "severity": "info",
    "confidence": "high",
    "kind": "images-summary",
-   "title": "1 image at v4.2.0: hello (app, 127 compiled files changed)"
+   "title": "1 image at v4.2.0: hello (app, 127 compiled files changed)",
+   "action": "Per-image findings follow, grouped by image.",
+   "files": ""
   },
   {
    "id": "KCONFIG-DEFAULT-CHANGED-fa3998d1",
    "severity": "info",
    "confidence": "high",
    "kind": "default-changed",
-   "title": "8 Kconfig symbols: other symbols resolve to a different value in v4.2.0"
+   "title": "8 Kconfig symbols: other symbols resolve to a different value in v4.2.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-NEWLY-SET-a489067c",
    "severity": "info",
    "confidence": "high",
    "kind": "newly-set",
-   "title": "46 Kconfig symbols: symbols are newly enabled or set in v4.2.0"
+   "title": "46 Kconfig symbols: symbols are newly enabled or set in v4.2.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-NO-LONGER-SET-74c7c5b8",
    "severity": "info",
    "confidence": "high",
    "kind": "no-longer-set",
-   "title": "23 Kconfig symbols: symbols set before are absent in v4.2.0"
+   "title": "23 Kconfig symbols: symbols set before are absent in v4.2.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "SBOM-HEADER-CHANGED-24bcf578",
    "severity": "info",
    "confidence": "high",
    "kind": "header-changed",
-   "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits); none of the declarations your code uses from it changed"
+   "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits); none of the declarations your code uses from it changed",
+   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "files": "src/main.c"
   },
   {
    "id": "SBOM-HEADER-CHANGED-e7c787b9",
    "severity": "info",
    "confidence": "high",
    "kind": "header-changed",
-   "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+195/-37 lines in 14 commits); none of the declarations your code uses from it changed"
+   "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+195/-37 lines in 14 commits); none of the declarations your code uses from it changed",
+   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "files": "src/main.c"
   },
   {
    "id": "SBOM-MODULE-REPINNED-022f33fb",
    "severity": "risky",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module mbedtls moves from 4952e1328529 to 85440ef5fffa; 31 files compiled into hello changed (31 modified, 0 added, 0 removed)"
+   "title": "Module mbedtls moves from 4952e1328529 to 85440ef5fffa; 31 files compiled into hello changed (31 modified, 0 added, 0 removed)",
+   "action": "Read the module's changelog for that range.",
+   "files": ""
   },
   {
    "id": "SBOM-MODULE-REPINNED-85ed84b2",
    "severity": "risky",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module hal-stm32 moves from 55043bcc35ff to 1e753266ddfb; 4 files compiled into hello changed (3 modified, 0 added, 1 removed)"
+   "title": "Module hal-stm32 moves from 55043bcc35ff to 1e753266ddfb; 4 files compiled into hello changed (3 modified, 0 added, 1 removed)",
+   "action": "Read the module's changelog for that range.",
+   "files": ""
   },
   {
    "id": "SBOM-ZEPHYR-SOURCES-9ccfe46b",
    "severity": "info",
    "confidence": "high",
    "kind": "zephyr-sources",
-   "title": "Zephyr files compiled: 235 → 241 (8 added, 2 removed, 93 changed); 353 upstream commits touch the files the target compiles"
+   "title": "Zephyr files compiled: 235 → 241 (8 added, 2 removed, 93 changed); 353 upstream commits touch the files the target compiles",
+   "action": "The busiest files are listed first; review those against your app's behavior.",
+   "files": ""
   },
   {
    "id": "STORAGE-BACKEND-OPTIONS-CHANGED-5c1b784f",
    "severity": "info",
    "confidence": "high",
    "kind": "backend-options-changed",
-   "title": "Storage backend settings options changed: CONFIG_SETTINGS_ZMS_LOAD_SUBTREE_PATH unset → n, CONFIG_SETTINGS_ZMS_NO_LL_DELETE unset → n"
+   "title": "Storage backend settings options changed: CONFIG_SETTINGS_ZMS_LOAD_SUBTREE_PATH unset → n, CONFIG_SETTINGS_ZMS_NO_LL_DELETE unset → n",
+   "action": "The backend stays enabled; review these options.",
+   "files": ""
   },
   {
    "id": "STORAGE-IMPLEMENTATION-CHANGED-17e68292",
    "severity": "info",
    "confidence": "medium",
    "kind": "implementation-changed",
-   "title": "2 compiled storage backend files changed; their on-media definitions didn't"
+   "title": "2 compiled storage backend files changed; their on-media definitions didn't",
+   "action": "Behavior can change without the declarations changing; named in the verdict basis.",
+   "files": ""
   }
  ]
 }

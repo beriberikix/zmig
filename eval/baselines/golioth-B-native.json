@@ -1,7 +1,7 @@
 {
  "config": "golioth-B-native",
- "scored": "DOGFOOD-3 P2 (zmig 6f0bf46)",
- "schema_version": "1.2",
+ "scored": "DOGFOOD-7 (zmig aa95a10)",
+ "schema_version": "1.4",
  "verdict": "direct-ok",
  "findings": [
   {
@@ -9,133 +9,153 @@
    "severity": "info",
    "confidence": "medium",
    "kind": "footprint",
-   "title": "ROM 304578 → 313907 bytes (+9329), RAM 80847 → 81339 bytes (+492) [host-runtime-inflated]"
-  },
-  {
-   "id": "BUILD-NEW-WARNING-ebdc4335",
-   "severity": "info",
-   "confidence": "high",
-   "kind": "new-warning",
-   "title": "New kconfig warning at v4.2.0: The choice symbol PICOLIBC (defined at lib/libc/Kconfig:91) was selected (set =y), but EXTERNAL_LIBC (defined at lib/libc/Kconfig:134) ended"
-  },
-  {
-   "id": "BUILD-WARNINGS-RESOLVED-bbfd01b5",
-   "severity": "info",
-   "confidence": "high",
-   "kind": "warnings-resolved",
-   "title": "Warnings from v4.1.0 that no longer appear: 1"
+   "title": "ROM 304425 → 313754 bytes (+9329), RAM 80847 → 81339 bytes (+492) [host-runtime-inflated]",
+   "action": "The symbols that grew or shrank most are listed; check them against your memory budget. This board runs on the host: both ELFs include host-side runtime code and data, so totals overstate what a device would use. Deltas are still comparable; absolute numbers are not.",
+   "files": ""
   },
   {
    "id": "DEVICETREE-OTHER-NODES-a2b4c0c1",
    "severity": "info",
    "confidence": "high",
    "kind": "other-nodes",
-   "title": "7 nodes your app doesn't reference changed, disappeared or appeared; 2 more nodes only changed binding"
+   "title": "6 nodes your app doesn't reference changed, disappeared or appeared; 3 more nodes only changed binding",
+   "action": "None needed unless you start using them.",
+   "files": ""
   },
   {
    "id": "GUIDE-COVERAGE-948f2c49",
    "severity": "info",
    "confidence": "high",
    "kind": "coverage",
-   "title": "Read 160 entries from 2 documents; 2 touch your app"
+   "title": "Read 160 entries from 2 documents; 2 touch your app",
+   "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+   "files": ""
   },
   {
    "id": "GUIDE-ENTRY-MATCH-8b5e108b",
    "severity": "info",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.2 migration guide (Modem): Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU. (only in files this build doesn't use: boards/rak5010_nrf52840.conf)"
+   "title": "4.2 migration guide (Modem): Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU. (only in files this build doesn't use: boards/rak5010_nrf52840.conf)",
+   "action": "Read MG-4.2-0074 and update the lines listed.",
+   "files": "boards/rak5010_nrf52840.conf"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-e066ec25",
    "severity": "breaking",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.2 migration guide (Ethernet): ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecate"
+   "title": "4.2 migration guide (Ethernet): ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecate",
+   "action": "Read MG-4.2-0046 and update the lines listed.",
+   "files": "socs/native.conf socs/native_64.conf"
   },
   {
    "id": "IMAGES-IMAGES-SUMMARY-0845f714",
    "severity": "info",
    "confidence": "high",
    "kind": "images-summary",
-   "title": "1 image at v4.2.0: hello (app, 102 compiled files changed)"
+   "title": "1 image at v4.2.0: hello (app, 102 compiled files changed)",
+   "action": "Per-image findings follow, grouped by image.",
+   "files": ""
   },
   {
    "id": "KCONFIG-DEFAULT-CHANGED-800dcf24",
    "severity": "info",
    "confidence": "high",
    "kind": "default-changed",
-   "title": "8 Kconfig symbols: other symbols resolve to a different value in v4.2.0"
+   "title": "8 Kconfig symbols: other symbols resolve to a different value in v4.2.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-EXPRESSION-CHANGED-7eb15562",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "dependency-expression-changed",
+   "title": "3 Kconfig symbols your build sets or reads changed their depends/selects/implies in v4.2.0",
+   "action": "Value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
+   "files": "socs/native.conf"
   },
   {
    "id": "KCONFIG-NEWLY-SET-6d493936",
    "severity": "info",
    "confidence": "high",
    "kind": "newly-set",
-   "title": "38 Kconfig symbols: symbols are newly enabled or set in v4.2.0"
+   "title": "38 Kconfig symbols: symbols are newly enabled or set in v4.2.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-NO-LONGER-SET-cf8be75f",
    "severity": "info",
    "confidence": "high",
    "kind": "no-longer-set",
-   "title": "18 Kconfig symbols: symbols set before are absent in v4.2.0"
+   "title": "18 Kconfig symbols: symbols set before are absent in v4.2.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-SYMBOL-DEPRECATED-edf190a1",
    "severity": "risky",
    "confidence": "high",
    "kind": "symbol-deprecated",
-   "title": "CONFIG_ETH_NATIVE_POSIX is deprecated in v4.2.0"
-  },
-  {
-   "id": "KCONFIG-SYMBOL-REMOVED-927bdbfe",
-   "severity": "info",
-   "confidence": "high",
-   "kind": "symbol-removed",
-   "title": "CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE, set in boards/rak5010_nrf52840.conf, no longer exists in v4.2.0 (only in files this build doesn't use: boards/rak5010_nrf52840.conf)"
+   "title": "CONFIG_ETH_NATIVE_POSIX is deprecated in v4.2.0",
+   "action": "Move off it before the release that removes it.",
+   "files": "socs/native.conf"
   },
   {
    "id": "SBOM-HEADER-CHANGED-6c59f4fd",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "high",
    "kind": "header-changed",
-   "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits)"
+   "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits); none of the declarations your code uses from it changed",
+   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "files": "src/main.c"
   },
   {
    "id": "SBOM-HEADER-CHANGED-f3d980c1",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "high",
    "kind": "header-changed",
-   "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+195/-37 lines in 14 commits)"
+   "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+195/-37 lines in 14 commits); none of the declarations your code uses from it changed",
+   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "files": "src/main.c"
   },
   {
    "id": "SBOM-MODULE-REPINNED-4ce9a60f",
    "severity": "risky",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module mbedtls moves from 4952e1328529 to 85440ef5fffa; 31 files compiled into hello changed (31 modified, 0 added, 0 removed)"
+   "title": "Module mbedtls moves from 4952e1328529 to 85440ef5fffa; 31 files compiled into hello changed (31 modified, 0 added, 0 removed)",
+   "action": "Read the module's changelog for that range.",
+   "files": ""
   },
   {
    "id": "SBOM-ZEPHYR-SOURCES-ea4d3a52",
    "severity": "info",
    "confidence": "high",
    "kind": "zephyr-sources",
-   "title": "Zephyr files compiled: 201 → 203 (8 added, 6 removed, 71 changed); 247 upstream commits touch the files the target compiles"
+   "title": "Zephyr files compiled: 201 → 203 (8 added, 6 removed, 71 changed); 247 upstream commits touch the files the target compiles",
+   "action": "The busiest files are listed first; review those against your app's behavior.",
+   "files": ""
   },
   {
    "id": "STORAGE-BACKEND-OPTIONS-CHANGED-29a58c8b",
    "severity": "info",
    "confidence": "high",
    "kind": "backend-options-changed",
-   "title": "Storage backend settings options changed: CONFIG_SETTINGS_ZMS_LOAD_SUBTREE_PATH unset → n, CONFIG_SETTINGS_ZMS_NO_LL_DELETE unset → n"
+   "title": "Storage backend settings options changed: CONFIG_SETTINGS_ZMS_LOAD_SUBTREE_PATH unset → n, CONFIG_SETTINGS_ZMS_NO_LL_DELETE unset → n",
+   "action": "The backend stays enabled; review these options.",
+   "files": ""
   },
   {
    "id": "STORAGE-IMPLEMENTATION-CHANGED-1be77c25",
    "severity": "info",
    "confidence": "medium",
    "kind": "implementation-changed",
-   "title": "2 compiled storage backend files changed; their on-media definitions didn't"
+   "title": "2 compiled storage backend files changed; their on-media definitions didn't",
+   "action": "Behavior can change without the declarations changing; named in the verdict basis.",
+   "files": ""
   }
  ]
 }

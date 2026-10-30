@@ -41,19 +41,19 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ | ″ | 1 | tuned (audit fixes, re-run at `aa95a10`) | 0 | 0 | **2/3 (67%)** | 0 | ok | direct-ok (medium) | DOGFOOD-7 |
 | **bms-firmware A1** bms_16s100_sc | v4.0 → v4.2 | 2 | clean: DOGFOOD-2 baseline | 0 (0%) | 1 (50%) | 1/6 (17%) | — | **build failed** (no cmsis_6) | unknown (medium) | DOGFOOD-2-baseline §5–6 |
 | ″ | ″ | 2 | tuned (Step 2 → P2; re-run 2026-10-29) | 0 → 1 | 1 | 1/2 (50%) → **1/9 (11%)** | 0 | ok after module recovery | unknown (medium) | DOGFOOD-2 §4, DOGFOOD-3 §2–3, DOGFOOD-5 §10 |
-| ″ | ″ | 2 | tuned (audit fixes, re-run at `aa95a10`) | 1 | 1 | **1/4 (25%)** | 0 | ok after module recovery | unknown (medium) | DOGFOOD-6 |
+| ″ | ″ | 2 | tuned (audit fixes, re-run at `aa95a10`) | 1 | 1 | **1/4 (25%)** | **1/2** (corrected 2026-10-30) | ok after module recovery | unknown (medium) | DOGFOOD-6 |
 | bms A1-native | ″ | 5 | clean: DOGFOOD-3 baseline (one caveat, §7.3) | 2 | 4 | 10/10 (100%) | 0 | configure-failed | | DOGFOOD-3 §2–3 |
 | ″ | ″ | 5 | tuned (P2) | 2 | 4 | 9/9 (100%) | 0 | | | ″ |
-| ″ | ″ | 5 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 4 | 8/8 (100%); P2 corrected to 8/9 (89%) | 0 | | direct-ok (low) | DOGFOOD-7 §2 correction |
+| ″ | ″ | 5 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 4 | 8/8 (100%); P2 corrected to 8/9 (89%) | **1/5** (corrected 2026-10-30) | | direct-ok (low) | DOGFOOD-7 §2 correction |
 | bms A1-oled | ″ | 3 | clean: DOGFOOD-3 baseline (same caveat) | 2 | 2 | 2/2 (100%) | 0 | build failed | | ″ |
 | ″ | ″ | 3 | tuned (P2) | 2 | 2 | 3/3 (100%) | 0 | | | ″ |
-| ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | 3/3 (100%) | 0 | | direct-ok (low) | DOGFOOD-7 |
+| ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | 3/3 (100%) | **1/3** (corrected 2026-10-30) | | direct-ok (low) | DOGFOOD-7 |
 | **CANnectivity C1** usb2canfdv1 | v1.1.0 → v1.2.0 (Zephyr v4.1.0 → v4.2-branch) | 3 | clean: DOGFOOD-4 baseline | 1 (33%) | 2 (67%) | 7/11 (64%) | 0 | build failed (link: `smf_set_handled`) | direct-ok (**low**) | DOGFOOD-4-baseline §2–3 |
 | ″ | ″ | 3 | tuned (M13–M15; definition sites) | 1 → **2** | 2 | 7/8 (88%) | 0 | ″ | ″ | DOGFOOD-4 §6, C2 correction |
-| ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | 7/8 (88%) | 0 | ″ | ″ | DOGFOOD-6 |
+| ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | 7/8 (88%) | **1/3** (corrected 2026-10-30) | ″ | ″ | DOGFOOD-6 |
 | CANnectivity C2 candlelight | ″ | 3 | clean: DOGFOOD-4 baseline | 1 (33%) | 2 (67%) | 7/8 (88%) | 0 | build failed | direct-ok (low) | ″ |
 | ″ | ″ | 3 | tuned (definition sites) | **2** | 2 | 7/8 (88%) | 0 | ″ | ″ | `oracles/cannectivity-c2-correction-2026-10-28.md` |
-| ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | 7/8 (88%) | 0 | ″ | ″ | DOGFOOD-6 |
+| ″ | ″ | 3 | tuned (audit fixes, re-run at `aa95a10`) | 2 | 2 | 7/8 (88%) | **1/3** (corrected 2026-10-30) | ″ | ″ | DOGFOOD-6 |
 | CANnectivity frdm_k64f | ″ | — | **not run** (the download was stopped) | | | | | | | ″ |
 | **OpenDeck** nucleo_h563zi, scan | bump `ab8f6af` (Zephyr `main` 4.4.99, both sides plus OpenDeck's patches) | 5 | clean: DOGFOOD-5 baseline | 0 (0%) | 2 (40%) | 11/22 (50%) | 0 | **configure failed** (devicetree label; a patch-supplied Kconfig function behind it) | needs-changes (low) | DOGFOOD-5-baseline §2–5 |
 | ″ | ″ | 5 | tuned (§10, §11) | 1 (20%) | 1 (20%) | 11/11 (100%) | 1/5 | ″ | ″ | DOGFOOD-5 §10–11 |
@@ -76,7 +76,9 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 
 Across every clean scan result, zmig names *what* breaks more often than *where to fix it*:
 **actionable was 0 on every clean measurement.** The only non-zero actionable figures are
-tuned: ZMK 1/18, OpenDeck plan 8/9, OpenDeck scan 1/5.
+tuned: ZMK 1/18, OpenDeck plan 8/9, OpenDeck scan 1/5, and, since the `module-required` action names the user's
+`west.yml` (`ddf6b2b`), bms A1 1/2, A1-native 1/5, A1-oled 1/3 and CANnectivity C1, C2 1/3
+(DOGFOOD-6 and DOGFOOD-7 corrections, 2026-10-30).
 
 ## The ceiling: items no tool could catch in these builds
 

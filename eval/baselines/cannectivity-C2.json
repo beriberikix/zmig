@@ -9,112 +9,144 @@
    "severity": "breaking",
    "confidence": "high",
    "kind": "callback-type-changed",
-   "title": "Callbacks your code provides no longer match the type Zephyr expects at 30de5e8a2ceef99177c6c96785a8888b978154f0: const state_execution"
+   "title": "Callbacks your code provides no longer match the type Zephyr expects at 30de5e8a2ceef99177c6c96785a8888b978154f0: const state_execution",
+   "action": "Change their signatures to match (incompatible function pointer types initializing 'const state_execution' (aka 'enum smf_state_result (*const)(void *)') with an expression of type 'void (void *)').",
+   "files": "src/led.c"
   },
   {
    "id": "API-FUNCTION-REMOVED-ec6b5e5b",
    "severity": "breaking",
    "confidence": "high",
    "kind": "function-removed",
-   "title": "Function smf_set_handled, which your code uses, no longer exists in 30de5e8a2ceef99177c6c96785a8888b978154f0"
+   "title": "Function smf_set_handled, which your code uses, no longer exists in 30de5e8a2ceef99177c6c96785a8888b978154f0",
+   "action": "Find its replacement in the migration guides.",
+   "files": "src/led.c"
   },
   {
    "id": "BUILD-NEW-WARNING-87c57d6a",
    "severity": "risky",
    "confidence": "high",
    "kind": "new-warning",
-   "title": "New compiler warning at 30de5e8a2ceef99177c6c96785a8888b978154f0: initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'"
+   "title": "New compiler warning at 30de5e8a2ceef99177c6c96785a8888b978154f0: initialization of 'enum smf_state_result (*)(void *)' from incompatible pointer type 'void (*)(void *)'",
+   "action": "Check whether it points at a real problem.",
+   "files": "src/led.c"
   },
   {
    "id": "BUILD-NEW-WARNING-c66c710e",
    "severity": "risky",
    "confidence": "high",
    "kind": "new-warning",
-   "title": "New compiler warning at 30de5e8a2ceef99177c6c96785a8888b978154f0: implicit declaration of function 'smf_set_handled'"
+   "title": "New compiler warning at 30de5e8a2ceef99177c6c96785a8888b978154f0: implicit declaration of function 'smf_set_handled'",
+   "action": "Check whether it points at a real problem.",
+   "files": "src/led.c"
   },
   {
    "id": "BUILD-TARGET-BUILD-FAILED-8d112210",
    "severity": "breaking",
    "confidence": "high",
    "kind": "target-build-failed",
-   "title": "The target build fails: 2 errors (linker)"
+   "title": "The target build fails: 2 errors (linker)",
+   "action": "The Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
+   "files": "src/led.c"
   },
   {
    "id": "DEVICETREE-NODE-CHANGED-4a30b254",
    "severity": "risky",
    "confidence": "high",
    "kind": "node-changed",
-   "title": "&zephyr_udc0 (/soc/usb@40005c00) changed: clocks, maximum-speed"
+   "title": "&zephyr_udc0 (/soc/usb@40005c00) changed: clocks, maximum-speed",
+   "action": "Check these property changes against how your code uses the node.",
+   "files": "src/usb.c"
   },
   {
    "id": "DEVICETREE-OTHER-NODES-81a2a6cc",
    "severity": "info",
    "confidence": "high",
    "kind": "other-nodes",
-   "title": "13 nodes your app doesn't reference changed, disappeared or appeared; 1 more node only changed binding"
+   "title": "13 nodes your app doesn't reference changed, disappeared or appeared; 1 more node only changed binding",
+   "action": "None needed unless you start using them.",
+   "files": ""
   },
   {
    "id": "GUIDE-COVERAGE-3befcedf",
    "severity": "info",
    "confidence": "high",
    "kind": "coverage",
-   "title": "Read 160 entries from 2 documents; 1 touch your app"
+   "title": "Read 160 entries from 2 documents; 1 touch your app",
+   "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+   "files": ""
   },
   {
    "id": "GUIDE-ENTRY-MATCH-33cac5e2",
    "severity": "breaking",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.2 migration guide (State Machine Framework): smf_set_handled has been removed. [smf_set_handled]"
+   "title": "4.2 migration guide (State Machine Framework): smf_set_handled has been removed. [smf_set_handled]",
+   "action": "Read MG-4.2-0137 and update the lines listed.",
+   "files": "src/led.c"
   },
   {
    "id": "IMAGES-IMAGES-SUMMARY-b22066df",
    "severity": "info",
    "confidence": "high",
    "kind": "images-summary",
-   "title": "1 image at 30de5e8a2ceef99177c6c96785a8888b978154f0: app (app)"
+   "title": "1 image at 30de5e8a2ceef99177c6c96785a8888b978154f0: app (app)",
+   "action": "Per-image findings follow, grouped by image.",
+   "files": ""
   },
   {
    "id": "KCONFIG-DEFAULT-CHANGED-d736ba88",
    "severity": "info",
    "confidence": "high",
    "kind": "default-changed",
-   "title": "3 Kconfig symbols: other symbols resolve to a different value in 30de5e8a2ceef99177c6c96785a8888b978154f0"
+   "title": "3 Kconfig symbols: other symbols resolve to a different value in 30de5e8a2ceef99177c6c96785a8888b978154f0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-NEWLY-SET-79a4abb7",
    "severity": "info",
    "confidence": "high",
    "kind": "newly-set",
-   "title": "22 Kconfig symbols: symbols are newly enabled or set in 30de5e8a2ceef99177c6c96785a8888b978154f0"
+   "title": "22 Kconfig symbols: symbols are newly enabled or set in 30de5e8a2ceef99177c6c96785a8888b978154f0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-NO-LONGER-SET-21a43b8c",
    "severity": "info",
    "confidence": "high",
    "kind": "no-longer-set",
-   "title": "11 Kconfig symbols: symbols set before are absent in 30de5e8a2ceef99177c6c96785a8888b978154f0"
+   "title": "11 Kconfig symbols: symbols set before are absent in 30de5e8a2ceef99177c6c96785a8888b978154f0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "MANIFEST-MODULE-REPINNED-45e8446d",
    "severity": "info",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module hal_stm32, which the build uses, moves from 55043bcc35ff to 1e753266ddfb"
+   "title": "Module hal_stm32, which the build uses, moves from 55043bcc35ff to 1e753266ddfb",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
   },
   {
    "id": "MANIFEST-MODULE-REPINNED-a0594ca2",
    "severity": "info",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module cmsis, which the build uses, moves from d1b8b20b6278 to 512cc7e895e8"
+   "title": "Module cmsis, which the build uses, moves from d1b8b20b6278 to 512cc7e895e8",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
   },
   {
    "id": "MANIFEST-MODULE-REQUIRED-e7f9a024",
    "severity": "breaking",
    "confidence": "high",
    "kind": "module-required",
-   "title": "The target build needs module cmsis_6, which the build's module set doesn't include"
+   "title": "The target build needs module cmsis_6, which the build's module set doesn't include",
+   "action": "Add cmsis_6 to your manifest in ../west.yml:14 (the name-allowlist of the Zephyr import) and run `west update`. zmig added it to analyze the target; the rest of this report compares against that build.",
+   "files": "../west.yml"
   }
  ]
 }

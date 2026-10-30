@@ -70,7 +70,7 @@ cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}"]
 
 [configs.golioth-B-rak]
 oracle = "docs/oracles/golioth-configs.md"
-scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+scored = "DOGFOOD-7 (zmig aa95a10)"
 app = "{src:golioth}/examples/zephyr/hello"
 board = "rak5010/nrf52840"
 from = "v4.1.0"
@@ -81,7 +81,7 @@ cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}"]
 
 [configs.golioth-B-esp]
 oracle = "docs/oracles/golioth-configs.md"
-scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+scored = "DOGFOOD-7 (zmig aa95a10)"
 app = "{src:golioth}/examples/zephyr/hello"
 board = "nrf52840dk/nrf52840"
 from = "v4.1.0"
@@ -92,7 +92,7 @@ cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}", "-DSHIELD=golioth_esp_at"]
 
 [configs.golioth-B-native]
 oracle = "docs/oracles/golioth-configs.md"
-scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+scored = "DOGFOOD-7 (zmig aa95a10)"
 app = "{src:golioth}/examples/zephyr/hello"
 board = "native_sim"
 from = "v4.1.0"
@@ -113,7 +113,7 @@ cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:bms-firmware};{src:thingset-zephyr-sd
 
 [configs.bms-A1-native]
 oracle = "docs/oracles/bms-firmware-configs.md"
-scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+scored = "DOGFOOD-7 (zmig aa95a10)"
 app = "{src:bms-firmware}/app"
 board = "native_sim"
 from = "4ebecae78ad969f2801e1dfcf453dc9dd2b288d3"
@@ -123,7 +123,7 @@ cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:bms-firmware};{src:thingset-zephyr-sd
 
 [configs.bms-A1-oled]
 oracle = "docs/oracles/bms-firmware-configs.md"
-scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+scored = "DOGFOOD-7 (zmig aa95a10)"
 app = "{src:bms-firmware}/app"
 board = "bms_8s50_ic@0.2"
 from = "4ebecae78ad969f2801e1dfcf453dc9dd2b288d3"
@@ -161,7 +161,7 @@ cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:cannectivity}"]
 # ZMK is scored as one item set over both builds (corne ∪ niceview).
 [configs.zmk-corne]
 oracle = "docs/DOGFOOD-2-baseline.md §1"
-scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+scored = "DOGFOOD-7 (zmig aa95a10)"
 group = "zmk"
 app = "{src:zmk}/app"
 board = "nice_nano_v2"
@@ -173,7 +173,7 @@ cmake_args = ["-DSHIELD=corne_left"]
 
 [configs.zmk-niceview]
 oracle = "docs/DOGFOOD-2-baseline.md §1"
-scored = "DOGFOOD-3 P2 (zmig 6f0bf46)"
+scored = "DOGFOOD-7 (zmig aa95a10)"
 group = "zmk"
 app = "{src:zmk}/app"
 board = "nice_nano_v2"

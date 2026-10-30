@@ -127,3 +127,45 @@ Every row is now re-runnable, except:
 - **OpenDeck:** patched Zephyr trees; re-runnable with `dogfood/d6/run.sh`.
 - **smp_svr:** a single field-upgrade hazard.
 - **The P1 fixtures:** asserted by tests.
+
+## Correction (2026-10-30): actionable
+
+This report said actionable was unchanged. **It wasn't**: the table's actionable column was
+copied from the scored runs, and nobody checked the action text.
+
+Commit `ddf6b2b` changed the action of `module-required`, between this report's baseline
+and the audit:
+- before: "Add cmsis_6 to your workspace (the name-allowlist or project list that imports
+  Zephyr)…";
+- after: "Add cmsis_6 to your manifest in ../west.yml:18 (the name-allowlist of the Zephyr
+  import)…" (`:14` for CANnectivity).
+
+`west.yml` is the file the maintainers edited for bms-firmware B1 and CANnectivity N2. Under
+the definition (DOGFOOD-3 §7.1), the action names an edited file. The finding IDs and
+severities didn't change, which is why matching by ID missed it.
+
+| Config | Actionable, as reported | Corrected |
+|---|---|---|
+| bms A1-native | 0 | **1/5** (B1b, `MANIFEST-MODULE-REQUIRED-559fd34e`: "Add mbedtls to your manifest in ../west.yml:18") |
+| bms A1-oled | 0 | **1/3** (B1a, `MANIFEST-MODULE-REQUIRED-194d1ea7`) |
+
+The Golioth configurations (0) and ZMK (1/18, #5) are unaffected.
+
+The comparison in `eval/run.py` now also reports changed action text and evidence files of
+breaking/risky findings, so this kind of change is listed for the scorer.
+
+## Open question (2026-10-30): ZMK #3's location
+
+ZMK #3 (`hci_err.h` → `hci_types.h`, `src/ble.c`) is labelled caught through
+`BUILD-TARGET-BUILD-FAILED-f5607720` (DOGFOOD-2-baseline §1).
+
+| Run | `src/ble.c:22` in the finding's evidence? |
+|---|---|
+| DOGFOOD-1/2 (`dogfood/out/final-corne`) | **yes**, as file_line evidence |
+| P2 (`p2final`), its reproduction, and today's run | **no**: the evidence lists only the five syscall-header errors. `src/ble.c:22` and `hci_err.h` survive only in the finding's raw error list (`new`) |
+
+So the change predates the audit fixes, and P2 kept the label. ORACLE-RULES §2 requires the
+*evidence* to point at the location. Under a strict reading, #3 has been **partly (c)**
+(the right cause, evidence elsewhere) since P2, which makes ZMK's strict recall 5/18 rather than 6/18. Lenient recall is
+unchanged. This is left for the maintainer to decide; the published numbers stand until
+then.

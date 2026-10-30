@@ -1,7 +1,7 @@
 {
  "config": "bms-A1-oled",
- "scored": "DOGFOOD-3 P2 (zmig 6f0bf46)",
- "schema_version": "1.2",
+ "scored": "DOGFOOD-7 (zmig aa95a10)",
+ "schema_version": "1.4",
  "verdict": "direct-ok",
  "findings": [
   {
@@ -9,126 +9,144 @@
    "severity": "breaking",
    "confidence": "high",
    "kind": "enum-removed",
-   "title": "Enum constant CFB_DISPLAY_HEIGH, which your code uses, no longer exists in 636ad05950bb35792fdc214b3f5fb3e106254f38"
+   "title": "Enum constant CFB_DISPLAY_HEIGH, which your code uses, no longer exists in 636ad05950bb35792fdc214b3f5fb3e106254f38",
+   "action": "Find its replacement in the migration guides.",
+   "files": "src/oled.c"
   },
   {
    "id": "BUILD-TARGET-BUILD-FAILED-0b778d9a",
    "severity": "breaking",
    "confidence": "high",
    "kind": "target-build-failed",
-   "title": "The target build fails: 5 errors (compiler)"
+   "title": "The target build fails: 5 errors (compiler)",
+   "action": "The Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
+   "files": "src/oled.c"
   },
   {
    "id": "DEVICETREE-OTHER-NODES-d75da3b4",
    "severity": "info",
    "confidence": "high",
    "kind": "other-nodes",
-   "title": "25 nodes your app doesn't reference changed, disappeared or appeared; 58 more nodes only changed binding"
+   "title": "25 nodes your app doesn't reference changed, disappeared or appeared; 58 more nodes only changed binding",
+   "action": "None needed unless you start using them.",
+   "files": ""
   },
   {
    "id": "GUIDE-COVERAGE-454b6864",
    "severity": "info",
    "confidence": "high",
    "kind": "coverage",
-   "title": "Read 282 entries from 4 documents; 4 touch your app"
+   "title": "Read 282 entries from 4 documents; 4 touch your app",
+   "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+   "files": ""
   },
   {
    "id": "GUIDE-ENTRY-MATCH-483cc659",
    "severity": "info",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.2 migration guide (Architectures): Moved CONFIG_SRAM_VECTOR_TABLE from zephyr/Kconfig.zephyr to zephyr/arch/Kconfig and added dependency to CONFIG_XIP, CONFIG_ARCH_HAS_VECTOR_TABLE_RELOCATION and"
+   "title": "4.2 migration guide (Architectures): Moved CONFIG_SRAM_VECTOR_TABLE from zephyr/Kconfig.zephyr to zephyr/arch/Kconfig and added dependency to CONFIG_XIP, CONFIG_ARCH_HAS_VECTOR_TABLE_RELOCATION and",
+   "action": "Read MG-4.2-0142 and update the lines listed.",
+   "files": "sysbuild/mcuboot/boards/bms_c1.conf"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-72632648",
    "severity": "info",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.2 migration guide (Serial): CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE has been deprecated. (only in files this build doesn't use: boards/native_sim.conf)"
+   "title": "4.2 migration guide (Serial): CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE has been deprecated. (only in files this build doesn't use: boards/native_sim.conf)",
+   "action": "Read MG-4.2-0089 and update the lines listed.",
+   "files": "boards/native_sim.conf"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-9b6a9fd5",
    "severity": "info",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.1 migration guide (Networking): The CONFIG_NET_L2_OPENTHREAD symbol no longer implies the CONFIG_NVS Kconfig option. (only in files this build doesn't use: boards/bms_16s100_sc.conf, boards/bms_16s100_sc_esp32c3.conf, boards/bms_c1.conf)"
+   "title": "4.1 migration guide (Networking): The CONFIG_NET_L2_OPENTHREAD symbol no longer implies the CONFIG_NVS Kconfig option. (only in files this build doesn't use: boards/bms_16s100_sc.conf, boards/bms_16s100_sc_esp32c3.conf, boards/bms_c1.conf)",
+   "action": "Read MG-4.1-0091 and update the lines listed.",
+   "files": "boards/bms_16s100_sc.conf boards/bms_16s100_sc_esp32c3.conf boards/bms_c1.conf"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-dfef2791",
    "severity": "info",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.1 migration guide (Bluetooth Audio): The following Kconfig options are not longer automatically enabled by the LE Audio Kconfig options and may need to be enabled manually : CONFIG_BT_GATT_CLIENT C"
+   "title": "4.1 migration guide (Bluetooth Audio): The following Kconfig options are not longer automatically enabled by the LE Audio Kconfig options and may need to be enabled manually : CONFIG_BT_GATT_CLIENT C",
+   "action": "Read MG-4.1-0079 and update the lines listed.",
+   "files": "boards/bms_16s100_sc_esp32c3.conf boards/bms_c1.conf boards/native_sim.conf"
   },
   {
    "id": "IMAGES-IMAGES-SUMMARY-36298641",
    "severity": "info",
    "confidence": "high",
    "kind": "images-summary",
-   "title": "1 image at 636ad05950bb35792fdc214b3f5fb3e106254f38: app (app)"
+   "title": "1 image at 636ad05950bb35792fdc214b3f5fb3e106254f38: app (app)",
+   "action": "Per-image findings follow, grouped by image.",
+   "files": ""
   },
   {
    "id": "KCONFIG-DEFAULT-CHANGED-498bbd17",
    "severity": "info",
    "confidence": "high",
    "kind": "default-changed",
-   "title": "4 Kconfig symbols: other symbols resolve to a different value in 636ad05950bb35792fdc214b3f5fb3e106254f38"
+   "title": "4 Kconfig symbols: other symbols resolve to a different value in 636ad05950bb35792fdc214b3f5fb3e106254f38",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-NEWLY-SET-eb589d00",
    "severity": "info",
    "confidence": "high",
    "kind": "newly-set",
-   "title": "24 Kconfig symbols: symbols are newly enabled or set in 636ad05950bb35792fdc214b3f5fb3e106254f38"
+   "title": "24 Kconfig symbols: symbols are newly enabled or set in 636ad05950bb35792fdc214b3f5fb3e106254f38",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-NO-LONGER-SET-62d40724",
    "severity": "info",
    "confidence": "high",
    "kind": "no-longer-set",
-   "title": "20 Kconfig symbols: symbols set before are absent in 636ad05950bb35792fdc214b3f5fb3e106254f38"
-  },
-  {
-   "id": "KCONFIG-SYMBOL-DEPRECATED-1c8c5e9b",
-   "severity": "info",
-   "confidence": "high",
-   "kind": "symbol-deprecated",
-   "title": "CONFIG_NATIVE_UART_0_ON_STDINOUT is deprecated in 636ad05950bb35792fdc214b3f5fb3e106254f38 (only in files this build doesn't use: boards/native_sim.conf)"
-  },
-  {
-   "id": "KCONFIG-SYMBOL-DEPRECATED-60b70896",
-   "severity": "info",
-   "confidence": "high",
-   "kind": "symbol-deprecated",
-   "title": "CONFIG_UART_NATIVE_POSIX_PORT_1_ENABLE is deprecated in 636ad05950bb35792fdc214b3f5fb3e106254f38 (only in files this build doesn't use: boards/native_sim.conf)"
+   "title": "20 Kconfig symbols: symbols set before are absent in 636ad05950bb35792fdc214b3f5fb3e106254f38",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "MANIFEST-MODULE-REPINNED-51d35ee6",
    "severity": "info",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module zcbor, which the build uses, moves from 47f34dd7f528 to 9b07780aca6f"
+   "title": "Module zcbor, which the build uses, moves from 47f34dd7f528 to 9b07780aca6f",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
   },
   {
    "id": "MANIFEST-MODULE-REPINNED-a95ce84d",
    "severity": "info",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module hal_stm32, which the build uses, moves from 019d8255333f to 1e753266ddfb"
+   "title": "Module hal_stm32, which the build uses, moves from 019d8255333f to 1e753266ddfb",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
   },
   {
    "id": "MANIFEST-MODULE-REPINNED-c4ef494d",
    "severity": "info",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module cmsis, which the build uses, moves from 4b96cbb17467 to 512cc7e895e8"
+   "title": "Module cmsis, which the build uses, moves from 4b96cbb17467 to 512cc7e895e8",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
   },
   {
    "id": "MANIFEST-MODULE-REQUIRED-194d1ea7",
    "severity": "breaking",
    "confidence": "high",
    "kind": "module-required",
-   "title": "The target build needs module cmsis_6, which the build's module set doesn't include"
+   "title": "The target build needs module cmsis_6, which the build's module set doesn't include",
+   "action": "Add cmsis_6 to your manifest in ../west.yml:18 (the name-allowlist of the Zephyr import) and run `west update`. zmig added it to analyze the target; the rest of this report compares against that build.",
+   "files": "../west.yml"
   }
  ]
 }

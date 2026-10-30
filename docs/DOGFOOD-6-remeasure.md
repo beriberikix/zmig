@@ -83,3 +83,30 @@ For B-rak, `6f11022` and the audit fixes are the two changes most likely to matt
 - **No confirmed finding was demoted, and recall is unchanged everywhere.**
 - **Actionable is still 0 on every scan except OpenDeck's 1/5.** The audit fixes weren't
   aimed at it, and it remains the weakest number.
+
+## Correction (2026-10-30): actionable
+
+This report said actionable was unchanged. **It wasn't**: the table's actionable column was
+copied from the scored runs, and nobody checked the action text.
+
+Commit `ddf6b2b` changed the action of `module-required`, between this report's baseline
+and the audit:
+- before: "Add cmsis_6 to your workspace (the name-allowlist or project list that imports
+  Zephyr)…";
+- after: "Add cmsis_6 to your manifest in ../west.yml:18 (the name-allowlist of the Zephyr
+  import)…" (`:14` for CANnectivity).
+
+`west.yml` is the file the maintainers edited for bms-firmware B1 and CANnectivity N2. Under
+the definition (DOGFOOD-3 §7.1), the action names an edited file. The finding IDs and
+severities didn't change, which is why matching by ID missed it.
+
+| Config | Actionable, as reported | Corrected |
+|---|---|---|
+| bms A1 | 0 | **1/2** (B1, `MANIFEST-MODULE-REQUIRED-cd65f61b`) |
+| CANnectivity C1 | 0 | **1/3** (N2, `MANIFEST-MODULE-REQUIRED-f4a43627`) |
+| CANnectivity C2 | 0 | **1/3** (N2, `MANIFEST-MODULE-REQUIRED-e7f9a024`) |
+
+Golioth B (0) and OpenDeck (scan 1/5, plan 8/9) are unaffected.
+
+The comparison in `eval/run.py` now also reports changed action text and evidence files of
+breaking/risky findings, so this kind of change is listed for the scorer.

@@ -1,7 +1,7 @@
 {
  "config": "golioth-B-rak",
- "scored": "DOGFOOD-3 P2 (zmig 6f0bf46)",
- "schema_version": "1.2",
+ "scored": "DOGFOOD-7 (zmig aa95a10)",
+ "schema_version": "1.4",
  "verdict": "blocked",
  "findings": [
   {
@@ -9,182 +9,234 @@
    "severity": "risky",
    "confidence": "high",
    "kind": "field-changed",
-   "title": "Field net_mgmt_event_callback.<anonymous>.event_mask, which your code uses, changed: unsigned int at bit offset 0 → unsigned long long at bit offset 0"
+   "title": "Field net_mgmt_event_callback.<anonymous>.event_mask, which your code uses, changed: unsigned int at bit offset 0 → unsigned long long at bit offset 0",
+   "action": "Check the code that uses it.",
+   "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
    "id": "API-MACRO-CHANGED-d2fc7345",
    "severity": "breaking",
    "confidence": "high",
    "kind": "macro-changed",
-   "title": "Macro NET_EVENT_IPV4_ADDR_ADD, which your code uses, changed: (unsigned long, 4 bytes) = 3758358529 → (unsigned long long, 8 bytes) = 16154411863377969153"
+   "title": "Macro NET_EVENT_IPV4_ADDR_ADD, which your code uses, changed: (unsigned long, 4 bytes) = 3758358529 → (unsigned long long, 8 bytes) = 16154411863377969153",
+   "action": "Its type got wider and your code stores it in a narrower type, which changes the value (see the lines listed); widen those.",
+   "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
    "id": "API-TYPEDEF-CHANGED-f63e4c00",
    "severity": "breaking",
    "confidence": "high",
    "kind": "typedef-changed",
-   "title": "Typedef net_mgmt_event_handler_t, which your code uses, changed: void (*)(struct net_mgmt_event_callback *, unsigned int, struct net_if *) → void (*)(struct net_mgmt_event_callback *, unsigned long long, struct net_if *)"
+   "title": "Typedef net_mgmt_event_handler_t, which your code uses, changed: void (*)(struct net_mgmt_event_callback *, unsigned int, struct net_if *) → void (*)(struct net_mgmt_event_callback *, unsigned long long, struct net_if *)",
+   "action": "Update the code that calls, implements or stores it (your callbacks no longer match it).",
+   "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
    "id": "BUILD-FOOTPRINT-d77cfbac",
    "severity": "info",
    "confidence": "high",
    "kind": "footprint",
-   "title": "ROM 276279 → 281681 bytes (+5402), RAM 85702 → 85114 bytes (-588)"
+   "title": "ROM 276295 → 281693 bytes (+5398), RAM 85702 → 85114 bytes (-588)",
+   "action": "The symbols that grew or shrank most are listed; check them against your memory budget.",
+   "files": ""
   },
   {
    "id": "BUILD-NEW-WARNING-60ef13a4",
    "severity": "risky",
    "confidence": "high",
    "kind": "new-warning",
-   "title": "New compiler warning at v4.2.0: assignment to 'net_mgmt_event_handler_t' {aka 'void (*)(struct net_mgmt_event_callback *, long long unsigned int, struct net_if *)'} from in"
+   "title": "New compiler warning at v4.2.0: assignment to 'net_mgmt_event_handler_t' {aka 'void (*)(struct net_mgmt_event_callback *, long long unsigned int, struct net_if *)'} from in",
+   "action": "Check whether it points at a real problem.",
+   "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
    "id": "BUILD-NEW-WARNING-e1303537",
    "severity": "risky",
    "confidence": "high",
    "kind": "new-warning",
-   "title": "New compiler warning at v4.2.0: conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1'"
+   "title": "New compiler warning at v4.2.0: conversion from 'long long unsigned int' to 'uint32_t' {aka 'unsigned int'} changes value from '16154411863377969153' to '1'",
+   "action": "Check whether it points at a real problem.",
+   "files": "golioth-firmware-sdk/examples/zephyr/common/net_connect.c"
   },
   {
    "id": "DEVICETREE-OTHER-NODES-a0c521e0",
    "severity": "info",
    "confidence": "high",
    "kind": "other-nodes",
-   "title": "27 nodes your app doesn't reference changed, disappeared or appeared; 8 more nodes only changed binding"
+   "title": "27 nodes your app doesn't reference changed, disappeared or appeared; 8 more nodes only changed binding",
+   "action": "None needed unless you start using them.",
+   "files": ""
   },
   {
    "id": "GUIDE-COVERAGE-a220fc16",
    "severity": "info",
    "confidence": "high",
    "kind": "coverage",
-   "title": "Read 160 entries from 2 documents; 2 touch your app"
+   "title": "Read 160 entries from 2 documents; 2 touch your app",
+   "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+   "files": ""
   },
   {
    "id": "GUIDE-ENTRY-MATCH-16b503d8",
    "severity": "info",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.2 migration guide (Ethernet): ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecate (only in files this build doesn't use: socs/native.conf, socs/native_64.conf)"
+   "title": "4.2 migration guide (Ethernet): ethernet_native_posix has been renamed ethernet_native_tap, and with it its kconfig options: CONFIG_ETH_NATIVE_POSIX and its related options have been deprecate (only in files this build doesn't use: socs/native.conf, socs/native_64.conf)",
+   "action": "Read MG-4.2-0046 and update the lines listed.",
+   "files": "socs/native.conf socs/native_64.conf"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-c20dd67e",
    "severity": "breaking",
    "confidence": "medium",
    "kind": "entry-match",
-   "title": "4.2 migration guide (Modem): Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU."
+   "title": "4.2 migration guide (Modem): Removed Kconfig option CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE in favor of CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE and CONFIG_MODEM_CMUX_MTU.",
+   "action": "Read MG-4.2-0074 and update the lines listed.",
+   "files": "boards/rak5010_nrf52840.conf"
   },
   {
    "id": "IMAGES-IMAGES-SUMMARY-19d5cad9",
    "severity": "info",
    "confidence": "high",
    "kind": "images-summary",
-   "title": "1 image at v4.2.0: hello (app, 125 compiled files changed)"
+   "title": "1 image at v4.2.0: hello (app, 125 compiled files changed)",
+   "action": "Per-image findings follow, grouped by image.",
+   "files": ""
   },
   {
    "id": "KCONFIG-DEFAULT-CHANGED-8397c765",
    "severity": "info",
    "confidence": "high",
    "kind": "default-changed",
-   "title": "7 Kconfig symbols: other symbols resolve to a different value in v4.2.0"
+   "title": "7 Kconfig symbols: other symbols resolve to a different value in v4.2.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
+  },
+  {
+   "id": "KCONFIG-DEPENDENCY-EXPRESSION-CHANGED-4e29065a",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "dependency-expression-changed",
+   "title": "1 Kconfig symbol your build sets or reads changed their depends/selects/implies in v4.2.0",
+   "action": "Value changes they caused in this build are reported as their own findings; the new expressions can matter for other boards or configurations.",
+   "files": "boards/rak5010_nrf52840.conf"
   },
   {
    "id": "KCONFIG-NEWLY-SET-f40862b9",
    "severity": "info",
    "confidence": "high",
    "kind": "newly-set",
-   "title": "36 Kconfig symbols: symbols are newly enabled or set in v4.2.0"
+   "title": "36 Kconfig symbols: symbols are newly enabled or set in v4.2.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-NO-LONGER-SET-8f5933aa",
    "severity": "info",
    "confidence": "high",
    "kind": "no-longer-set",
-   "title": "19 Kconfig symbols: symbols set before are absent in v4.2.0"
+   "title": "19 Kconfig symbols: symbols set before are absent in v4.2.0",
+   "action": "Not set or read by your app; review the list for size or behavior changes you care about (stack sizes, heap, logging).",
+   "files": ""
   },
   {
    "id": "KCONFIG-SALVAGED-5f54f9eb",
    "severity": "info",
    "confidence": "high",
    "kind": "salvaged",
-   "title": "The target configure failed; zmig disabled 1 line in a copy of your app to compare the rest"
-  },
-  {
-   "id": "KCONFIG-SYMBOL-DEPRECATED-17c46380",
-   "severity": "info",
-   "confidence": "high",
-   "kind": "symbol-deprecated",
-   "title": "CONFIG_ETH_NATIVE_POSIX is deprecated in v4.2.0 (only in files this build doesn't use: socs/native.conf, socs/native_64.conf)"
+   "title": "The target configure failed; zmig disabled 1 line in a copy of your app to compare the rest",
+   "action": "Everything else in this report compares against that salvaged build, so values that depended on the disabled lines (symbols they selected, for example) differ in it too. Fix the breaking findings and rerun.",
+   "files": "boards/rak5010_nrf52840.conf"
   },
   {
    "id": "KCONFIG-SYMBOL-REMOVED-8108c136",
    "severity": "breaking",
    "confidence": "high",
    "kind": "symbol-removed",
-   "title": "CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE, set in boards/rak5010_nrf52840.conf, no longer exists in v4.2.0"
+   "title": "CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE, set in boards/rak5010_nrf52840.conf, no longer exists in v4.2.0",
+   "action": "Remove the assignment, or find its replacement in the migration guides. Zephyr aborts the target configure on this assignment.",
+   "files": "boards/rak5010_nrf52840.conf"
   },
   {
    "id": "LAYOUT-PARTITION-MOVED-e2bcc29c",
    "severity": "breaking",
    "confidence": "high",
    "kind": "partition-moved",
-   "title": "Partition slot1_partition moved and resized: 0x83000+0x75000 at v4.1.0 → 0x82000+0x76000 at v4.2.0 [role: unknown]"
+   "title": "Partition slot1_partition moved and resized: 0x83000+0x75000 at v4.1.0 → 0x82000+0x76000 at v4.2.0 [role: unknown]",
+   "action": "A deployed device keeps the old layout: its bootloader and data stay where the source build put them.",
+   "files": "<v4.1.0 hello>/zephyr/zephyr.dts <v4.2.0 hello>/zephyr/zephyr.dts"
   },
   {
    "id": "LAYOUT-PARTITION-RESIZED-d87bfe01",
    "severity": "breaking",
    "confidence": "high",
    "kind": "partition-resized",
-   "title": "Partition slot0_partition resized: 0xc000+0x77000 at v4.1.0 → 0xc000+0x76000 at v4.2.0 [role: code]"
+   "title": "Partition slot0_partition resized: 0xc000+0x77000 at v4.1.0 → 0xc000+0x76000 at v4.2.0 [role: code]",
+   "action": "A deployed device keeps the old layout: its bootloader and data stay where the source build put them.",
+   "files": "<v4.1.0 hello>/zephyr/zephyr.dts <v4.2.0 hello>/zephyr/zephyr.dts"
   },
   {
    "id": "SBOM-HEADER-CHANGED-91b8a52a",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "high",
    "kind": "header-changed",
-   "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits)"
+   "title": "<zephyr/logging/log.h>, which your code includes, changed upstream (+17/-0 lines in 1 commits); none of the declarations your code uses from it changed",
+   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "files": "src/main.c"
   },
   {
    "id": "SBOM-HEADER-CHANGED-d9d45a0c",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "high",
    "kind": "header-changed",
-   "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+195/-37 lines in 14 commits)"
+   "title": "<zephyr/kernel.h>, which your code includes, changed upstream (+195/-37 lines in 14 commits); none of the declarations your code uses from it changed",
+   "action": "libclang compared the declarations your code uses at both versions; review the header only for behavior changes behind unchanged signatures.",
+   "files": "src/main.c"
   },
   {
    "id": "SBOM-MODULE-REPINNED-7533b9df",
    "severity": "risky",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module mbedtls moves from 4952e1328529 to 85440ef5fffa; 31 files compiled into hello changed (31 modified, 0 added, 0 removed)"
+   "title": "Module mbedtls moves from 4952e1328529 to 85440ef5fffa; 31 files compiled into hello changed (31 modified, 0 added, 0 removed)",
+   "action": "Read the module's changelog for that range.",
+   "files": ""
   },
   {
    "id": "SBOM-MODULE-REPINNED-fb46d824",
    "severity": "risky",
    "confidence": "high",
    "kind": "module-repinned",
-   "title": "Module hal-nordic moves from 37ca068d7b01 to 9587b1dcb83d; 4 files compiled into hello changed (4 modified, 0 added, 0 removed)"
+   "title": "Module hal-nordic moves from 37ca068d7b01 to 9587b1dcb83d; 4 files compiled into hello changed (4 modified, 0 added, 0 removed)",
+   "action": "Read the module's changelog for that range.",
+   "files": ""
   },
   {
    "id": "SBOM-ZEPHYR-SOURCES-4a4e2936",
    "severity": "info",
    "confidence": "high",
    "kind": "zephyr-sources",
-   "title": "Zephyr files compiled: 257 → 262 (7 added, 2 removed, 90 changed); 299 upstream commits touch the files the target compiles"
+   "title": "Zephyr files compiled: 257 → 262 (7 added, 2 removed, 90 changed); 299 upstream commits touch the files the target compiles",
+   "action": "The busiest files are listed first; review those against your app's behavior.",
+   "files": ""
   },
   {
    "id": "STORAGE-BACKEND-OPTIONS-CHANGED-4599cc73",
    "severity": "info",
    "confidence": "high",
    "kind": "backend-options-changed",
-   "title": "Storage backend settings options changed: CONFIG_SETTINGS_ZMS_LOAD_SUBTREE_PATH unset → n, CONFIG_SETTINGS_ZMS_NO_LL_DELETE unset → n"
+   "title": "Storage backend settings options changed: CONFIG_SETTINGS_ZMS_LOAD_SUBTREE_PATH unset → n, CONFIG_SETTINGS_ZMS_NO_LL_DELETE unset → n",
+   "action": "The backend stays enabled; review these options.",
+   "files": ""
   },
   {
    "id": "STORAGE-IMPLEMENTATION-CHANGED-d78e651c",
    "severity": "info",
    "confidence": "medium",
    "kind": "implementation-changed",
-   "title": "2 compiled storage backend files changed; their on-media definitions didn't"
+   "title": "2 compiled storage backend files changed; their on-media definitions didn't",
+   "action": "Behavior can change without the declarations changing; named in the verdict basis.",
+   "files": ""
   }
  ]
 }
