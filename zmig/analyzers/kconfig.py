@@ -180,7 +180,7 @@ def dependency_chains(
 class KconfigAnalyzer:
     name: ClassVar[str] = "kconfig"
     kind: ClassVar[Literal["build"]] = "build"
-    requires: ClassVar[frozenset[Artifact]] = frozenset({Artifact.CONFIG})
+    requires: ClassVar[frozenset[Artifact]] = frozenset({Artifact.CONFIG, Artifact.BUILD_NINJA})
 
     def analyze(self, ctx: ScanContext) -> AnalyzerResult:
         ov, nv = ctx.old_config, ctx.new_config

@@ -262,6 +262,7 @@ def test_tree_needs_become_module_required_or_module_not_in_manifest(
     from typing import Any
 
     from zmig.analyzers import modules
+    from zmig.buildctx import Artifact
     from zmig.findings import Category, make_id
     from zmig.modulecheck import ModuleNeed
 
@@ -281,7 +282,7 @@ def test_tree_needs_become_module_required_or_module_not_in_manifest(
         modules.ModulesAnalyzer, "_tree_needs", staticmethod(lambda ctx, m, o: (needs, None))
     )
 
-    def run(target_config: bool) -> Any:
+    def run(target_config: bool, ninja: bool | None = None) -> Any:
         ws = SimpleNamespace(
             zephyr=tmp_path / "zephyr", root=tmp_path,
             modules=lambda runner: [SimpleNamespace(name="cmsis_6"), SimpleNamespace(name="cmsis")],
@@ -291,7 +292,11 @@ def test_tree_needs_become_module_required_or_module_not_in_manifest(
             old=SimpleNamespace(workspace=ws, spec=SimpleNamespace(app=tmp_path), src=tmp_path),
             new=SimpleNamespace(workspace=ws),
             old_img=SimpleNamespace(has=lambda a: True, dir=tmp_path / "b"),
-            new_img=SimpleNamespace(has=lambda a: target_config),
+            new_img=SimpleNamespace(
+                has=lambda a: (target_config if ninja is None else ninja)
+                if a is Artifact.BUILD_NINJA
+                else target_config
+            ),
             runner=SimpleNamespace(redact=lambda s: s),
             old_spec="v4.3.0", new_spec="v4.4.0", scope=("s",),
         )  # fmt: skip
@@ -305,3 +310,6 @@ def test_tree_needs_become_module_required_or_module_not_in_manifest(
     gap = found["module-not-in-manifest"]
     assert gap.subject == "cmsis_6" and "west.yml:5" in gap.action
     assert set(run(target_config=True)) == {"module-not-in-manifest"}
+    # DOGFOOD-12 E1, proves: a .config, but the configure failed before build.ninja (in the
+    # Mbed TLS module, for want of tf-psa-crypto): the target didn't show it can do without.
+    assert "module-required" in run(target_config=True, ninja=False)

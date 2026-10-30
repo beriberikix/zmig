@@ -21,6 +21,7 @@ reported at the project's lines. Parse gaps are "not interpreted", never clean.
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import re
@@ -329,6 +330,34 @@ class ApiAnalyzer:
             for k, v in t["decls"].items():
                 new_decls.setdefault(k, v)
         parsed_at_target = {t["file"] for t in tgt}
+        # Compatibility aliases at the target: an object-like macro whose whole expansion is
+        # one identifier keeps an old name compiling as the new one (Zephyr 4.4's
+        # net_compat.h: `#define sockaddr_in net_sockaddr_in`). An old name is compared with
+        # what it names now, and old types are spelled through the aliases (regression:
+        # ble-copro's 13 "removed"/"changed" network findings, DOGFOOD-12 E2).
+        alias = {
+            k: to
+            for k, v in new_decls.items()
+            if v["kind"] == "macro"
+            and not v.get("function_like")
+            and re.fullmatch(r"[A-Za-z_]\w*", to := str(v.get("tokens", "")).strip())
+            and to != k
+        }
+        spelled = re.compile(r"\b(" + "|".join(map(re.escape, alias)) + r")\b") if alias else None
+
+        def aliased(d: dict[str, Any]) -> dict[str, Any]:
+            if spelled is None or not isinstance(d.get("type"), str):
+                return d
+            return {**d, "type": spelled.sub(lambda m: alias[m[1]], d["type"])}
+
+        def through(name: str) -> str | None:
+            """The target name an old name is an alias of. Each part of a field's name: the
+            macro renames every token, a struct's name and a member's alike
+            (`net_addr.in_addr` is `net_addr.net_in_addr` once `in_addr` is an alias)."""
+            parts = name.split(".")
+            now = ".".join(alias.get(part, part) for part in parts)
+            return now if now != name else None
+
         uses: dict[str, list[str]] = {}
         value_uses: dict[str, set[str]] = {}
         for t in src:
@@ -409,12 +438,12 @@ class ApiAnalyzer:
                  "enum": "Enum constant", "field": "Field"}  # fmt: skip
         explained: set[str] = set()
         typedef_changes = {
-            (old_decls[k]["type"], new_decls[k]["type"])
+            (aliased(old_decls[k])["type"], new_decls[k]["type"])
             for k in uses
             if k in old_decls
             and k in new_decls
             and old_decls[k]["kind"] == new_decls[k]["kind"] == "typedef"
-            and old_decls[k]["type"] != new_decls[k]["type"]
+            and aliased(old_decls[k])["type"] != new_decls[k]["type"]
         }
         for name in sorted(uses):
             o = old_decls.get(name)
@@ -433,6 +462,18 @@ class ApiAnalyzer:
             what = o["kind"]
             what_l = label.get(what, what)
             decl_old = tool_output("declaration at the source", f"{o['where']}: {shown(o)}")
+            # Not for a name that was a macro: a macro aliasing a macro expands as before
+            # (regression: CANnectivity's K_THREAD_STACK_SIZEOF, an object-like alias of a
+            # function-like macro at the target, reported as a kind change).
+            if (
+                what != "macro"
+                and (now := through(name)) is not None
+                and (n is None or n["kind"] == "macro")
+            ):
+                n = new_decls.get(now)
+                if n is None:
+                    continue  # the old name still compiles through the alias
+            o = aliased(o)
             if n is None and what == "macro":
                 # A macro whose new form the target parse couldn't expand (its arity
                 # changed) is never instantiated there: read its definition instead.
@@ -440,6 +481,8 @@ class ApiAnalyzer:
             if n is None:
                 if not covered:
                     continue
+                if what != "macro" and _alias_definition(ctx.new.workspace.zephyr, name):
+                    continue  # an alias the project never named at the target: it compiles
                 if what == "function" and (old_ws := getattr(ctx.old, "workspace", None)):
                     # The same declaration in the same header at both refs isn't a removal:
                     # a target parse with errors records no reference to a call it couldn't
@@ -910,6 +953,27 @@ def _strip_cv(t: str) -> str:
     """A type spelling without const/volatile, spacing normalized around punctuation."""
     t = re.sub(r"\b(?:const|volatile)\b", " ", t)
     return re.sub(r"\s*([(),*\[\]])\s*", r"\1", " ".join(t.split()))
+
+
+@functools.cache
+def _alias_definition(zephyr: Path, name: str) -> str | None:
+    """`path:line` of `#define name IDENT`, an object-like macro that is just another name
+    (a compatibility alias, net_compat.h's `#define sa_family_t net_sa_family_t`), in the
+    Zephyr tree's public headers. Only a plain name is looked up."""
+    if not re.fullmatch(r"[A-Za-z_]\w*", name):
+        return None
+    pat = re.compile(rf"^\s*#\s*define\s+{re.escape(name)}\s+[A-Za-z_]\w*\s*(?:/[*/].*)?$")
+    for f in sorted((zephyr / "include").rglob("*.h")):
+        try:
+            text = f.read_text(errors="replace")
+        except OSError:
+            continue
+        if name not in text:
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            if pat.match(line):
+                return f"zephyr/{f.relative_to(zephyr)}:{i}"
+    return None
 
 
 def _macro_definition(zephyr: Path, name: str) -> str | None:

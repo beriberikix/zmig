@@ -14,7 +14,7 @@ from dataclasses import dataclass, field, replace
 from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol, runtime_checkable
 
-from zmig.errors import ZmigError
+from zmig.errors import ArtifactMissing, ZmigError
 from zmig.findings import AnalyzerStatus, Checked, Finding, NotChecked
 
 if TYPE_CHECKING:
@@ -173,6 +173,11 @@ def run_build_analyzers(
             ctx.prior = list(findings)
             try:
                 res: AnalyzerResult = cls().analyze(ctx)
+            except ArtifactMissing as e:
+                # What a snapshot needs and the build didn't produce, as for `requires`
+                # (DOGFOOD-12 E1: build.ninja after a configure that failed past Kconfig).
+                statuses.append(AnalyzerStatus(label, "skipped", str(e)))
+                continue
             except ZmigError as e:
                 statuses.append(AnalyzerStatus(label, "error", str(e)))
                 continue

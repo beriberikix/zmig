@@ -739,3 +739,23 @@ def test_changes_analyzer_reports_a_newly_deprecated_symbol_the_project_uses(
         ("prj.conf", 9),
         ("ardep/boards/mercedes/ardep/Kconfig.uds", 2),
     ]
+
+
+def test_a_target_that_wrote_config_but_never_finished_configure_gets_the_stand_ins(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DOGFOOD-12 E1, proves: the target configure wrote zephyr/.config, then failed in CMake
+    (the Mbed TLS module) before build.ninja existed. The kconfig analyzer can't snapshot
+    Kconfig without build.ninja, so the change database stands in, as it does when the
+    target never reached Kconfig."""
+    from types import SimpleNamespace
+
+    from zmig.analyzers import changes as mod
+    from zmig.buildctx import Artifact
+
+    monkeypatch.setattr(mod, "database", lambda ctx: DB)
+    monkeypatch.setattr(mod, "project_roots", lambda b, d: {str(tmp_path / "ardep"): "ardep/"})
+    ctx = _ctx(tmp_path, target_configured=False)
+    ctx.new_img = SimpleNamespace(dir=tmp_path / "c", has=lambda a: a is Artifact.CONFIG)
+    kinds = {f.kind for f in mod.ChangesAnalyzer().analyze(ctx).findings}
+    assert "symbol-removed" in kinds

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -183,3 +184,39 @@ def test_deprecated_symbols_help_text_names_its_replacement() -> None:
     # Not deprecated, or a name that doesn't exist: nothing.
     assert deprecation_replacements("X", {**sym, "deprecated": False}, new) == []
     assert deprecation_replacements("X", {**sym, "help": "use NOPE instead"}, new) == []
+
+
+def test_a_missing_artifact_skips_an_analyzer_instead_of_erroring(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """DOGFOOD-12 E1: ble, storage and wire reported `error` ("build.ninja missing ...
+    configure failed") on a target whose configure failed after Kconfig. A missing build
+    artifact is a skip, with its reason, like a missing `requires` artifact."""
+    from types import SimpleNamespace
+    from typing import ClassVar
+
+    import zmig.analyzers as an
+    import zmig.buildctx as bc
+    from zmig.errors import ArtifactMissing
+
+    class Needy:
+        name: ClassVar[str] = "needy"
+        requires: ClassVar[frozenset[Any]] = frozenset()
+
+        def analyze(self, ctx: Any) -> Any:
+            raise ArtifactMissing("build.ninja missing for image app at v2 (configure failed)")
+
+    img = SimpleNamespace(name="app", has=lambda a: True)
+    monkeypatch.setattr(bc, "pair_images", lambda o, n: [(img, img)])
+    monkeypatch.setattr(an, "outside_build", lambda f, b: f)
+    monkeypatch.setattr("zmig.fixes.apply_fixes", lambda f, b: f)
+    from zmig.scan import ScanContext
+
+    monkeypatch.setattr(ScanContext, "for_pair", classmethod(lambda cls, base, o, n: base))
+    base = SimpleNamespace(
+        old=None, new=None, old_img=img, new_img=img, old_spec="v1", new_spec="v2",
+        shared={}, prior=[], is_app=True, image="app",
+    )  # fmt: skip
+    _, statuses, _ = an.run_build_analyzers([Needy], base)  # type: ignore[arg-type]
+    assert [(s.name, s.status) for s in statuses] == [("needy", "skipped")]
+    assert "build.ninja missing" in (statuses[0].reason or "")

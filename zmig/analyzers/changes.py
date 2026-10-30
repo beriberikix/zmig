@@ -91,7 +91,11 @@ class ChangesAnalyzer:
 
     def analyze(self, ctx: ScanContext) -> AnalyzerResult:
         # The kconfig and devicetree analyzers cover what the target build generated.
-        need_kconfig = not ctx.new_img.has(Artifact.CONFIG)
+        # A .config without build.ninja is a configure that failed after Kconfig: the
+        # kconfig analyzer can't snapshot it (DOGFOOD-12 E1).
+        need_kconfig = not (
+            ctx.new_img.has(Artifact.CONFIG) and ctx.new_img.has(Artifact.BUILD_NINJA)
+        )
         need_dts = not ctx.new_img.has(Artifact.EDT)
         if not ctx.is_app or not (need_kconfig or need_dts):
             return AnalyzerResult([])

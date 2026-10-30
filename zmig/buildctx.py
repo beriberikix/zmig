@@ -50,6 +50,10 @@ class Artifact(Enum):
     ELF = "zephyr/zephyr.elf"
     MAP = "zephyr/zephyr.map"
     SPDX = "spdx/zephyr.spdx"  # plus app.spdx and build.spdx in the same directory
+    # A completed configure. zephyr/.config alone isn't one: CMake can fail after Kconfig
+    # (proves: the Mbed TLS module, DOGFOOD-12 E1), and Kconfig's environment for a
+    # snapshot is reproduced from build.ninja's menuconfig rule.
+    BUILD_NINJA = "build.ninja"
 
 
 # Artifacts that exist only after the build step, not after configure.

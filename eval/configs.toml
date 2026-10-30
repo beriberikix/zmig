@@ -270,7 +270,7 @@ sha = "edee97c18006802ce387229c9c49ab2f9e1a18d7"  # base of PR #3 (Zephyr v4.3.0
 
 [configs.ble-copro]
 oracle = "docs/oracles/ble-copro.md"
-scored = "DOGFOOD-12 (zmig c919498, clean)"
+scored = "DOGFOOD-12 §5 (E1, E2; tuned)"
 app = "{src:ble-copro}"
 board = "nrf52840dk/nrf52840"
 from = "v4.3.0"
@@ -291,7 +291,7 @@ submodules = ["lib/fprime", "lib/fprime-zephyr", "lib/fprime-extras", "lib/Radio
 
 [configs.proves]
 oracle = "docs/oracles/proves.md"
-scored = "DOGFOOD-12 (zmig c919498, clean)"
+scored = "DOGFOOD-12 §5 (E1, E2; tuned)"
 app = "{src:proves}"
 # AuthDefaultKey.h, which `make generate` creates before CMake runs; and prj.conf:77's MCUboot
 # signing key, which it also creates (keys/proves.pem), points at MCUboot's own sample key in

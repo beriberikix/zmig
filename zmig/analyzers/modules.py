@@ -171,8 +171,10 @@ class ModulesAnalyzer:
             need = replace(need, declared=manifest_line(ctx.new.workspace.zephyr, need.module))
             if need.module not in have:
                 # A target that configured without it didn't need it (or failed for a
-                # reason the build itself names, diagnosed above).
-                if not ctx.new_img.has(Artifact.CONFIG):
+                # reason the build itself names, diagnosed above). Configured means
+                # build.ninja, not .config: proves' target wrote .config, then failed in
+                # the Mbed TLS module for want of tf-psa-crypto (DOGFOOD-12 E1).
+                if not ctx.new_img.has(Artifact.BUILD_NINJA):
                     required(need, "Zephyr tree at the target", Confidence.MEDIUM,
                              ("changes.lexical",))  # fmt: skip
             elif mine is not None and allow is not None and need.module not in allow:

@@ -80,7 +80,9 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ | ″ | 4 | tuned: after the detection fixes (DOGFOOD-10) | **1 (25%)** | 2 (50%) | **8/8 (100%)** | **2** (fix-actionable 1) | ″ | ″ | DOGFOOD-10 §2 |
 | ″ | ″ | 4 | tuned: + `input-not-applied` (C1, `eval/runs/c1`) | **2 (50%)** | 2 (50%) | **10/10 (100%)** | 2 (fix-actionable 1) | ″ | ″ | DOGFOOD-11 §10 |
 | **ble-copro** (nrf52840dk) | v4.3.0 → v4.4.2 | 2 | **clean**: DOGFOOD-12 baseline | 0 | 2 (100%) | 5/23 (22%) | 2 (fix-actionable 0) | build failed (`stream_client.c`) | needs-changes | DOGFOOD-12 §2 |
+| ″ | ″ | 2 | tuned: E2 (compatibility macros) | 0 | 2 (100%) | **5/10 (50%)** | 2 (fix-actionable 0) | ″ | ″ | DOGFOOD-12 §5 |
 | **proves** (`proves_flight_control_board_v5e`, F´) | v4.3.0 → v4.4.1 | 5 | **clean**: DOGFOOD-12 baseline | 1 (20%) | 4 (80%) | 20/24 (83%) | 2 (fix-actionable 0) | configure failed (Mbed TLS module, after Kconfig) | unknown | DOGFOOD-12 §2 |
+| ″ | ″ | 5 | tuned: E1 (configure failed after Kconfig) | **2 (40%)** | 4 (80%) | **21/25 (84%)** | **3** (fix-actionable **1**) | ″ | ″ | DOGFOOD-12 §5 |
 | **P1 fixtures** (`tests/fixtures/p1-layout`, `p1-mode`, `p1-rename`, `p1-ble`, `xapp*`) | v4.2.2 → v4.3.0 (constructed) | — | **tuned by construction** (written to exercise P1) | — | — | — | — | | each fixture's expected verdict (layout hazard, MCUboot mode, rename, BLE clean; cross-image) is asserted by `tests/test_p1_fixture.py`, `test_cross_fixture.py` | DESIGN-P1 §11 |
 
 ### Clean results only

@@ -1,6 +1,6 @@
 {
  "config": "proves",
- "scored": "DOGFOOD-12 (zmig c919498, clean)",
+ "scored": "DOGFOOD-12 §5 (E1, E2; tuned)",
  "schema_version": "1.5",
  "verdict": "unknown",
  "findings": [
@@ -426,6 +426,15 @@
    "title": "Module picolibc, which the build uses, moves from ca8b6ebba522 to 01254932e8e8",
    "action": "The SBOM findings list what changed in the files the build compiles.",
    "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REQUIRED-491c6f62",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "module-required",
+   "title": "The target build needs module tf-psa-crypto, which the build's module set doesn't include",
+   "action": "Add tf-psa-crypto to your manifest in west.yml:25 (the name-allowlist of the Zephyr import) and run `west update`.",
+   "files": "west.yml"
   }
  ]
 }

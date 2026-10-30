@@ -124,3 +124,50 @@ so later numbers on them are **tuned**.
   E3) that the earlier, tuned set didn't exercise. Zephyr 4.4's network namespacing is new,
   and neither earlier project used sockets.
 - **Fix-actionable is 0 on clean data again.** E4 and E7 are the closest.
+
+## 5. Addendum (2026-10-30): E1 and E2 fixed (tuned)
+
+**E1:** a completed configure now means `build.ninja`, not `zephyr/.config`
+(`Artifact.BUILD_NINJA`).
+- The kconfig analyzer requires it.
+- A snapshot that hits a missing build artifact makes an analyzer `skipped`, with the
+  reason, not `error`.
+- The `changes` stand-ins and step 4's module gate treat a `.config` without `build.ninja`
+  as a configure that didn't finish.
+
+**E2:** at the target, an object-like macro whose whole expansion is one identifier is a
+compatibility alias (`#define sockaddr_in net_sockaddr_in`).
+- An old name, or each part of a field name, is compared with what it now names, and old
+  type spellings go through the aliases.
+- A name the project never wrote at the target is looked up in the headers
+  (`#define sa_family_t net_sa_family_t`) before it's called removed.
+- A name that was a macro at the source keeps the old comparison. The first version
+  followed a macro alias and gave CANnectivity C1 and C2 a new risky "`K_THREAD_STACK_SIZEOF`
+  changed", which the full re-scan caught before commit.
+
+**Re-scan** (`eval/runs/e1e2b`, all 16 configurations; OpenDeck scan and plan), against the
+baselines:
+- **ble-copro:** 12 breaking/risky findings gone, and `API-FIELD-CHANGED-d638ba4d` risky →
+  info. Those are all 13 of E2's harmless findings.
+- **proves:**
+  - **+1** `MANIFEST-MODULE-REQUIRED-491c6f62` (breaking/medium) at `west.yml:25`, the
+    allowlist: `tf-psa-crypto`, from the mbedtls glue at the target (step 4). **True: P3.**
+  - ble, kconfig, storage and wire are `skipped` instead of `error`.
+- **Everything else, and OpenDeck:** no finding changed. ZMK's `BUILD-NEW-WARNING-adbded30` and
+  CoffeeCaller's `BUILD-TARGET-BUILD-FAILED-acc08695` list their sites in a different order
+  (E8 below). Their IDs, severities and first locations are unchanged.
+
+| | ble-copro, tuned | proves, tuned | Second set (7), tuned |
+|---|---|---|---|
+| Strict | 0 | 1 → **2** (P3) | 1 → **2** |
+| Lenient | 2 | 4 | 6 |
+| Precision | 5/23 → **5/10** | 20/24 → **21/25** | 25/47 → **26/35 (74%)** |
+| Actionable | 2 | 2 → **3** | 4 → **5** |
+| Fix-actionable | 0 | 0 → **1** (P3, "Add tf-psa-crypto", as ardep A6) | 0 → **1** |
+
+**E8 (found here, open): build-error sites follow the log's order.** Installing F´'s tools
+into zmig's venv changed every build key, since the key includes the Python environment,
+so every configuration was rebuilt. A parallel build prints errors and warnings in a
+different order, so findings that list "the first few sites" list different ones. The
+first location was the same this time, but a watch fingerprint takes the primary location,
+so the sites should be ordered by file and line, not by log order.

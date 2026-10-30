@@ -1,27 +1,9 @@
 {
  "config": "ble-copro",
- "scored": "DOGFOOD-12 (zmig c919498, clean)",
+ "scored": "DOGFOOD-12 §5 (E1, E2; tuned)",
  "schema_version": "1.5",
  "verdict": "needs-changes",
  "findings": [
-  {
-   "id": "API-ENUM-KIND-CHANGED-7985a677",
-   "severity": "risky",
-   "confidence": "high",
-   "kind": "enum-kind-changed",
-   "title": "Enum constant IPPROTO_TCP, which your code uses, is now a macro in v4.4.2",
-   "action": "In src/stream_client.c:188: check every use: a different kind of declaration behaves differently.",
-   "files": "src/stream_client.c"
-  },
-  {
-   "id": "API-ENUM-KIND-CHANGED-dda7bb0f",
-   "severity": "risky",
-   "confidence": "high",
-   "kind": "enum-kind-changed",
-   "title": "Enum constant SOCK_STREAM, which your code uses, is now a macro in v4.4.2",
-   "action": "In src/stream_client.c:188: check every use: a different kind of declaration behaves differently.",
-   "files": "src/stream_client.c"
-  },
   {
    "id": "API-FIELD-CHANGED-0aded812",
    "severity": "info",
@@ -32,103 +14,13 @@
    "files": "src/stream_client.c"
   },
   {
-   "id": "API-FIELD-CHANGED-14132866",
-   "severity": "risky",
-   "confidence": "high",
-   "kind": "field-changed",
-   "title": "Field net_if_addr_ipv4.netmask, which your code uses, changed: struct in_addr at bit offset 512 → struct net_in_addr at bit offset 512",
-   "action": "In src/usb_net.c:115: check the code that uses it.",
-   "files": "src/usb_net.c"
-  },
-  {
    "id": "API-FIELD-CHANGED-d638ba4d",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "high",
    "kind": "field-changed",
-   "title": "Field net_if_ipv4.gw, which your code uses, changed: struct in_addr at bit offset 768 → struct net_in_addr at bit offset 800",
-   "action": "In src/usb_net.c:117: check the code that uses it.",
+   "title": "Field net_if_ipv4.gw, which your code uses, changed: struct net_in_addr at bit offset 768 → struct net_in_addr at bit offset 800",
+   "action": "In src/usb_net.c:117: only its position moved; source code is unaffected, binaries built against the old layout aren't.",
    "files": "src/usb_net.c"
-  },
-  {
-   "id": "API-FIELD-REMOVED-14a323fe",
-   "severity": "breaking",
-   "confidence": "high",
-   "kind": "field-removed",
-   "title": "Field sockaddr_in.sin_addr, which your code uses, no longer exists in v4.4.2",
-   "action": "In src/stream_client.c:180: find its replacement in the migration guides.",
-   "files": "src/stream_client.c"
-  },
-  {
-   "id": "API-FIELD-REMOVED-62cf43c2",
-   "severity": "breaking",
-   "confidence": "high",
-   "kind": "field-removed",
-   "title": "Field net_addr.<anonymous>.in_addr, which your code uses, no longer exists in v4.4.2",
-   "action": "In src/usb_net.c:108: find its replacement in the migration guides.",
-   "files": "src/usb_net.c"
-  },
-  {
-   "id": "API-FIELD-REMOVED-cadc86b8",
-   "severity": "breaking",
-   "confidence": "high",
-   "kind": "field-removed",
-   "title": "Field sockaddr_in.sin_family, which your code uses, no longer exists in v4.4.2",
-   "action": "In src/stream_client.c:185: find its replacement in the migration guides.",
-   "files": "src/stream_client.c"
-  },
-  {
-   "id": "API-FIELD-REMOVED-ff266ef2",
-   "severity": "breaking",
-   "confidence": "high",
-   "kind": "field-removed",
-   "title": "Field sockaddr_in.sin_port, which your code uses, no longer exists in v4.4.2",
-   "action": "In src/stream_client.c:186: find its replacement in the migration guides.",
-   "files": "src/stream_client.c"
-  },
-  {
-   "id": "API-FUNCTION-CHANGED-2f9b88de",
-   "severity": "breaking",
-   "confidence": "high",
-   "kind": "function-changed",
-   "title": "Function net_if_ipv4_set_netmask_by_addr, which your code uses, changed: _Bool (struct net_if *, const struct in_addr *, const struct in_addr *) → _Bool (struct net_if *, const struct net_in_addr *, const struct net_in_addr *)",
-   "action": "In src/usb_net.c:163: update the code that calls, implements or stores it.",
-   "files": "src/usb_net.c"
-  },
-  {
-   "id": "API-FUNCTION-CHANGED-ac677689",
-   "severity": "breaking",
-   "confidence": "high",
-   "kind": "function-changed",
-   "title": "Function net_if_ipv4_addr_rm, which your code uses, changed: _Bool (struct net_if *, const struct in_addr *) → _Bool (struct net_if *, const struct net_in_addr *)",
-   "action": "In src/usb_net.c:171: update the code that calls, implements or stores it.",
-   "files": "src/usb_net.c"
-  },
-  {
-   "id": "API-FUNCTION-CHANGED-d4acffa5",
-   "severity": "breaking",
-   "confidence": "high",
-   "kind": "function-changed",
-   "title": "Function net_if_ipv4_addr_add, which your code uses, changed: struct net_if_addr *(struct net_if *, const struct in_addr *, enum net_addr_type, unsigned int) → struct net_if_addr *(struct net_if *, const struct net_in_addr *, enum net_addr_type, unsigned int)",
-   "action": "In src/usb_net.c:160: update the code that calls, implements or stores it.",
-   "files": "src/usb_net.c"
-  },
-  {
-   "id": "API-FUNCTION-CHANGED-fa715125",
-   "severity": "breaking",
-   "confidence": "high",
-   "kind": "function-changed",
-   "title": "Function net_if_ipv4_set_gw, which your code uses, changed: void (struct net_if *, const struct in_addr *) → void (struct net_if *, const struct net_in_addr *)",
-   "action": "In src/usb_net.c:166: update the code that calls, implements or stores it.",
-   "files": "src/usb_net.c"
-  },
-  {
-   "id": "API-TYPEDEF-REMOVED-af2798b4",
-   "severity": "breaking",
-   "confidence": "high",
-   "kind": "typedef-removed",
-   "title": "Typedef sa_family_t, which your code uses, no longer exists in v4.4.2",
-   "action": "In src/stream_client.c:185: find its replacement in the migration guides.",
-   "files": "src/stream_client.c"
   },
   {
    "id": "BLE-BLE-STRUCT-CHANGED-8ef8e2de",

@@ -488,3 +488,97 @@ def test_compiler_builtin_headers_are_not_zephyr_api(tmp_path: Path) -> None:
     tgt = dict(out[1], decls={"size_t": {"kind": "builtin", "where": "/clang/include/stddef.h:1"}},
                refs=[{"name": "size_t", "kind": "typedef", "at": "main.c:2"}])  # fmt: skip
     assert ApiAnalyzer()._declaration_changes(ctx, [src], [tgt]) == []  # type: ignore[arg-type]
+
+
+def test_compatibility_macros_are_followed_not_reported(tmp_path: Path) -> None:
+    """DOGFOOD-12 E2, ble-copro: Zephyr 4.4 namespaced the network API and keeps the old
+    names as macros (net_compat.h: `#define sockaddr_in net_sockaddr_in`, `in_addr`,
+    `sa_family_t`, `IPPROTO_TCP`). 13 findings said fields were removed, signatures changed
+    and enum constants became macros, for code that compiles unchanged. An old name that
+    is an alias at the target is compared with what it names; a real change through the
+    alias is still reported."""
+    from zmig.analyzers.api import ApiAnalyzer
+
+    def tu(decls: dict[str, Any], refs: list[tuple[str, str]]) -> dict[str, Any]:
+        return {"file": "main.c", "errors": [], "diags": [], "fn_values": [], "decls": decls,
+                "refs": [{"name": n, "kind": k, "at": "main.c:5"} for n, k in refs]}  # fmt: skip
+
+    def alias(to: str) -> dict[str, Any]:
+        return {"kind": "macro", "function_like": False, "tokens": to, "where": "net_compat.h:1"}
+
+    def field(t: str) -> dict[str, Any]:
+        return {"kind": "field", "type": t, "offset": 32, "where": "net_ip.h:1"}
+
+    def enum(v: int) -> dict[str, Any]:
+        return {"kind": "enum", "value": v, "type": "int", "where": "net_ip.h:1"}
+
+    def typed(kind: str, t: str) -> dict[str, Any]:
+        return {"kind": kind, "type": t, "where": "net_ip.h:1"}
+
+    fn = "struct net_if_addr *(struct net_if *, const struct {}in_addr *)"
+    used = [
+        ("sockaddr_in.sin_addr", "field"),
+        ("sa_family_t", "typedef"),
+        ("IPPROTO_TCP", "enum"),
+        ("net_if_ipv4_addr_add", "function"),
+        ("SOCK_DGRAM", "enum"),
+        ("K_THREAD_STACK_SIZEOF", "macro"),
+        ("net_addr.<anonymous>.in_addr", "field"),
+        ("in_port_t", "typedef"),
+    ]
+    src = tu(
+        {
+            "sockaddr_in.sin_addr": field("struct in_addr"),
+            "sa_family_t": typed("typedef", "unsigned short"),
+            "IPPROTO_TCP": enum(6),
+            "SOCK_DGRAM": enum(2),
+            "net_if_ipv4_addr_add": typed("function", fn.format("")),
+            # A macro that's an alias of a function-like macro at the target still expands
+            # the same way: CANnectivity's K_THREAD_STACK_SIZEOF (the regression the first
+            # version of this fix made).
+            "K_THREAD_STACK_SIZEOF": {
+                "kind": "macro",
+                "function_like": False,
+                "vtype": "int",
+                "vsize": 4,
+                "where": "thread_stack.h:292",
+            },
+            # `#define in_addr net_in_addr` renames the union member too.
+            "net_addr.<anonymous>.in_addr": field("struct in_addr"),
+            # Never named by the project at the target, so known only from the headers.
+            "in_port_t": typed("typedef", "unsigned short"),
+        },
+        used,
+    )
+    tgt = tu(
+        {
+            "sockaddr_in": alias("net_sockaddr_in"),
+            "in_addr": alias("net_in_addr"),
+            "sa_family_t": alias("net_sa_family_t"),
+            "IPPROTO_TCP": alias("NET_IPPROTO_TCP"),
+            "SOCK_DGRAM": alias("NET_SOCK_DGRAM"),
+            "net_sockaddr_in.sin_addr": field("struct net_in_addr"),
+            "net_sa_family_t": typed("typedef", "unsigned short"),
+            "NET_IPPROTO_TCP": enum(6),
+            "NET_SOCK_DGRAM": enum(3),
+            "net_if_ipv4_addr_add": typed("function", fn.format("net_")),
+            "K_THREAD_STACK_SIZEOF": alias("Z_THREAD_STACK_SIZEOF"),
+            "Z_THREAD_STACK_SIZEOF": {
+                "kind": "macro",
+                "function_like": True,
+                "arity": 1,
+                "where": "thread_stack.h:282",
+            },
+            "net_addr.<anonymous>.net_in_addr": field("struct net_in_addr"),
+        },
+        used,
+    )
+    compat = tmp_path / "include" / "zephyr" / "net" / "net_compat.h"
+    compat.parent.mkdir(parents=True)
+    compat.write_text("#define in_port_t     net_in_port_t\n")
+    ws = SimpleNamespace(zephyr=tmp_path, root=tmp_path)
+    ctx = SimpleNamespace(old=SimpleNamespace(workspace=ws), new=SimpleNamespace(workspace=ws),
+                          new_spec="v4.4.2", scope=("s",))  # fmt: skip
+    found = ApiAnalyzer()._declaration_changes(ctx, [src], [tgt])  # type: ignore[arg-type]
+    # Only the value that really changed through its alias (SOCK_DGRAM 2 -> 3).
+    assert [(f.kind, f.subject) for f in found] == [("enum-changed", "SOCK_DGRAM")]
