@@ -434,6 +434,16 @@ class ApiAnalyzer:
             if n is None:
                 if not covered:
                     continue
+                if what == "function" and (old_ws := getattr(ctx.old, "workspace", None)):
+                    # The same declaration in the same header at both refs isn't a removal:
+                    # a target parse with errors records no reference to a call it couldn't
+                    # type-check (regression: CoffeeCaller's led_strip_update_rgb, DOGFOOD-8
+                    # B3). A changed declaration still falls through to "removed".
+                    before = _declaration_text(old_ws.root, o["where"], name)
+                    if before and before == _declaration_text(
+                        ctx.new.workspace.root, o["where"], name
+                    ):
+                        continue
                 macro = (
                     _macro_definition(ctx.new.workspace.zephyr, name)
                     if what == "function"
@@ -910,6 +920,27 @@ def _macro_definition(zephyr: Path, name: str) -> str | None:
         for i, line in enumerate(text.splitlines(), 1):
             if pat.match(line):
                 return f"zephyr/{f.relative_to(zephyr)}:{i}: {line.strip()[:120]}"
+    return None
+
+
+def _declaration_text(root: Any, where: str, name: str) -> str | None:
+    """Function `name`'s declaration in the header `where` (relative to the workspace
+    `root`) names, from its name to the closing parenthesis, whitespace collapsed; None if
+    the header doesn't declare it."""
+    try:
+        text = (Path(str(root)) / where.rpartition(":")[0]).read_text(errors="replace")
+    except OSError:
+        return None
+    # Not a preprocessor line, a return statement or a comment (`* @see name()` in the
+    # doc comment comes first in led_strip.h, and is reworded between versions).
+    m = re.search(rf"^(?!\s*(?:#|return\b|\*|/[/*]))[^;=\n]*\b{re.escape(name)}\s*\(", text, re.M)
+    if m is None:
+        return None
+    depth = 0
+    for k in range(m.end() - 1, len(text)):
+        depth += {"(": 1, ")": -1}.get(text[k], 0)
+        if depth == 0:
+            return " ".join(text[m.start() : k + 1].split())
     return None
 
 

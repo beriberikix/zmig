@@ -129,6 +129,7 @@ def _tus(
             }
         )
     ctx = SimpleNamespace(
+        old=SimpleNamespace(workspace=SimpleNamespace(zephyr=tmp / "old", root=tmp / "old")),
         new=SimpleNamespace(workspace=SimpleNamespace(zephyr=tmp / "new", root=tmp / "new")),
         new_spec="new",
         scope=("s",),
@@ -412,3 +413,40 @@ def test_parse_coverage_detail_is_the_same_on_a_warm_cache() -> None:
     warm = coverage_detail("clang 18", (1, 0), (1, 0), {"parsed": 0, "cached": 2, "unchanged": 0})
     assert cold == warm
     assert "2 parsed" in cold and "1 project TU(s) with the source flags (0 with errors)" in cold
+
+
+def test_a_function_declared_the_same_at_both_refs_is_not_removed(tmp_path: Path) -> None:
+    """DOGFOOD-8 B3, CoffeeCaller: the target parse of leds.c had errors (missing devicetree
+    aliases), so no reference to `led_strip_update_rgb` was recorded and it was reported as
+    removed, although led_strip.h declares it identically at v4.2.0 and v4.4.0. A removed
+    declaration (`smf_set_handled`, CANnectivity N1b) is still told apart."""
+    from zmig.analyzers.api import _declaration_text
+
+    decl = (
+        "static inline int led_strip_update_rgb(const struct device *dev,\n"
+        "\t\t\t\t       struct led_rgb *pixels,\n"
+        "\t\t\t\t       size_t num_pixels)\n{\n"
+        "\treturn led_strip_update_rgb(dev, pixels, num_pixels);\n}\n"
+    )
+    where = "zephyr/include/zephyr/drivers/led_strip.h:107"
+    # The doc comments mention the function first and are reworded between the versions
+    # (v4.2.0 led_strip.h:60 vs v4.4.0 :70); only the declaration counts.
+    old_doc = "/**\n * @see led_strip_update_rgb() for argument descriptions.\n */\n"
+    new_doc = "/**\n * See @a led_strip_update_rgb() for argument descriptions.\n */\n\n"
+    for side, pre in (("old", old_doc), ("new", new_doc)):
+        h = tmp_path / side / "zephyr" / "include" / "zephyr" / "drivers" / "led_strip.h"
+        h.parent.mkdir(parents=True)
+        h.write_text(pre + decl)
+    a = _declaration_text(tmp_path / "old", where, "led_strip_update_rgb")
+    assert a == (
+        "static inline int led_strip_update_rgb(const struct device *dev, "
+        "struct led_rgb *pixels, size_t num_pixels)"
+    )
+    assert a == _declaration_text(tmp_path / "new", where, "led_strip_update_rgb")
+    smf = tmp_path / "new" / "zephyr" / "include" / "zephyr" / "smf.h"
+    smf.write_text("enum smf_state_result { A };\n")
+    assert (
+        _declaration_text(tmp_path / "new", "zephyr/include/zephyr/smf.h:9", "smf_set_handled")
+        is None
+    )
+    assert _declaration_text(tmp_path / "new", "zephyr/include/zephyr/gone.h:3", "x") is None
