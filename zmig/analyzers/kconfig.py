@@ -13,6 +13,7 @@ from typing import Any, ClassVar, Literal
 
 from zmig.analyzers import AnalyzerResult
 from zmig.buildctx import Artifact, project_path, project_roots
+from zmig.changes import USE_INSTEAD
 from zmig.diagnostics import Diagnostic, app_relative, preexisting
 from zmig.findings import (
     JSON,
@@ -45,12 +46,6 @@ def _strip_deprecated(prompt: str | None) -> str:
     return re.sub(r"^\s*\[DEPRECATED\]\s*", "", prompt or "", flags=re.I).strip().lower()
 
 
-_USE_INSTEAD = re.compile(
-    r"\b(?:use|in favou?r of|replaced (?:by|with)|superseded by)\s+(?:the\s+)?(?:CONFIG_)?"
-    r"([A-Z][A-Z0-9_]{2,})"
-)
-
-
 def deprecation_replacements(
     sym: str, info: dict[str, Any], syms: Symbols
 ) -> list[tuple[str, str, Confidence]]:
@@ -59,7 +54,7 @@ def deprecation_replacements(
     choice members select nothing, so this is the Kconfig-level evidence they carry."""
     if not info.get("deprecated"):
         return []
-    found = dict.fromkeys(m[1] for m in _USE_INSTEAD.finditer(info.get("help") or ""))
+    found = dict.fromkeys(m[1] for m in USE_INSTEAD.finditer(info.get("help") or ""))
     return [
         (n, f"the deprecated {sym}'s help text says to use {n}", Confidence.MEDIUM)
         for n in found

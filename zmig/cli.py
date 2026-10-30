@@ -168,6 +168,23 @@ def build_parser() -> argparse.ArgumentParser:
         "cached mirror's HEAD)",
     )
 
+    changes = sub.add_parser(
+        "changes",
+        parents=[common],
+        help="what changed between two Zephyr refs, from the tree alone (Kconfig for now)",
+        description="Builds (or reads from the cache) the change database for a ref pair: "
+        "Kconfig symbols removed between them, with the symbols that replaced them and the "
+        "conditions under which those are defined. Needs no build (docs/DESIGN-CHANGE-DB.md).",
+    )
+    changes.add_argument("--from", dest="from_ref", required=True, help="source Zephyr ref")
+    changes.add_argument("--to", dest="to_ref", required=True, help="target Zephyr ref")
+    changes.add_argument(
+        "--symbol",
+        action="append",
+        default=[],
+        help="only this removed symbol (with or without CONFIG_; repeatable)",
+    )
+
     watch = sub.add_parser(
         "watch",
         parents=[common],
@@ -640,6 +657,43 @@ def _resolve_plan_from(
     ]
 
 
+def cmd_changes(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
+    """`zmig changes`: the change database for a ref pair (docs/DESIGN-CHANGE-DB.md)."""
+    from zmig.changes import load_or_build
+
+    old, new = resolve_ref(args.from_ref, cache, runner), resolve_ref(args.to_ref, cache, runner)
+    db = load_or_build(new.mirror, runner, cache.root, old.ref.sha, new.ref.sha)
+    removed = db["kconfig"]["removed"]
+    want = {s.removeprefix("CONFIG_") for s in args.symbol}
+    if want:
+        unknown = sorted(want - removed.keys())
+        if unknown:
+            raise UsageError(f"not removed between the refs: {', '.join(unknown)}")
+        removed = {k: v for k, v in removed.items() if k in want}
+    if args.format == "json":
+        print(json.dumps({**db, "kconfig": {**db["kconfig"], "removed": removed}}, indent=1))
+        return EXIT_OK
+    k = db["kconfig"]
+    named = sum(1 for v in k["removed"].values() if v["candidates"])
+    print(
+        f"Kconfig, {args.from_ref} -> {args.to_ref}: {len(k['removed'])} symbols removed "
+        f"({named} with a replacement), {k['added']} added"
+    )
+    for sym, v in removed.items():
+        cands = v["candidates"]
+        if not cands and not want:
+            continue
+        print(f"  CONFIG_{sym} ({v['defined_at']})")
+        for c in cands[:3]:
+            via = f" via {' -> '.join(c['via'])}" if c["via"] else ""
+            cond = f"; if {' && '.join(c['conditions'])}" if c["conditions"] else ""
+            commit = f", {c['commit'][:12]}" if c["commit"] else ""
+            print(f"    -> CONFIG_{c['symbol']} ({c['how']}{commit}{via}{cond})")
+        if not cands:
+            print("    -> (no replacement found)")
+    return EXIT_OK
+
+
 def cmd_plan(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     find_tool("git")
     selected = analyzers.select("workspace", args.analyzers)
@@ -727,6 +781,8 @@ def main(argv: list[str] | None = None) -> int:
             from zmig.watchcmd import cmd_watch
 
             return cmd_watch(args, cache, runner)
+        if args.command == "changes":
+            return cmd_changes(args, cache, runner)
         raise ZmigError(f"`zmig {args.command}` is outside the MVP scope (see docs/DESIGN.md)")
     except UsageError as e:
         print(f"zmig: error: {e}", file=sys.stderr)
