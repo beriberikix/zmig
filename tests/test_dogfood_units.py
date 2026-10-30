@@ -933,3 +933,68 @@ def test_dts_values_that_differ_only_in_wrapping_are_unchanged(tmp_path: Path) -
     changed = [f for f in found if f.kind == "node-changed"]
     assert len(changed) == 1 and changed[0].subject.endswith("/gpio")  # a real value change
     assert changed[0].new == {"ngpios": ["<0x10>", "<0x8>"]}
+
+
+def test_build_sites_do_not_depend_on_the_order_a_parallel_build_printed_them(
+    tmp_path: Path,
+) -> None:
+    """DOGFOOD-12 E8: after a rebuild, CoffeeCaller's build failure and ZMK's new warning
+    listed different "first" sites. A parallel build prints files in any order, so errors
+    (compiler before linker) and a warning's sites are ordered by file and line."""
+    from types import SimpleNamespace
+
+    from zmig.analyzers.buildlog import BuildlogAnalyzer
+
+    app = tmp_path / "app"
+    a = f"{app}/src/a.c:3:5: error: 'x' undeclared\n"
+    b = f"{app}/src/b.c:1:2: error: 'y' undeclared\n"
+    link = "/usr/bin/ld: undefined reference to `z'\n"
+    one, other = build_errors(a + b + link), build_errors(link + b + a)
+    assert one == other
+    assert [(e.kind, e.file) for e in one] == [
+        ("compiler", f"{app}/src/a.c"),
+        ("compiler", f"{app}/src/b.c"),
+        ("linker", ""),
+    ]
+
+    # One warning raised in a Zephyr header, reached from two project files (ZMK's shape).
+    warn = "/ws/zephyr/include/zephyr/k.h:7:1: warning: 'k_foo' is deprecated [-Wdeprecated-declarations]\n"
+    logs = {}
+    for name, order in (("x", ("b", "a")), ("y", ("a", "b"))):
+        p = tmp_path / f"{name}.log"
+        p.write_text("".join(f"In file included from {app}/src/{f}.c:9:\n{warn}" for f in order))
+        logs[name] = p
+    empty = tmp_path / "empty.log"
+    empty.write_text("")
+    sites = []
+    for name in ("x", "y"):
+        b_ctx = SimpleNamespace(workspace=SimpleNamespace(zephyr=tmp_path / "z", root=tmp_path),
+                                src=app, dir=tmp_path / "build")  # fmt: skip
+        ctx = SimpleNamespace(
+            old=b_ctx, new=b_ctx, prior=[], new_spec="v2",
+            old_img=SimpleNamespace(log=empty, dir=tmp_path / "o"),
+            new_img=SimpleNamespace(log=logs[name], dir=tmp_path / "n"),
+            runner=SimpleNamespace(redact=lambda s: s),
+        )  # fmt: skip
+        found: list[Any] = []
+        BuildlogAnalyzer._warnings(ctx, lambda *a, out=found: out.append(a))  # type: ignore[arg-type]
+        sites.append(found[0][7]["sites"])  # add(kind, subject, title, sev, action, ev, old, new)
+    assert sites[0] == sites[1] == ["src/a.c:9", "src/b.c:9"]
+
+
+def test_repeated_build_errors_do_not_crowd_out_other_sites() -> None:
+    """DOGFOOD-12 E8, ZMK: the same missing-header error is printed once per file that
+    includes the header. Ordered by file, five copies of `behavior.h:276` filled the
+    evidence and dropped `ext_power.h:104`. The evidence lists distinct sites."""
+    from zmig.analyzers.buildlog import BuildError, error_evidence
+
+    def err(f: str, ln: int, msg: str) -> BuildError:
+        return BuildError("compiler", msg, f"/app/include/drivers/{f}", ln)
+
+    errors = [err("behavior.h", 276, "syscalls/behavior.h: No such file or directory")] * 6
+    errors.append(err("ext_power.h", 104, "syscalls/ext_power.h: No such file or directory"))
+    ev = error_evidence(errors, {"/app": ""}, lambda s: s)
+    assert [(e["path"], e["line"]) for e in ev] == [
+        ("include/drivers/behavior.h", 276),
+        ("include/drivers/ext_power.h", 104),
+    ]

@@ -28,8 +28,8 @@
    "confidence": "high",
    "kind": "target-build-failed",
    "title": "The target build fails: 8 errors (compiler)",
-   "action": "In coffeecaller/lib/cc_lib/button.c:18, coffeecaller/lib/cc_lib/watchdog.c:21, coffeecaller/lib/cc_lib/aldrin.c:16: the Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
-   "files": "coffeecaller/lib/cc_lib/aldrin.c coffeecaller/lib/cc_lib/button.c coffeecaller/lib/cc_lib/watchdog.c"
+   "action": "In coffeecaller/lib/cc_lib/button.c:18, coffeecaller/lib/cc_lib/watchdog.c:21, coffeecaller/lib/cc_lib/leds.c:18, …: the Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
+   "files": "coffeecaller/lib/cc_lib/aldrin.c coffeecaller/lib/cc_lib/button.c coffeecaller/lib/cc_lib/leds.c coffeecaller/lib/cc_lib/watchdog.c"
   },
   {
    "id": "BUILD-WARNINGS-RESOLVED-a199c339",

@@ -154,7 +154,7 @@
    "confidence": "high",
    "kind": "new-warning",
    "title": "New compiler warning at zephyr-to@339570e2393b: initialization of 'int (*)(void)' from incompatible pointer type 'int (*)(const struct device *)'",
-   "action": "In src/activity.c:98, src/endpoints.c:366, src/workqueue.c:27, …: check whether it points at a real problem.",
+   "action": "In src/activity.c:98, src/battery.c:137, src/endpoints.c:366, …: check whether it points at a real problem.",
    "files": "src/activity.c src/battery.c src/endpoints.c src/hog.c src/split/bluetooth/central.c src/usb.c src/usb_hid.c src/workqueue.c"
   },
   {
@@ -163,8 +163,8 @@
    "confidence": "high",
    "kind": "target-build-failed",
    "title": "The target build fails (after salvage): 24 errors (compiler)",
-   "action": "In include/drivers/ext_power.h:104, include/drivers/behavior.h:276: the Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
-   "files": "include/drivers/behavior.h include/drivers/ext_power.h"
+   "action": "In include/drivers/behavior.h:276, include/drivers/ext_power.h:104, src/ble.c:22: the Kconfig and devicetree findings often explain these errors; a linker region overflow means the image no longer fits the board's memory.",
+   "files": "include/drivers/behavior.h include/drivers/ext_power.h src/ble.c"
   },
   {
    "id": "BUILD-WARNINGS-RESOLVED-50d7d868",

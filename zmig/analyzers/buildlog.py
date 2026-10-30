@@ -142,7 +142,10 @@ def configure_locations(
 
 
 def build_errors(log: str) -> list[BuildError]:
-    """Compiler and linker errors in a build log; ninja's FAILED steps if neither."""
+    """Compiler and linker errors in a build log, compiler errors first, each kind by file
+    and line; ninja's FAILED steps if neither. Not in log order: a parallel build prints
+    files in any order, and findings cite the first few (regression: the cited sites
+    changed after a rebuild, DOGFOOD-12 E8)."""
     out: list[BuildError] = []
     lines = log.splitlines()
     for m in _COMPILER_ERROR.finditer(log):
@@ -169,7 +172,40 @@ def build_errors(log: str) -> list[BuildError]:
     if not out:
         for m in failed:
             out.append(BuildError("step", f"FAILED: {m['target']}"))
-    return list(dict.fromkeys(out))
+    rank = {"compiler": 0, "linker": 1, "step": 2}
+    return sorted(dict.fromkeys(out), key=lambda e: (rank[e.kind], e.file, e.line, e.message))
+
+
+def error_evidence(
+    errors: list[BuildError], proj: dict[str, str], redact: Callable[[str], str]
+) -> list[JSON]:
+    """Evidence for the first MAX_ERRORS distinct build errors: at the project line, or the
+    project line that led into a Zephyr header, else the tool's message. The same error
+    printed once per file that includes a header is one site (regression: five copies of
+    ZMK's `behavior.h:276` hid `ext_power.h:104` once errors were ordered by file,
+    DOGFOOD-12 E8)."""
+    ev: list[JSON] = []
+    for e in errors:
+        where = f"{e.image} image: " if e.image else ""
+        if own := project_path(e.file, proj):
+            item = file_line(own, e.line, e.message)
+        elif site := next(
+            ((rel, ln) for f, ln in e.sites if ln and (rel := project_path(f, proj)) is not None),
+            None,
+        ):
+            # Raised inside a Zephyr header: show the project line that led there
+            # (regression: A1-native's '__device_dts_ord_20' undeclared in device.h:96,
+            # docs/DOGFOOD-3-baseline.md M9).
+            raised = redact(f"{e.file}:{e.line}")
+            item = file_line(site[0], site[1], f"{e.message} (raised in {raised})")
+        else:
+            loc = f"{e.file}:{e.line}: " if e.file else ""
+            item = tool_output(f"target build ({e.kind})", redact(f"{where}{loc}{e.message}"))
+        if item not in ev:
+            ev.append(item)
+        if len(ev) == MAX_ERRORS:
+            break
+    return ev
 
 
 def kconfig_abort_causes(log: str, roots: dict[str, str]) -> list[tuple[str, int, str]]:
@@ -465,32 +501,7 @@ class BuildlogAnalyzer:
         if ctx.new_img.status == "build-failed":
             proj = project_roots(ctx.new, ctx.new_img.dir)
             errors = build_errors(log)
-            ev: list[JSON] = []
-            for e in errors[:MAX_ERRORS]:
-                where = f"{e.image} image: " if e.image else ""
-                if own := project_path(e.file, proj):
-                    ev.append(file_line(own, e.line, e.message))
-                elif site := next(
-                    (
-                        (rel, ln)
-                        for f, ln in e.sites
-                        if ln and (rel := project_path(f, proj)) is not None
-                    ),
-                    None,
-                ):
-                    # Raised inside a Zephyr header: show the project line that led there
-                    # (regression: A1-native's '__device_dts_ord_20' undeclared in
-                    # device.h:96, docs/DOGFOOD-3-baseline.md M9).
-                    raised = ctx.runner.redact(f"{e.file}:{e.line}")
-                    ev.append(file_line(site[0], site[1], f"{e.message} (raised in {raised})"))
-                else:
-                    loc = f"{e.file}:{e.line}: " if e.file else ""
-                    ev.append(
-                        tool_output(
-                            f"target build ({e.kind})",
-                            ctx.runner.redact(f"{where}{loc}{e.message}"),
-                        )
-                    )
+            ev = error_evidence(errors, proj, ctx.runner.redact)
             kinds = sorted({e.kind for e in errors})
             images = sorted({e.image for e in errors if e.image})
             add(
@@ -550,7 +561,7 @@ class BuildlogAnalyzer:
             dep = re.match(r"Deprecated symbol (\w+) is enabled", msg)
             if source == "kconfig" and dep and dep[1] in deprecated:
                 continue
-            lines: dict[tuple[str, int], None] = {}  # project file:line sites, in order
+            lines: dict[tuple[str, int], None] = {}  # project file:line sites
             files: dict[str, None] = {}  # project files without a line (enclosing function)
             for w in ws:
                 own = project_path(w.file, proj) if w.file else None
@@ -565,6 +576,9 @@ class BuildlogAnalyzer:
                     if rel and not ln:
                         files[rel] = None
                         break
+            # By file and line, not log order (DOGFOOD-12 E8: a rebuild reordered them).
+            lines = dict.fromkeys(sorted(lines))
+            files = dict.fromkeys(sorted(files))
             raised = ctx.runner.redact(f"{path}: {msg}" if path else msg)
             ev: tuple[JSON, ...] = tuple(file_line(f, ln, msg) for f, ln in lines) + tuple(
                 tool_output(f"target build ({source})", f"in {f}: {raised}") for f in files

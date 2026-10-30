@@ -171,3 +171,26 @@ so every configuration was rebuilt. A parallel build prints errors and warnings 
 different order, so findings that list "the first few sites" list different ones. The
 first location was the same this time, but a watch fingerprint takes the primary location,
 so the sites should be ordered by file and line, not by log order.
+
+## 6. Addendum (2026-10-30): E8 fixed
+
+**What changed.**
+- Build errors are ordered compiler first, then by file and line, instead of log order.
+- A new warning's sites are ordered by file and line.
+- The build-failure evidence lists distinct sites: the same missing-header error, printed
+  once per file that includes the header, is one site.
+
+**Re-scan** (`eval/runs/e8b`, all 16 configurations; OpenDeck scan and plan), against `e1e2b`:
+- No ID, severity or set of findings changed.
+- Site order changed in `BUILD-TARGET-BUILD-FAILED` (ble-copro, bms-A1-oled, CoffeeCaller,
+  ZMK ×2) and `BUILD-NEW-WARNING-adbded30` (ZMK ×2).
+- ZMK's build failure now lists three distinct sites (it had two). Before, five copies of
+  `behavior.h:276` could fill the evidence.
+- CoffeeCaller's lists the first five of its errors by file.
+
+**Primary location changed once in one finding:** zmk-corne's
+`BUILD-TARGET-BUILD-FAILED-f5607720`, `ext_power.h:104` → `behavior.h:276`. Its watch
+fingerprint changes once.
+
+**No score changes.** ZMK #2 and #5, and CoffeeCaller C1, are scored on other findings
+(DOGFOOD-2/3; §10 of DOGFOOD-11).
