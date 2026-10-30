@@ -79,6 +79,8 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ | ″ | 4 | tuned: after Phase 0 (DOGFOOD-9) | 0 | 2 (50%) | 3/4 (75%) | **1** (fix-actionable **1**) | ″ | ″ | DOGFOOD-9 §3 |
 | ″ | ″ | 4 | tuned: after the detection fixes (DOGFOOD-10) | **1 (25%)** | 2 (50%) | **8/8 (100%)** | **2** (fix-actionable 1) | ″ | ″ | DOGFOOD-10 §2 |
 | ″ | ″ | 4 | tuned: + `input-not-applied` (C1, `eval/runs/c1`) | **2 (50%)** | 2 (50%) | **10/10 (100%)** | 2 (fix-actionable 1) | ″ | ″ | DOGFOOD-11 §10 |
+| **ble-copro** (nrf52840dk) | v4.3.0 → v4.4.2 | 2 | **clean**: DOGFOOD-12 baseline | 0 | 2 (100%) | 5/23 (22%) | 2 (fix-actionable 0) | build failed (`stream_client.c`) | needs-changes | DOGFOOD-12 §2 |
+| **proves** (`proves_flight_control_board_v5e`, F´) | v4.3.0 → v4.4.1 | 5 | **clean**: DOGFOOD-12 baseline | 1 (20%) | 4 (80%) | 20/24 (83%) | 2 (fix-actionable 0) | configure failed (Mbed TLS module, after Kconfig) | unknown | DOGFOOD-12 §2 |
 | **P1 fixtures** (`tests/fixtures/p1-layout`, `p1-mode`, `p1-rename`, `p1-ble`, `xapp*`) | v4.2.2 → v4.3.0 (constructed) | — | **tuned by construction** (written to exercise P1) | — | — | — | — | | each fixture's expected verdict (layout hazard, MCUboot mode, rename, BLE clean; cross-image) is asserted by `tests/test_p1_fixture.py`, `test_cross_fixture.py` | DESIGN-P1 §11 |
 
 ### Clean results only
@@ -93,6 +95,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | Held-out 2026-10-30 (ardep, RIT FSW, CoffeeCaller; DOGFOOD-8) | 13 | 0 | 6 (46%) | 10/15 (67%) | 0 (fix-actionable 0) |
 | ″ after Phase 0, clean part only (ardep, RIT FSW; DOGFOOD-9) | 9 | 0 | 4 (44%) | 7/11 (64%) | **2** (fix-actionable 0) |
 | ″ after the change database, clean part only (ardep; DOGFOOD-11) | 6 | **2 (33%)** | 5 (83%) | 8/10 (80%) | **4** (fix-actionable **2**) |
+| Held-out 2026-10-30, second set (ble-copro, proves; DOGFOOD-12) | 7 | 1 (14%) | 6 (86%) | 25/47 (53%) | 4 (fix-actionable 0) |
 
 Across every clean scan result, zmig names *what* breaks more often than *where to fix it*:
 **actionable was 0 on every clean measurement** until Phase 0 (ardep 2, DOGFOOD-9) and the

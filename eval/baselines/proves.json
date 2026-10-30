@@ -1,0 +1,431 @@
+{
+ "config": "proves",
+ "scored": "DOGFOOD-12 (zmig c919498, clean)",
+ "schema_version": "1.5",
+ "verdict": "unknown",
+ "findings": [
+  {
+   "id": "BUILD-TARGET-CONFIGURE-FAILED-38835789",
+   "severity": "breaking",
+   "confidence": "high",
+   "kind": "target-configure-failed",
+   "title": "The target configure fails (after salvage): CMake Error at $ZMIG_CACHE/workspaces/1f6485eca25431b5ff27ce9a754218c9e559bbbb/modules/crypto/mbedtls/CMakeLists.txt:346 (add_subdirectory):",
+   "action": "Fix the error in the evidence (often a board or toolchain change), then rerun; Kconfig and devicetree analysis need a configured target.",
+   "files": ""
+  },
+  {
+   "id": "DEVICETREE-COMPATIBLE-UNBOUND-ab02f96b",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "compatible-unbound",
+   "title": "No node matches compatible ti_tca9548a_channel through a binding in v4.4.1",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:211: the compatible was renamed or its binding removed; check the migration guide.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-607aabfc",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&spi1/sx1276@0 (/soc/spi@40088000/sx1276@0): binding defaults changed, not set in the DTS: force-ldro, regulator-ldo",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:159, boards/bronco_space/proves_flight_control_board_v5c/proves_flight_control_board_v5c_rp2350a_m33.dts:28: only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi boards/bronco_space/proves_flight_control_board_v5c/proves_flight_control_board_v5c_rp2350a_m33.dts"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-699e126f",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&lsm6dso0 (/soc/i2c@40098000/lsm6dso0@6b): binding defaults changed, not set in the DTS: accel-lp-filter",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:28: only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-6c9cb507",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&i2c1/lsm6dso0@6b (/soc/i2c@40098000/lsm6dso0@6b): binding defaults changed, not set in the DTS: accel-lp-filter",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:497: only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-b523f172",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&lora0 (/soc/spi@40088000/sx1276@0): binding defaults changed, not set in the DTS: force-ldro, regulator-ldo",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:24, boards/bronco_space/proves_flight_control_board_v5e/proves_flight_control_board_v5e_rp2350a_m33.dts:16: only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp boards/bronco_space/proves_flight_control_board_v5e/proves_flight_control_board_v5e_rp2350a_m33.dts"
+  },
+  {
+   "id": "DEVICETREE-NODE-BINDING-DEFAULTS-f4379866",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-binding-defaults",
+   "title": "&flash0/partitions (/soc/flash-controller@400d0000/flash@10000000/partitions): binding defaults changed, not set in the DTS: wakeup-source, zephyr,deferred-init, zephyr,pm-device-runtime-auto",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:67: only the binding changed; set the property explicitly if the new default matters to you.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-024f5a21",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&mux_channel_0 (/soc/i2c@40090000/tca9548a@77/i2c_mux@0) changed: (binding)",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:32: check these property changes against how your code uses the node.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-08f432aa",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&i2c0/tca9548a@77/i2c_mux@1 (/soc/i2c@40090000/tca9548a@77/i2c_mux@1) changed: (binding)",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:247: check these property changes against how your code uses the node.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-1c81ddd0",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&mux_channel_1 (/soc/i2c@40090000/tca9548a@77/i2c_mux@1) changed: (binding)",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:33: check these property changes against how your code uses the node.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-2b493448",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&i2c0/tca9548a@77/i2c_mux@0 (/soc/i2c@40090000/tca9548a@77/i2c_mux@0) changed: (binding)",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:210: check these property changes against how your code uses the node.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-336077cf",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&i2c0/tca9548a@77/i2c_mux@3 (/soc/i2c@40090000/tca9548a@77/i2c_mux@3) changed: (binding)",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:321: check these property changes against how your code uses the node.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-3ab11620",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&mux_channel_4 (/soc/i2c@40090000/tca9548a@77/i2c_mux@4) changed: (binding)",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:36: check these property changes against how your code uses the node.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-40b4d8db",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&i2c0/tca9548a@77/i2c_mux@2 (/soc/i2c@40090000/tca9548a@77/i2c_mux@2) changed: (binding)",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:284: check these property changes against how your code uses the node.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-539cff47",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&mux_channel_3 (/soc/i2c@40090000/tca9548a@77/i2c_mux@3) changed: (binding)",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:35: check these property changes against how your code uses the node.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-78f47ddf",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&mux_channel_6 (/soc/i2c@40090000/tca9548a@77/i2c_mux@6) changed: (binding)",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:38: check these property changes against how your code uses the node.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-896563d8",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&mux_channel_2 (/soc/i2c@40090000/tca9548a@77/i2c_mux@2) changed: (binding)",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:34: check these property changes against how your code uses the node.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-9121d831",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&i2c0/tca9548a@77/i2c_mux@7 (/soc/i2c@40090000/tca9548a@77/i2c_mux@7) changed: (binding)",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:472: check these property changes against how your code uses the node.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-bececc16",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&i2c0/tca9548a@77/i2c_mux@5 (/soc/i2c@40090000/tca9548a@77/i2c_mux@5) changed: (binding)",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:396: check these property changes against how your code uses the node.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-c23747ce",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&i2c0/tca9548a@77/i2c_mux@6 (/soc/i2c@40090000/tca9548a@77/i2c_mux@6) changed: (binding)",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:434: check these property changes against how your code uses the node.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-cd73aaee",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&i2c0/tca9548a@77/i2c_mux@4 (/soc/i2c@40090000/tca9548a@77/i2c_mux@4) changed: (binding)",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:359: check these property changes against how your code uses the node.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-d4bda486",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&mux_channel_7 (/soc/i2c@40090000/tca9548a@77/i2c_mux@7) changed: (binding)",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:39: check these property changes against how your code uses the node.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-CHANGED-f91c2137",
+   "severity": "risky",
+   "confidence": "high",
+   "kind": "node-changed",
+   "title": "&mux_channel_5 (/soc/i2c@40090000/tca9548a@77/i2c_mux@5) changed: (binding)",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:37: check these property changes against how your code uses the node.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "DEVICETREE-NODE-PROPERTIES-NEW_PROPS-dd17a2c7",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "node-properties-new_props",
+   "title": "/chosen (/chosen) has new properties in v4.4.1: zephyr,entropy",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:9: new hardware description, usually used by the driver; check it if you configure this node's behavior yourself.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "DEVICETREE-OTHER-NODES-89f8122d",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "other-nodes",
+   "title": "6 nodes your app doesn't reference changed, disappeared or appeared; 2 more nodes only changed binding",
+   "action": "None needed unless you start using them.",
+   "files": ""
+  },
+  {
+   "id": "GUIDE-COVERAGE-48867ec5",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "coverage",
+   "title": "Read 192 entries from 2 documents; 11 touch your app",
+   "action": "Unmatched entries don't reference anything zmig found in your app; rerun with --all-guide-entries to list them.",
+   "files": ""
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-15554f60",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Flash map): The following include/zephyr/storage/flash_map.h macros have been deprecated and replaced:",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:17: read MG-4.4-0155 and update the lines listed.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-1a7e147c",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Networking): External network applications can continue to use POSIX defined network symbols and include relevant POSIX header files like sys/socket.h to get the POSIX symbo (only in files this build doesn't compile: lib/fprime/Drv/Ip/IpSocket.cpp, lib/fprime/Drv/Ip/TcpClientSocket.cpp, lib/fprime/Drv/Ip/TcpServerSocket.cpp, ...)",
+   "action": "In lib/fprime/Drv/Ip/IpSocket.cpp:38, lib/fprime/Drv/Ip/TcpClientSocket.cpp:32, lib/fprime/Drv/Ip/TcpServerSocket.cpp:31, …: read MG-4.4-0138 and update the lines listed.",
+   "files": "lib/fprime/Drv/Ip/IpSocket.cpp lib/fprime/Drv/Ip/TcpClientSocket.cpp lib/fprime/Drv/Ip/TcpServerSocket.cpp lib/fprime/Drv/Ip/UdpSocket.cpp lib/fprime/Drv/Ip/UdpSocket.hpp lib/fprime/Drv/Ip/test/ut/PortSelector.cpp lib/fprime/Drv/Ip/test/ut/SocketTestHelper.cpp lib/fprime/Drv/Udp/test/ut/UdpTester.cpp lib/fprime/default/config/IpCfg.hpp"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-1c220a16",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Kernel): Heap hardening support has been implemented by adding a build time generated zephyr/heap_constants.h file that is now included from kernel.h.",
+   "action": "In PROVESFlightControllerReference/Components/AntennaDeployer/AntennaDeployer.cpp:8, PROVESFlightControllerReference/Components/Drv/Ina219Manager/Ina219Manager.hpp:12, PROVESFlightControllerReference/Components/Drv/PicoTempManager/PicoTempManager.hpp:13, …: read MG-4.4-0010 and update the lines listed.",
+   "files": "PROVESFlightControllerReference/Components/AntennaDeployer/AntennaDeployer.cpp PROVESFlightControllerReference/Components/Drv/Ina219Manager/Ina219Manager.hpp PROVESFlightControllerReference/Components/Drv/PicoTempManager/PicoTempManager.hpp PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.hpp PROVESFlightControllerReference/Components/Drv/Tmp112Manager/Tmp112Manager.hpp PROVESFlightControllerReference/Components/Drv/Veml6031Manager/Veml6031Manager.hpp PROVESFlightControllerReference/Components/FsSpace/FsSpace.cpp PROVESFlightControllerReference/Components/LoadSwitch/LoadSwitch.hpp PROVESFlightControllerReference/Components/SBand/FprimeHal.cpp PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-34879899",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (CoAP): Resource-related metadata for CoAP .well-known/core responses is now configured with a dedicated coap_resource.metadata pointer instead of coap_resource.user_da",
+   "action": "In PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.cpp:292, PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.hpp:102, lib/fprime-zephyr/fprime-zephyr/Drv/LoRa/LoRa.cpp:29: read MG-4.4-0144 and update the lines listed.",
+   "files": "PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.cpp PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.hpp lib/fprime-zephyr/fprime-zephyr/Drv/LoRa/LoRa.cpp"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-3e75e69a",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (NXP): zephyr,flash chosen property must point to the soc-nv-flash compatible node.",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:65: read MG-4.4-0078 and update the lines listed.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-41a5f996",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (File System): CONFIG_FS_FATFS_FSTAB_AUTOMOUNT is now enabled by default, if any enabled zephyr,fstab,fatfs with the automount property are present in the devicetree.",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:21: read MG-4.4-0063 and update the lines listed.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-6b5a674c",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Bluetooth Host): bt_conn_le_info.interval has been deprecated. (only in files this build doesn't compile: lib/RadioLib/extras/test/unit/tests/TestModule.cpp)",
+   "action": "In lib/RadioLib/extras/test/unit/tests/TestModule.cpp:98: read MG-4.4-0120 and update the lines listed.",
+   "files": "lib/RadioLib/extras/test/unit/tests/TestModule.cpp"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-8d41001f",
+   "severity": "breaking",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (STM32): SPI operation mode is now selected automatically based on devicetree configuration: instances with either of the cs-gpios or new st,soft-nss property operate in",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:137: read MG-4.4-0102 and update the lines listed.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-8f0c9055",
+   "severity": "info",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (File System): CONFIG_FS_FATFS_FSTAB_AUTOMOUNT is now enabled by default, if any enabled zephyr,fstab,fatfs with the automount property are present in the devicetree.",
+   "action": "In prj.conf:75: read MG-4.4-0063 and update the lines listed.",
+   "files": "prj.conf"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-92671beb",
+   "severity": "risky",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Flash map): +-----------------------------------------+-----------------------------------+ | Deprecated macro | Replacement macro | +======================================",
+   "action": "In PROVESFlightControllerReference/ReferenceDeployment/Main.cpp:62: read MG-4.4-0155 and update the lines listed.",
+   "files": "PROVESFlightControllerReference/ReferenceDeployment/Main.cpp"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-9914900e",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 release notes (Deprecated APIs and options): bt_conn_le_info.interval has been deprecated. (only in files this build doesn't compile: lib/RadioLib/extras/test/unit/tests/TestModule.cpp)",
+   "action": "In lib/RadioLib/extras/test/unit/tests/TestModule.cpp:98: read RN-4.4-0005 and update the lines listed.",
+   "files": "lib/RadioLib/extras/test/unit/tests/TestModule.cpp"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-bd6a5722",
+   "severity": "breaking",
+   "confidence": "medium",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (NXP): nxp,imx-flexspi-nor compatible nodes now have a soc-nv-flash compatible child node to describe the flash memory.",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:65: read MG-4.4-0077 and update the lines listed.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-e880bbf9",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (File System): CONFIG_FS_FATFS_FSTAB_AUTOMOUNT is now enabled by default, if any enabled zephyr,fstab,fatfs with the automount property are present in the devicetree.",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:22: read MG-4.4-0063 and update the lines listed.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
+  },
+  {
+   "id": "GUIDE-ENTRY-MATCH-fd5949be",
+   "severity": "info",
+   "confidence": "low",
+   "kind": "entry-match",
+   "title": "4.4 migration guide (Ethernet): The reset-gpios property of microchip,ksz8081 has been reworked to be used as active low, you may have to set the pin as GPIO_ACTIVE_LOW in devicetree .",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:164, boards/bronco_space/proves_flight_control_board_v5e/proves_flight_control_board_v5e_rp2350a_m33.dts:18: read MG-4.4-0057 and update the lines listed.",
+   "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi boards/bronco_space/proves_flight_control_board_v5e/proves_flight_control_board_v5e_rp2350a_m33.dts"
+  },
+  {
+   "id": "IMAGES-IMAGES-SUMMARY-1182b69b",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "images-summary",
+   "title": "1 image at v4.4.1: proves-core-reference (app)",
+   "action": "Per-image findings follow, grouped by image.",
+   "files": ""
+  },
+  {
+   "id": "IMAGES-MCUBOOT-REVISION-efcf51c8",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "mcuboot-revision",
+   "title": "MCUboot moves from 96576b341ee1 (96576b34) to 6d3b3d2c38ab (6d3b3d2c); the bootloader image's SBOM isn't available",
+   "action": "Read MCUboot's release notes for that range; image format, swap and signature changes need the bootloader and app updated together.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-a58142f7",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module hal_st, which the build uses, moves from 9f81b4427e95 to 7a7928828472",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-c6c9497a",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module hal_rpi_pico, which the build uses, moves from 09e957522da6 to 562b41e10a1d",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-d9533225",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module mbedtls, which the build uses, moves from c5b06d89c9c4 to a3e190fe44c7",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-e7655634",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module mcuboot, which the build uses, moves from 96576b341ee1 to 6d3b3d2c38ab",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  },
+  {
+   "id": "MANIFEST-MODULE-REPINNED-fb658cc1",
+   "severity": "info",
+   "confidence": "high",
+   "kind": "module-repinned",
+   "title": "Module picolibc, which the build uses, moves from ca8b6ebba522 to 01254932e8e8",
+   "action": "The SBOM findings list what changed in the files the build compiles.",
+   "files": ""
+  }
+ ]
+}
