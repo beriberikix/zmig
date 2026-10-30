@@ -247,6 +247,9 @@ def render(f: Finding, fix: JSON) -> str:
     elif fix["new"] is not None:
         head = f"In {where}, add `{fix['new']}` ({fix['source']}; {fix['confidence']} confidence)."
     else:
+        loc = f"{fix['file']}:{fix['line']}" if fix["line"] else fix["file"]
+        if loc in rest:
+            return rest  # the action already says where
         if rest[:1].isupper() and rest[1:2].islower():
             rest = rest[0].lower() + rest[1:]
         return f"In {where}: {rest}"

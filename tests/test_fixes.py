@@ -184,3 +184,12 @@ def test_guide_rename_only_on_a_line_that_has_the_old_name() -> None:
         "ti,tmp116",
         "ti,tmp11x",
     )
+
+
+def test_no_location_prefix_when_the_action_already_names_it() -> None:
+    """ "In ../west.yml:18: add cmsis_6 to your manifest in ../west.yml:18 …" said it twice."""
+    f = _f("module-required", Category.MANIFEST, (file_line("../west.yml", 18, "name-allowlist:"),),
+           action="Add cmsis_6 to your manifest in ../west.yml:18 (the name-allowlist) and run `west update`.")  # fmt: skip
+    (g,) = apply_fixes([f], CTX)  # type: ignore[arg-type]
+    assert g.action == f.action
+    assert g.fix is not None and (g.fix["file"], g.fix["line"]) == ("../west.yml", 18)
