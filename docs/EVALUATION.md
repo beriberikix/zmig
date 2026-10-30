@@ -87,6 +87,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ | ″ | 5 | tuned: E1 (configure failed after Kconfig) | **2 (40%)** | 4 (80%) | **21/25 (84%)** | **3** (fix-actionable **1**) | ″ | ″ | DOGFOOD-12 §5 |
 | ″ | ″ | 5 | tuned: E3 (guide vendor sections, struct members) | 2 (40%) | 4 (80%) | **21/21 (100%)** | 3 (fix-actionable 1) | ″ | ″ | DOGFOOD-12 §7 |
 | **edgehog** `e2e` (native_sim) | v4.3.0 → v4.4.0 | 8 | **clean**: DOGFOOD-13 baseline | 4 (50%) | 7 (88%) | 38/40 (95%) | 7 (fix-actionable 2) | configure failed (Kconfig); salvaged build failed | unknown | DOGFOOD-13 §2 |
+| ″ | ″ | 8 | tuned: F1–F3 (warnings at the project's assignment and include; new dependencies) | **7 (88%)** | **8 (100%)** | **39/41 (95%)** | **8** (fix-actionable **3**) | ″ | ″ | DOGFOOD-13 §6 |
 | **P1 fixtures** (`tests/fixtures/p1-layout`, `p1-mode`, `p1-rename`, `p1-ble`, `xapp*`) | v4.2.2 → v4.3.0 (constructed) | — | **tuned by construction** (written to exercise P1) | — | — | — | — | | each fixture's expected verdict (layout hazard, MCUboot mode, rename, BLE clean; cross-image) is asserted by `tests/test_p1_fixture.py`, `test_cross_fixture.py` | DESIGN-P1 §11 |
 
 ### Clean results only

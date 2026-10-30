@@ -133,6 +133,21 @@ def expression_changes(old: dict[str, Any], new: dict[str, Any]) -> dict[str, li
     return {k: [old.get(k), new.get(k)] for k in EXPRESSIONS if old.get(k) != new.get(k)}
 
 
+def new_dependencies_off(
+    deps: str, old: Symbols, new: Symbols, config: dict[str, str]
+) -> list[str]:
+    """The symbols in an unmet dependency expression that are new at the target, can be set
+    (they have a prompt), and are off in this build: what the assignment now needs that
+    didn't exist before (regression: edgehog's ECDHE key exchanges need
+    MBEDTLS_X509_CRT_PARSE_C, a v4.4 option, lost in a long expression, DOGFOOD-13 F3)."""
+    names = dict.fromkeys(re.findall(r"\b[A-Z][A-Z0-9_]*\b", deps))
+    return [
+        n
+        for n in names
+        if n not in old and n in new and new[n].get("prompt") and config.get(n, "n") in ("n", "")
+    ]
+
+
 def expression_note(old: Symbols, new: Symbols, sym: str, spec: str) -> str:
     """ " Its definition changed in <spec>: ..." for a finding's action, or "" (AUDIT.md
     §6 item 5: the value findings say why)."""
@@ -295,6 +310,13 @@ class KconfigAnalyzer:
                 )
                 continue
             if d is not None and d.kind == "kconfig-not-taken":
+                needed = new_dependencies_off(d.deps or "", ok, nk, nv)
+                lead = (
+                    f"It now needs {', '.join(f'CONFIG_{n}' for n in needed)}, new in "
+                    f"{ctx.new_spec} and off in this build. "
+                    if needed
+                    else ""
+                )
                 add(
                     "value-not-taken",
                     sym,
@@ -302,12 +324,18 @@ class KconfigAnalyzer:
                     f"(it gets {d.got})",
                     Severity.BREAKING,
                     Confidence.HIGH,
-                    f"New or changed dependencies are unmet: {d.deps or 'see the evidence'}. "
+                    lead
+                    + f"New or changed dependencies are unmet: {d.deps or 'see the evidence'}. "
                     f"Enable them, or drop the assignment if the feature moved."
                     + expression_note(ok, nk, sym, ctx.new_spec),
                     ev + dev,
                     old=ov.get(sym),
-                    new={"assigned": value, "got": d.got, "unsatisfied": d.deps},
+                    new={
+                        "assigned": value,
+                        "got": d.got,
+                        "unsatisfied": d.deps,
+                        **({"new_dependencies": needed} if needed else {}),
+                    },
                 )
                 continue
             if d is not None and d.kind == "kconfig-promptless":

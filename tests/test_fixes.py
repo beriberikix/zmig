@@ -237,3 +237,19 @@ def test_a_missing_include_is_an_include_to_add() -> None:
     assert fixed.action.startswith(
         "In src/stream_client.c:4, add `#include <zephyr/logging/log.h>`"
     )
+
+
+def test_a_single_new_dependency_is_a_line_to_add() -> None:
+    """DOGFOOD-13 F3: an assignment that's no longer taken because of one new, settable,
+    off dependency gets that dependency as the line to add (edgehog H6:
+    CONFIG_MBEDTLS_X509_CRT_PARSE_C=y, which selects X509_USE_C)."""
+    from zmig.findings import Category, Confidence, Finding, Severity, file_line
+    from zmig.fixes import apply_fixes
+
+    f = Finding(Category.KCONFIG, "value-not-taken", "MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED",
+                "t", Severity.BREAKING, Confidence.HIGH, "It now needs ...", "kconfig", ("s",),
+                evidence=(file_line("prj.conf", 83, "CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED=y"),),
+                new={"assigned": "y", "got": "n", "new_dependencies": ["MBEDTLS_X509_CRT_PARSE_C"]})  # fmt: skip
+    (fixed,) = apply_fixes([f], None)  # type: ignore[arg-type]
+    assert (fixed.fix["file"], fixed.fix["line"]) == ("prj.conf", 83)
+    assert fixed.fix["old"] is None and fixed.fix["new"] == "CONFIG_MBEDTLS_X509_CRT_PARSE_C=y"

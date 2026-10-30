@@ -174,6 +174,11 @@ def _derive(f: Finding, by_id: dict[str, Finding], ctx: ScanContext) -> JSON | N
             conf = _cap(f.confidence, Confidence(c["confidence"]))
             renamed = quoted.sub(f'"{c["symbol"]}"', at[2])
             return _fix(at, at[2], renamed, f"bindings: {c['why']}", conf)
+    elif f.kind == "value-not-taken" and len(new.get("new_dependencies") or []) == 1:
+        # One new, settable dependency that's off: enable it (DOGFOOD-13 F3).
+        line = f"CONFIG_{new['new_dependencies'][0]}=y"
+        return _fix(place, None, line, "kconfig: a dependency new at the target",
+                    _cap(f.confidence, Confidence.MEDIUM))  # fmt: skip
     elif f.kind == "include-missing" and new.get("header"):
         return _fix(place, None, f"#include <{new['header']}>",
                     "build: the source build's include chain", f.confidence)  # fmt: skip

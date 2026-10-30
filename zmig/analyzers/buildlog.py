@@ -176,6 +176,31 @@ def build_errors(log: str) -> list[BuildError]:
     return sorted(dict.fromkeys(out), key=lambda e: (rank[e.kind], e.file, e.line, e.message))
 
 
+def header_includes(w: BuildWarning, proj: dict[str, str]) -> list[tuple[str, int]]:
+    """For a warning a non-project header raises about itself (its own `__WARN`, e.g.
+    "This header file is deprecated"): the project lines that #include that header. GCC's
+    include chain then leads to toolchain/gcc.h, where `__WARN` is defined, so the chain's
+    first file isn't where the header is included (regression: edgehog's fs/nvs.h, cited at
+    nvs.c:7 instead of include/nvs.h and nvs.c's own includes, DOGFOOD-13 F2). The project
+    files searched are those in the include chain."""
+    if not w.notes or any(project_path(f, proj) for f, _ in w.notes):
+        return []
+    header = _include_name(w.notes[-1][0])
+    if header is None or not header.endswith(".h"):
+        return []
+    pattern = re.compile(rf'^\s*#\s*include\s*[<"]{re.escape(header)}[>"]')
+    out: list[tuple[str, int]] = []
+    for f, _ in w.includes:
+        if (shown := project_path(f, proj)) is None:
+            continue
+        try:
+            text = Path(f).read_text(errors="replace")
+        except OSError:
+            continue
+        out += [(shown, i) for i, ln in enumerate(text.splitlines(), 1) if pattern.match(ln)]
+    return list(dict.fromkeys(out))
+
+
 def error_evidence(
     errors: list[BuildError], proj: dict[str, str], redact: Callable[[str], str]
 ) -> list[JSON]:
@@ -690,6 +715,9 @@ class BuildlogAnalyzer:
                 if own:
                     lines[(own, w.line)] = None
                     continue
+                if included := header_includes(w, proj):
+                    lines.update(dict.fromkeys(included))
+                    continue
                 for f, ln in w.sites:
                     rel = project_path(f, proj)
                     if rel and ln:
@@ -698,6 +726,12 @@ class BuildlogAnalyzer:
                     if rel and not ln:
                         files[rel] = None
                         break
+            if not lines and not files:
+                # A warning about a Kconfig value the project sets: at the assignment
+                # (DOGFOOD-13 F1: Zephyr's lib/os/CMakeLists.txt on CONFIG_ZVFS_OPEN_MAX).
+                for sym in dict.fromkeys(re.findall(r"\bCONFIG_([A-Z0-9_]+)", msg)):
+                    for loc, _ in ctx.usage.kconfig_set.get(sym, []):
+                        lines[(loc.path, loc.line)] = None
             # By file and line, not log order (DOGFOOD-12 E8: a rebuild reordered them).
             lines = dict.fromkeys(sorted(lines))
             files = dict.fromkeys(sorted(files))

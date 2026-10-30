@@ -1,6 +1,6 @@
 {
  "config": "edgehog",
- "scored": "DOGFOOD-13 (zmig 7c64974, clean)",
+ "scored": "DOGFOOD-13 §6 (F1-F3; tuned)",
  "schema_version": "1.5",
  "verdict": "unknown",
  "findings": [
@@ -33,12 +33,12 @@
   },
   {
    "id": "BUILD-NEW-WARNING-7c6a29d5",
-   "severity": "info",
+   "severity": "risky",
    "confidence": "high",
    "kind": "new-warning",
    "title": "New cmake warning at v4.4.0: CONFIG_ZVFS_OPEN_MAX is less than requested minimum: 25 < 26 Setting the file descriptor size to 26",
-   "action": "Check whether it points at a real problem.",
-   "files": ""
+   "action": "In prj.conf:171: check whether it points at a real problem.",
+   "files": "prj.conf"
   },
   {
    "id": "BUILD-NEW-WARNING-b1b2ddf6",
@@ -46,8 +46,8 @@
    "confidence": "high",
    "kind": "new-warning",
    "title": "New compiler warning at v4.4.0: This header file is deprecated, please use zephyr/kvss/nvs.h instead.",
-   "action": "In edgehog-zephyr-device/lib/edgehog_device/nvs.c:7, edgehog-zephyr-device/lib/edgehog_device/storage_usage.c:9: look at it before it becomes an error in a later release.",
-   "files": "edgehog-zephyr-device/lib/edgehog_device/nvs.c edgehog-zephyr-device/lib/edgehog_device/storage_usage.c"
+   "action": "In edgehog-zephyr-device/lib/edgehog_device/include/nvs.h:18, edgehog-zephyr-device/lib/edgehog_device/nvs.c:10, edgehog-zephyr-device/lib/edgehog_device/storage_usage.c:9: look at it before it becomes an error in a later release.",
+   "files": "edgehog-zephyr-device/lib/edgehog_device/include/nvs.h edgehog-zephyr-device/lib/edgehog_device/nvs.c edgehog-zephyr-device/lib/edgehog_device/storage_usage.c"
   },
   {
    "id": "BUILD-TARGET-BUILD-FAILED-42d2c437",
@@ -505,7 +505,7 @@
    "confidence": "high",
    "kind": "value-not-taken",
    "title": "CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED=y no longer takes effect in v4.4.0 (it gets n)",
-   "action": "In prj.conf:84: new or changed dependencies are unmet: ((PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0)) (=n). Enable them, or drop the assignment if the feature moved. Its definition changed in v4.4.0: depends on ((MBEDTLS_PKCS1_V15 || MBEDTLS_PKCS1_V21) && MBEDTLS_ECDH_C && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS) || ((MBEDTLS_PKCS1_V15 || MBEDTLS_PKCS1_V21) && MBEDTLS_ECDH_C && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS && 0) -> (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0).",
+   "action": "In prj.conf:84, add `CONFIG_MBEDTLS_X509_CRT_PARSE_C=y` (kconfig: a dependency new at the target; medium confidence). It now needs CONFIG_MBEDTLS_X509_CRT_PARSE_C, new in v4.4.0 and off in this build. New or changed dependencies are unmet: ((PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0)) (=n). Enable them, or drop the assignment if the feature moved. Its definition changed in v4.4.0: depends on ((MBEDTLS_PKCS1_V15 || MBEDTLS_PKCS1_V21) && MBEDTLS_ECDH_C && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS) || ((MBEDTLS_PKCS1_V15 || MBEDTLS_PKCS1_V21) && MBEDTLS_ECDH_C && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS && 0) -> (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_BASIC && PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_BASIC && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0).",
    "files": "prj.conf"
   },
   {
@@ -514,7 +514,7 @@
    "confidence": "high",
    "kind": "value-not-taken",
    "title": "CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED=y no longer takes effect in v4.4.0 (it gets n)",
-   "action": "In prj.conf:83: new or changed dependencies are unmet: ((PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0)) (=n). Enable them, or drop the assignment if the feature moved. Its definition changed in v4.4.0: depends on (((MBEDTLS_ECDH_C && MBEDTLS_ECDSA_C) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA)) && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS) || (((MBEDTLS_ECDH_C && MBEDTLS_ECDSA_C) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA)) && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS && 0) -> (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0).",
+   "action": "In prj.conf:83, add `CONFIG_MBEDTLS_X509_CRT_PARSE_C=y` (kconfig: a dependency new at the target; medium confidence). It now needs CONFIG_MBEDTLS_X509_CRT_PARSE_C, new in v4.4.0 and off in this build. New or changed dependencies are unmet: ((PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0)) (=n). Enable them, or drop the assignment if the feature moved. Its definition changed in v4.4.0: depends on (((MBEDTLS_ECDH_C && MBEDTLS_ECDSA_C) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA)) && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS) || (((MBEDTLS_ECDH_C && MBEDTLS_ECDSA_C) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA)) && MBEDTLS_BUILTIN && MBEDTLS_CFG_FILE = \"config-mbedtls.h\" && MBEDTLS && 0) -> (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS) || (PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS_BUILTIN && MBEDTLS && 0).",
    "files": "prj.conf"
   },
   {

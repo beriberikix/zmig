@@ -86,3 +86,42 @@ Run: `eval/run.py scan --out ~/.cache/zmig/eval/runs/edgehog-baseline edgehog` (
 - **One caveat on cleanliness:** edgehog's items overlap with patterns the earlier fixes
   were built for (Mbed TLS 4 removals, the UART rename). It is clean by the rules (no
   change was informed by edgehog), but the overlap favours zmig here.
+
+## 6. Addendum (2026-10-30): F1–F3 fixed (tuned)
+
+**What changed.**
+- **F1:** a build warning with no project location that names a `CONFIG_X` the project
+  assigns is cited at that assignment, and is risky instead of info.
+- **F2:** a warning a non-project header raises about itself (its own `__WARN`, e.g.
+  "This header file is deprecated") is cited at the project lines that `#include` that
+  header. The header comes from the last macro-expansion note; the files searched are
+  those in the warning's include chain. `BuildWarning` now keeps the notes and the whole
+  include chain.
+- **F3:** `value-not-taken` names the symbols in the unmet dependency that are new at the
+  target, settable, and off in this build. With exactly one such symbol, the fix is to
+  enable it.
+
+**Re-scan** (`eval/runs/f13`, all 17 configurations; OpenDeck scan and plan): only edgehog
+changed, in four findings.
+
+| Finding | Was | Now | Item |
+|---|---|---|---|
+| `BUILD-NEW-WARNING-7c6a29d5` (`ZVFS_OPEN_MAX … 25 < 26`) | info, no location | **risky at `prj.conf:171`** | H8: missed → **caught** |
+| `BUILD-NEW-WARNING-b1b2ddf6` (`fs/nvs.h` deprecated) | `nvs.c:7`, `storage_usage.c:9` | **`include/nvs.h:18`, `nvs.c:10`**, `storage_usage.c:9` | H1: partly (c) → **caught** (both parts) |
+| `KCONFIG-VALUE-NOT-TAKEN-92cd75b8`, `-836f1342` | the whole dependency expression | "It now needs CONFIG_MBEDTLS_X509_CRT_PARSE_C, new in v4.4.0 and off", fix `CONFIG_MBEDTLS_X509_CRT_PARSE_C=y` | H6: partly (c) → **caught, fix-actionable** |
+
+- **H1:** `storage_usage.c:9` is the old fallback site; no file in that warning's chain
+  includes the header directly.
+- **H6, judgement call:** the finding is at `:83`/`:84`, in the same Mbed TLS block as the
+  maintainers' addition after `:77`. The fix (`X509_CRT_PARSE_C`, which selects
+  `X509_USE_C`) configures like their two lines.
+
+| | edgehog, clean (§1) | edgehog, tuned |
+|---|---|---|
+| Strict | 4 (50%) | **7 (88%)** |
+| Lenient | 7 (88%) | **8 (100%)** |
+| Precision | 38/40 | **39/41** (H8's finding is now risky and true) |
+| Actionable | 7 | **8** |
+| Fix-actionable | 2 | **3** (+H6) |
+
+F4–F7 remain open.

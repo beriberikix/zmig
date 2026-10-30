@@ -998,3 +998,103 @@ def test_repeated_build_errors_do_not_crowd_out_other_sites() -> None:
         ("include/drivers/behavior.h", 276),
         ("include/drivers/ext_power.h", 104),
     ]
+
+
+def _warn_ctx(tmp_path: Path, log: str, kconfig_set: dict[str, Any] | None = None) -> Any:
+    from types import SimpleNamespace
+
+    app = tmp_path / "app"
+    empty, target = tmp_path / "old.log", tmp_path / "new.log"
+    empty.write_text("")
+    target.write_text(log)
+    b = SimpleNamespace(workspace=SimpleNamespace(zephyr=tmp_path / "z", root=tmp_path),
+                        src=app, dir=tmp_path / "build")  # fmt: skip
+    return SimpleNamespace(
+        old=b, new=b, prior=[], new_spec="v4.4.0",
+        old_img=SimpleNamespace(log=empty, dir=tmp_path / "o"),
+        new_img=SimpleNamespace(log=target, dir=tmp_path / "n"),
+        runner=SimpleNamespace(redact=lambda s: s),
+        usage=SimpleNamespace(kconfig_set=kconfig_set or {}),
+    )  # fmt: skip
+
+
+def _warned(ctx: Any) -> list[Any]:
+    from zmig.analyzers.buildlog import BuildlogAnalyzer
+
+    found: list[Any] = []
+    BuildlogAnalyzer._warnings(ctx, lambda *a, out=found: out.append(a))  # type: ignore[arg-type]
+    return found
+
+
+def test_a_cmake_warning_about_a_kconfig_value_is_cited_at_its_assignment(tmp_path: Path) -> None:
+    """DOGFOOD-13 F1, edgehog H8: Zephyr's lib/os/CMakeLists.txt warns "CONFIG_ZVFS_OPEN_MAX
+    is less than requested minimum: 25 < 26". The project sets it at prj.conf:171, so
+    that's where the warning is, and it's risky, not info."""
+    from zmig.findings import Severity
+    from zmig.usage import Loc
+
+    log = (
+        f"CMake Warning at {tmp_path}/z/lib/os/CMakeLists.txt:60 (message):\n\n\n"
+        "            CONFIG_ZVFS_OPEN_MAX is less than requested minimum:\n"
+        "              25 < 26\n            Setting the file descriptor size to 26\n\n\n"
+    )
+    loc = Loc("prj.conf", 171, "CONFIG_ZVFS_OPEN_MAX=25")
+    (w,) = _warned(_warn_ctx(tmp_path, log, {"ZVFS_OPEN_MAX": [(loc, "25")]}))
+    assert w[3] is Severity.RISKY  # add(kind, subject, title, sev, action, ev, old, new)
+    assert [(e["path"], e["line"]) for e in w[5] if e["type"] == "file_line"] == [("prj.conf", 171)]
+
+
+def test_a_deprecated_header_is_cited_where_the_project_includes_it(tmp_path: Path) -> None:
+    """DOGFOOD-13 F2, edgehog H1: zephyr/fs/nvs.h warns from its own `__WARN`. GCC prints the
+    include chain to toolchain/gcc.h (nvs.c:7 -> nvs.h:15 -> device.h -> ...), not to
+    fs/nvs.h, so the warning was cited at nvs.c:7. The deprecated header is the last
+    macro-expansion note; the sites are the project lines that include it."""
+    z = tmp_path / "z" / "include" / "zephyr"
+    lib = tmp_path / "mod" / "lib"
+    (lib / "include").mkdir(parents=True)
+    (lib / "include" / "nvs.h").write_text(
+        "#pragma once\n#include <zephyr/kernel.h>\n#include <zephyr/fs/nvs.h>\n"
+    )
+    (lib / "nvs.c").write_text(
+        '#include "nvs.h"\n#include <zephyr/drivers/flash.h>\n#include <zephyr/fs/nvs.h>\n'
+    )
+    log = (
+        f"In file included from {z}/sys_clock.h:7,\n"
+        f"                 from {lib}/include/nvs.h:2,\n"
+        f"                 from {lib}/nvs.c:1:\n"
+        f"{z}/toolchain/gcc.h:357:20: warning: This header file is deprecated, please use zephyr/kvss/nvs.h instead.\n"
+        "  357 | #define __WARN1(s) _Pragma(#s)\n"
+        f"{z}/toolchain/gcc.h:356:21: note: in expansion of macro '__WARN1'\n"
+        f"{z}/fs/nvs.h:17:1: note: in expansion of macro '__WARN'\n"
+    )
+    ctx = _warn_ctx(tmp_path, log)
+    from zmig.analyzers import buildlog
+
+    roots = {str(tmp_path / "app"): "", str(tmp_path / "mod"): "mod/"}
+    orig = buildlog.project_roots
+    buildlog.project_roots = lambda b, d: roots  # type: ignore[assignment]
+    try:
+        (w,) = _warned(ctx)
+    finally:
+        buildlog.project_roots = orig  # type: ignore[assignment]
+    assert [(e["path"], e["line"]) for e in w[5] if e["type"] == "file_line"] == [
+        ("mod/lib/include/nvs.h", 3),
+        ("mod/lib/nvs.c", 3),
+    ]
+
+
+def test_value_not_taken_names_a_new_dependency_that_is_off() -> None:
+    """DOGFOOD-13 F3, edgehog H6: MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED=y isn't taken at
+    v4.4.0; its unmet dependency is a long expression, and the one symbol to add is
+    MBEDTLS_X509_CRT_PARSE_C, new at v4.4.0, settable, and off."""
+    from zmig.analyzers.kconfig import new_dependencies_off
+
+    deps = "(PSA_WANT_ALG_ECDH && PSA_WANT_ALG_ECDSA && MBEDTLS_X509_CRT_PARSE_C && MBEDTLS)"
+    old = {"PSA_WANT_ALG_ECDH": {}, "PSA_WANT_ALG_ECDSA": {}, "MBEDTLS": {}}
+    new = {"PSA_WANT_ALG_ECDH": {"prompt": "x"}, "PSA_WANT_ALG_ECDSA": {"prompt": "x"},
+           "MBEDTLS": {"prompt": "x"}, "MBEDTLS_X509_CRT_PARSE_C": {"prompt": "X.509 parsing"},
+           "NEW_HIDDEN": {"prompt": None}}  # fmt: skip
+    config = {"PSA_WANT_ALG_ECDH": "y", "MBEDTLS": "y"}
+    assert new_dependencies_off(deps + " || NEW_HIDDEN", old, new, config) == [
+        "MBEDTLS_X509_CRT_PARSE_C"
+    ]

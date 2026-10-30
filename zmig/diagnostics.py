@@ -303,6 +303,11 @@ class BuildWarning:
     # another file (a Zephyr header): the "in expansion of macro" sites, innermost first,
     # then the enclosing function's file (line 0), then the include chain's outermost file.
     sites: tuple[tuple[str, int], ...] = ()
+    # The "in expansion of macro" sites alone, innermost first; and the whole include chain
+    # printed before it, innermost first (DOGFOOD-13 F2: a header's own `__WARN` is about
+    # including it, and the chain is to toolchain/gcc.h, not to that header).
+    notes: tuple[tuple[str, int], ...] = ()
+    includes: tuple[tuple[str, int], ...] = ()
 
     def key(self, roots: dict[str, str]) -> tuple[str, str, str]:
         """Identity across builds: paths made relative to known roots (the zephyr tree,
@@ -324,6 +329,16 @@ class BuildWarning:
 
 def compiler_sites(lines: list[str], i: int) -> tuple[tuple[str, int], ...]:
     """The code locations GCC prints around the diagnostic on lines[i] (see BuildWarning)."""
+    notes, function, included = compiler_context(lines, i)
+    # The include chain is printed innermost first; its last line is the compiled file.
+    return tuple(dict.fromkeys([*notes, *function, *included[-1:]]))
+
+
+def compiler_context(
+    lines: list[str], i: int
+) -> tuple[list[tuple[str, int]], list[tuple[str, int]], list[tuple[str, int]]]:
+    """(macro-expansion notes, innermost first; the enclosing function's file, line 0; the
+    include chain, innermost first) GCC prints around the diagnostic on lines[i]."""
     notes: list[tuple[str, int]] = []
     for ln in lines[i + 1 :]:
         if m := _W_NOTE.match(ln):
@@ -340,8 +355,8 @@ def compiler_sites(lines: list[str], i: int) -> tuple[tuple[str, int], ...]:
             included.append((m["file"], int(m["line"])))
         else:
             break
-    # The include chain is printed innermost first; its last line is the compiled file.
-    return tuple(dict.fromkeys([*notes, *function, *included[:1]]))
+    # Read upwards, so the chain was collected outermost first.
+    return notes, function, included[::-1]
 
 
 def parse_warnings(text: str) -> list[BuildWarning]:
@@ -349,6 +364,7 @@ def parse_warnings(text: str) -> list[BuildWarning]:
     out = []
     for i, ln in enumerate(lines):
         if m := _W_COMPILER.match(ln):
+            notes, _, included = compiler_context(lines, i)
             out.append(
                 BuildWarning(
                     "compiler",
@@ -357,6 +373,8 @@ def parse_warnings(text: str) -> list[BuildWarning]:
                     m["msg"].strip(),
                     m["flag"] or "",
                     compiler_sites(lines, i),
+                    tuple(notes),
+                    tuple(included),
                 )
             )
     out += [
