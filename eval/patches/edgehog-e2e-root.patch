@@ -1,0 +1,44 @@
+Let e2e/CMakeLists.txt take the repository root (EDGEHOG_ROOT) from the command line, and drop
+e2e/Kconfig's rsource of the repository's Kconfig. Upstream reaches both by relative paths out
+of the app directory (../samples, ../lib, ../Kconfig), which break in zmig's copy of the app
+(docs/oracles/edgehog.md, "App shim"). The repository is passed as a Zephyr module, which
+sources the same Kconfig. No file of the upgrade is touched.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -16,8 +16,13 @@ endfunction()
+ 
+ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+ 
++# The repository root; zmig passes it, as it builds a copy of this directory alone
++if(NOT DEFINED EDGEHOG_ROOT)
++    set(EDGEHOG_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
++endif()
++
+ # add some custom functions from the sample directory
+-set(SAMPLE_DIR "${CMAKE_CURRENT_LIST_DIR}/../samples/edgehog_app")
++set(SAMPLE_DIR "${EDGEHOG_ROOT}/samples/edgehog_app")
+ 
+ # add the sample specific private configuration
+ concat_if_exists(${CMAKE_SOURCE_DIR}/private.conf EXTRA_CONF_FILE)
+@@ -58,7 +63,7 @@ endif()
+ generate_certificate_inc("${CONFIG_E2E_HTTP_SERVER_CERT_DIR}/192.0.2.2.pem" "edgehog_ft_root_certificate")
+ 
+ # add astarte private headers
+-target_include_directories(app PRIVATE ${CMAKE_SOURCE_DIR}/../lib/edgehog_device/include)
++target_include_directories(app PRIVATE ${EDGEHOG_ROOT}/lib/edgehog_device/include)
+ 
+ # add sources
+ FILE(GLOB app_sources src/*.c)
+--- a/Kconfig
++++ b/Kconfig
+@@ -6,7 +6,8 @@ menu "Zephyr"
+ source "Kconfig.zephyr"
+ endmenu
+ 
+-rsource "../Kconfig"
++# rsource "../Kconfig": the repository is a Zephyr module (ZEPHYR_EXTRA_MODULES), which
++# sources the same Kconfig
+ 
+ menu "End to end test"
+ 

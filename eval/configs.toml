@@ -311,3 +311,46 @@ cmake_args = [
     "-DCMAKE_TOOLCHAIN_FILE=lib/fprime-zephyr/cmake/toolchain/zephyr.cmake",
     "-DFPRIME_LIBRARY_LOCATIONS=lib/fprime-zephyr;lib/fprime-extras",
 ]
+
+[sources.edgehog]
+kind = "git"
+url = "https://github.com/edgehog-device-manager/edgehog-zephyr-device"
+sha = "bc1c98672545046ac5cf580dbd63436b6987e6b7"  # 3a531e59a2^1, base of PR #175 (Zephyr v4.3.0 -> v4.4.0, merge 4ea9219cc6)
+
+[sources.edgehog-astarte]
+kind = "git"
+url = "https://github.com/astarte-platform/astarte-device-sdk-zephyr"
+sha = "a72dd16efa95bdbfc218d2fb0db293554558efa8"  # the upgrade's pin; the source manifest says `master`
+# Beside the edgehog checkout, as in the project's west workspace: edgehog's lib/Kconfig:9 does
+# rsource "../../astarte-device-sdk-zephyr/Kconfig".
+dir = "../edgehog-bc1c98672545/astarte-device-sdk-zephyr"
+
+[sources.edgehog-zlib]
+kind = "git"
+url = "https://github.com/secomind/zlib-zephyr"
+sha = "db8d97ffb4767fcfe2ce1fe243fa215744f3e3d1"  # tag release-v1.3.1 (peeled), the Astarte SDK manifest's pin
+
+[sources.edgehog-lz4]
+kind = "git"
+url = "https://github.com/zephyrproject-rtos/lz4"
+sha = "0ad20d0fc4ec70d6f4c3d399357e59d0544cf07f"  # branch `zephyr` tip since 2026-04-29, both sides
+
+[configs.edgehog]
+oracle = "docs/oracles/edgehog.md"
+scored = "not yet scored (oracle frozen 2026-10-30)"
+app = "{src:edgehog}/e2e"
+# e2e/ reaches ../samples, ../lib and ../Kconfig, which aren't in zmig's copy of the app: the
+# root comes from -DEDGEHOG_ROOT instead, and the Kconfig through the module.
+app_patch = "eval/patches/edgehog-e2e-root.patch"
+board = "native_sim"
+from = "v4.3.0"
+to = "v4.4.0"
+# No `sdk`: v4.3.0 rejects SDK 1.x and v4.4.x needs >= 1.0.0 (as for ardep).
+# The project's west.yml imports Zephyr with `import: true` (every module); these are the ones
+# this build uses. tf-psa-crypto exists only in the v4.4 manifest (Mbed TLS 4's crypto).
+modules = ["mbedtls", "tf-psa-crypto", "picolibc", "mcuboot", "littlefs"]
+cmake_args = [
+    "-DZEPHYR_EXTRA_MODULES={src:edgehog};{src:edgehog-astarte};{src:edgehog-zlib};{src:edgehog-lz4}",
+    "-DEDGEHOG_ROOT={src:edgehog}",
+    "-DCMAKE_PREFIX_PATH={sdk:0.17.4};{sdk:1.0.1}",
+]
