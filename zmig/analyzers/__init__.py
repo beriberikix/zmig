@@ -73,6 +73,7 @@ def _builtin(kind: str) -> list[type[Any]]:
     from zmig.analyzers.ble import BleAnalyzer
     from zmig.analyzers.board import BoardAnalyzer
     from zmig.analyzers.buildlog import BuildlogAnalyzer
+    from zmig.analyzers.changes import ChangesAnalyzer
     from zmig.analyzers.crossimage import CrossImageAnalyzer
     from zmig.analyzers.devicetree import DevicetreeAnalyzer
     from zmig.analyzers.guide import GuideAnalyzer
@@ -94,6 +95,9 @@ def _builtin(kind: str) -> list[type[Any]]:
         KconfigAnalyzer,
         DevicetreeAnalyzer,
         BuildlogAnalyzer,
+        # After buildlog: it stands in for kconfig and buildlog findings the target
+        # configure couldn't produce, and skips subjects they already reported.
+        ChangesAnalyzer,
         InitOrderAnalyzer,
         ApiAnalyzer,
         SbomAnalyzer,

@@ -77,6 +77,7 @@ class Mirror:
         self.url = url
         self.runner = runner
         self.path = cache.mirrors / f"{url_slug(url)}.git"
+        self.cache_root = cache.root  # for data derived from the mirror (zmig.changes)
         self.git = find_tool("git")
         self._fetched = False
 

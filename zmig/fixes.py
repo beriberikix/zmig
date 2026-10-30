@@ -83,7 +83,11 @@ def _fix(
 
 
 def _renamed_line(text: str, old_sym: str, new_sym: str) -> tuple[str, str]:
-    """The assignment as written, and the same line with the symbol renamed."""
+    """The line as written, and the same line with the symbol renamed: an assignment or a
+    read (`CONFIG_X`), or a Kconfig re-declaration (`config X`, ardep A1)."""
+    decl = re.compile(rf"^(\s*(?:menu)?config\s+){re.escape(old_sym)}\b")
+    if text and decl.match(text):
+        return text.strip(), decl.sub(rf"\g<1>{new_sym}", text).strip()
     if text and re.search(rf"\bCONFIG_{re.escape(old_sym)}\b", text):
         return text.strip(), re.sub(
             rf"\bCONFIG_{re.escape(old_sym)}\b", f"CONFIG_{new_sym}", text
@@ -152,7 +156,12 @@ def _derive(f: Finding, by_id: dict[str, Finding], ctx: ScanContext) -> JSON | N
         return None
     place = places[0]
     new = f.new if isinstance(f.new, dict) else {}
-    if f.category is Category.KCONFIG and f.kind in ("symbol-removed", "symbol-deprecated"):
+    if f.kind in (
+        "symbol-removed",
+        "symbol-deprecated",
+        "read-symbol-removed",
+        "kconfig-override-orphaned",
+    ):
         if fx := _kconfig(f, by_id, place):
             return fx
     elif f.kind == "entry-match" and (r := _guide_rename(f)):

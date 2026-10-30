@@ -193,3 +193,29 @@ def test_no_location_prefix_when_the_action_already_names_it() -> None:
     (g,) = apply_fixes([f], CTX)  # type: ignore[arg-type]
     assert g.action == f.action
     assert g.fix is not None and (g.fix["file"], g.fix["line"]) == ("../west.yml", 18)
+
+
+def test_an_orphaned_override_gets_its_rename_as_a_kconfig_line() -> None:
+    """ardep A1: `config CAN_MAX_STD_ID_FILTER` in the board's Kconfig.defconfig."""
+    f = _f("kconfig-override-orphaned", Category.BUILD,
+           (file_line("ardep/boards/mercedes/ardep/Kconfig.defconfig", 17, "config CAN_MAX_STD_ID_FILTER"),),
+           subject="CONFIG_CAN_MAX_STD_ID_FILTER",
+           new={"candidates": [{"symbol": "CAN_STM32_FDCAN_MAX_STD_ID_FILTERS", "confidence": "medium",
+                                "why": "renamed in 38c329742146; defined if CAN_STM32_FDCAN"}]})  # fmt: skip
+    (g,) = apply_fixes([f], CTX)  # type: ignore[arg-type]
+    assert g.fix is not None
+    assert (g.fix["old"], g.fix["new"]) == (
+        "config CAN_MAX_STD_ID_FILTER",
+        "config CAN_STM32_FDCAN_MAX_STD_ID_FILTERS",
+    )
+    assert g.fix["confidence"] == "medium"
+
+
+def test_a_read_of_a_removed_symbol_gets_the_rename() -> None:
+    f = _f("read-symbol-removed", Category.KCONFIG, (file_line("src/main.c", 4, "#ifdef CONFIG_OLD"),),
+           subject="CONFIG_OLD", new={"candidates": [{"symbol": "NEW", "confidence": "medium", "why": "w"}]})  # fmt: skip
+    (g,) = apply_fixes([f], CTX)  # type: ignore[arg-type]
+    assert g.fix is not None and (g.fix["old"], g.fix["new"]) == (
+        "#ifdef CONFIG_OLD",
+        "#ifdef CONFIG_NEW",
+    )

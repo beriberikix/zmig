@@ -25,6 +25,8 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from zmig.errors import ZmigError
+
 if TYPE_CHECKING:
     from zmig.refs import Mirror
     from zmig.tools import Runner
@@ -240,6 +242,91 @@ def kconfig_changes(
     }
 
 
+# --- choosing a replacement for one build ------------------------------------------------------
+
+_TOKEN = re.compile(r'\s*(&&|\|\||!=|<=|>=|[!()=<>]|"[^"]*"|[A-Za-z0-9_]+)')
+_COMPARE = {"=", "!=", "<", ">", "<=", ">="}
+
+
+def evaluate(expr: str, config: dict[str, str]) -> bool | None:
+    """A Kconfig condition against a build's .config values: True, False, or None when it
+    can't tell (a symbol the .config doesn't have, e.g. one new at the target; any
+    comparison). `||`, `&&` and `!` follow three-valued logic."""
+    toks = [m[1] for m in _TOKEN.finditer(expr)]
+    pos = 0
+
+    def peek() -> str | None:
+        return toks[pos] if pos < len(toks) else None
+
+    def take() -> str:
+        nonlocal pos
+        pos += 1
+        return toks[pos - 1]
+
+    def or_() -> bool | None:
+        v = and_()
+        while peek() == "||":
+            take()
+            w = and_()
+            v = True if (v or w) else (None if v is None or w is None else False)
+        return v
+
+    def and_() -> bool | None:
+        v = not_()
+        while peek() == "&&":
+            take()
+            w = not_()
+            v = False if (v is False or w is False) else (None if v is None or w is None else True)
+        return v
+
+    def not_() -> bool | None:
+        if peek() == "!":
+            take()
+            v = not_()
+            return None if v is None else not v
+        return atom()
+
+    def atom() -> bool | None:
+        if peek() == "(":
+            take()
+            v = or_()
+            take()  # ")"
+            return v
+        tok = take()
+        if peek() in _COMPARE:
+            take()
+            take()
+            return None
+        value = config.get(tok)
+        return {"y": True, "m": True, "n": False}.get(value) if value is not None else None
+
+    try:
+        return or_()
+    except IndexError:
+        return None
+
+
+def choose(candidates: list[dict[str, Any]], config: dict[str, str]) -> list[dict[str, Any]]:
+    """The candidates a build can use, best first, each with a `confidence`. A candidate
+    whose conditions the build makes false is dropped. One whose conditions all hold comes
+    first; it is medium when it is the only such one. With none that holds, a single
+    remaining candidate is medium. Everything else is low, and a same-commit candidate is
+    always low (DESIGN-CHANGE-DB §2.2)."""
+    rated = []
+    for c in candidates:
+        vals = [evaluate(x, config) for x in c.get("conditions", [])]
+        if False in vals:
+            continue
+        rated.append((True if all(v is True for v in vals) else None, c))
+    holds = [c for v, c in rated if v is True]
+    ordered = holds + [c for v, c in rated if v is not True]
+    sure = holds[:1] if len(holds) == 1 else (ordered if len(ordered) == 1 else [])
+    return [
+        {**c, "confidence": "medium" if c in sure and c["how"] != "same commit" else "low"}
+        for c in ordered
+    ]
+
+
 # --- git-backed ----------------------------------------------------------------------------------
 
 
@@ -257,6 +344,11 @@ def symbol_table(mirror: Mirror, runner: Runner, sha: str) -> dict[str, str]:
 def build(mirror: Mirror, runner: Runner, old_sha: str, new_sha: str) -> dict[str, Any]:
     source = symbol_table(mirror, runner, old_sha)
     target = symbol_table(mirror, runner, new_sha)
+    for sha, table in ((old_sha, source), (new_sha, target)):
+        if not table:
+            # Never let a failed grep read as "nothing changed" (AUDIT §4: text layers must
+            # fail loudly, not return less).
+            raise ZmigError(f"no Kconfig symbols found at {sha[:12]} in {mirror.path}")
     log = _git(mirror, runner, "log", "-M", "--format=commit %H", "-p", "-U0",
                f"{old_sha}..{new_sha}", "--", *_KCONFIG_PATHS)  # fmt: skip
 
