@@ -5,6 +5,7 @@ salvage round's log)."""
 
 from __future__ import annotations
 
+# ruff: noqa: E501  (verbatim log lines)
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -54,3 +55,37 @@ def test_salvage_edits_record_their_log() -> None:
     e = SalvageEdit("Kconfig", 175, "choice BT_LL_SW_LLCP_IMPL", WARNING, "/b/r2/zmig-logs/app.log")
     assert e.to_json()["log"] == "/b/r2/zmig-logs/app.log"
     assert "log" not in SalvageEdit("Kconfig", 175, "x", WARNING).to_json()
+
+
+# RIT FSW sensor_module at v4.2.0 (DOGFOOD-8 B4), paths shortened; verbatim otherwise.
+KCONFIG_ABORT_LOG = """\
+warning: ENTROPY_STM32_RNG (defined at drivers/entropy/Kconfig.stm32:6) was assigned the value 'y'
+but got the value 'n'. Check these unsatisfied dependencies: (DT_HAS_ST_STM32_RNG_ENABLED ||
+DT_HAS_ST_STM32_RNG_NOIRQ_ENABLED) (=n).
+
+/src/FSW/boards/arm/sensor_module/sensor_module_defconfig:33: warning: attempt to assign the value 'y' to the undefined symbol TMP116
+Parsing /ws/apps/x/sensor_module/Kconfig
+Loaded configuration '/src/FSW/boards/arm/sensor_module/sensor_module_defconfig'
+error: Aborting due to Kconfig warnings
+"""
+
+
+def test_kconfig_abort_names_the_undefined_assignment() -> None:
+    """The configure failure said only "Aborting due to Kconfig warnings"; the warning that
+    caused it is earlier in the log, with the project file and line."""
+    from zmig.analyzers.buildlog import kconfig_abort_causes
+
+    causes = kconfig_abort_causes(KCONFIG_ABORT_LOG, {"/src/FSW": "FSW/"})
+    assert causes == [
+        (
+            "FSW/boards/arm/sensor_module/sensor_module_defconfig",
+            33,
+            "attempt to assign the value 'y' to the undefined symbol TMP116",
+        )
+    ]
+    # A file outside the project keeps its place as text only; no abort, nothing.
+    assert kconfig_abort_causes(KCONFIG_ABORT_LOG, {}) == [
+        ("", 0, "/src/FSW/boards/arm/sensor_module/sensor_module_defconfig:33: attempt to assign "
+         "the value 'y' to the undefined symbol TMP116")
+    ]  # fmt: skip
+    assert kconfig_abort_causes(KCONFIG_ABORT_LOG.replace("error: Aborting", "x"), {}) == []

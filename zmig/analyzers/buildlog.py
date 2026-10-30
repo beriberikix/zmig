@@ -7,6 +7,7 @@ line, so a warning that only moved isn't new. Sizes come from the two ELFs.
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -164,6 +165,23 @@ def build_errors(log: str) -> list[BuildError]:
     return list(dict.fromkeys(out))
 
 
+def kconfig_abort_causes(log: str, roots: dict[str, str]) -> list[tuple[str, int, str]]:
+    """The assignments to undefined symbols behind "Aborting due to Kconfig warnings", as
+    (project file, line, message); ("", 0, message with its path) when the file isn't the
+    project's. The abort line itself names none of them (regression: RIT FSW's
+    `sensor_module_defconfig:33` TMP116, DOGFOOD-8 B4)."""
+    if "Aborting due to Kconfig warnings" not in log:
+        return []
+    out = []
+    for d in parse_log(log).diagnostics:
+        if d.kind != "kconfig-undefined":
+            continue
+        msg = f"attempt to assign the value '{d.value}' to the undefined symbol {d.symbol}"
+        own = project_path(os.path.normpath(d.file), roots)
+        out.append((own, d.line, msg) if own else ("", 0, f"{d.file}:{d.line}: {msg}"))
+    return out
+
+
 # add(kind, subject, title, severity, action, evidence, old, new)
 Add = Callable[..., None]
 _COMPILER_ERROR = re.compile(
@@ -246,6 +264,19 @@ class BuildlogAnalyzer:
                     *(file_line(p, ln, ctx.runner.redact(text)) for p, ln, text in locs),
                     tool_output("first configure error", ctx.runner.redact("\n".join(lines))),
                 )
+            causes = kconfig_abort_causes(log, project_roots(ctx.new, ctx.new_img.dir))
+            if causes:
+                ev_first = (
+                    *(
+                        file_line(p, ln, msg)
+                        if p
+                        else tool_output("target configure (Kconfig)", ctx.runner.redact(msg))
+                        for p, ln, msg in causes[:MAX_ERRORS]
+                    ),
+                    *ev_first,
+                )
+                cause = f": {ctx.runner.redact(causes[0][2])[:160]}"
+                locs = [c for c in causes if c[0]] + locs
             at = f"{locs[0][0]}:{locs[0][1]}" if locs else ""
             add(
                 "target-configure-failed",
