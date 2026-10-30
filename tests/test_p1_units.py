@@ -62,7 +62,7 @@ def test_schema_12_fields_validate() -> None:
     )
     doc = json.loads(render(r, "json"))
     jsonschema.validate(doc, SCHEMA)
-    assert doc["schema_version"] == "1.4"
+    assert doc["schema_version"] == "1.5"
     (j,) = doc["findings"]
     assert (j["introduced_by_migration"], j["remedy"]) == (False, "reflash")
 

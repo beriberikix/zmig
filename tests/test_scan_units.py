@@ -158,3 +158,28 @@ def test_build_files_unknown_when_no_record_maps_to_the_project(
     assert scan.ScanContext.build_files.func(fake) is None  # type: ignore[attr-defined]
     deps["CMakeFiles/app.dir/src/main.c.obj"].append(f"{second}/src/main.c")
     assert scan.ScanContext.build_files.func(fake) == {"src/main.c"}  # type: ignore[attr-defined]
+
+
+def test_deprecated_symbols_help_text_names_its_replacement() -> None:
+    """Zephyr v4.2.0 drivers/serial/Kconfig.native_pty: a deprecated choice member that
+    selects nothing but says "use X instead" in its help (CoffeeCaller C2, bms B4)."""
+    from zmig.analyzers.kconfig import deprecation_replacements
+
+    sym = {
+        "deprecated": True,
+        "selects": ["DEPRECATED"],
+        "prompt": "Connect the UART to the invoking shell stdin/stdout (deprecated)",
+        "help": "Deprecated, use UART_NATIVE_PTY_0_ON_STDINOUT instead.",
+    }
+    new = {"UART_NATIVE_PTY_0_ON_STDINOUT": {}, "OTHER": {}}
+    (c,) = deprecation_replacements("NATIVE_UART_0_ON_STDINOUT", sym, new)
+    assert c[0] == "UART_NATIVE_PTY_0_ON_STDINOUT" and c[2] is Confidence.MEDIUM
+    assert "help text" in c[1]
+    # Removed at the target: rename_candidates finds it through the source definition.
+    old = {"NATIVE_UART_0_ON_STDINOUT": sym, "UART_NATIVE_PTY_0_ON_STDINOUT": {}}
+    assert rename_candidates("NATIVE_UART_0_ON_STDINOUT", old, new)[0][0] == (
+        "UART_NATIVE_PTY_0_ON_STDINOUT"
+    )
+    # Not deprecated, or a name that doesn't exist: nothing.
+    assert deprecation_replacements("X", {**sym, "deprecated": False}, new) == []
+    assert deprecation_replacements("X", {**sym, "help": "use NOPE instead"}, new) == []

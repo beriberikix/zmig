@@ -192,7 +192,11 @@ def run_build_analyzers(
         mine = [f for f in final if f.analyzer == name and (f.image or "") == image]
         hazards = sum(1 for f in mine if f.severity.value != "info")
         counted.append(replace(st, findings=len(mine), hazards=hazards))
-    return link_related(final), counted, not_checked
+    # Where each fix goes, and the edit when the findings already hold it (schema 1.5).
+    # Changes only `fix` and `action`, never what is reported (zmig.fixes).
+    from zmig.fixes import apply_fixes
+
+    return apply_fixes(link_related(final), base), counted, not_checked
 
 
 # App input files that a build may or may not use, depending on board, shield and SoC.

@@ -453,6 +453,19 @@
             "fyi"
           ],
           "description": "Presentation tier (zmig.tiers); additive, not used for the verdict, exit codes or fingerprints."
+        },
+        "fix": {
+          "type": "object",
+          "description": "since 1.5 (zmig.fixes): where the fix goes and, when known, the edit; additive",
+          "required": ["file", "source", "confidence"],
+          "properties": {
+            "file": {"type": "string"},
+            "line": {"type": ["integer", "null"]},
+            "old": {"type": ["string", "null"]},
+            "new": {"type": ["string", "null"]},
+            "source": {"type": "string"},
+            "confidence": {"enum": ["high", "medium", "low"]}
+          }
         }
       }
     },

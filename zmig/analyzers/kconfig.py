@@ -45,6 +45,28 @@ def _strip_deprecated(prompt: str | None) -> str:
     return re.sub(r"^\s*\[DEPRECATED\]\s*", "", prompt or "", flags=re.I).strip().lower()
 
 
+_USE_INSTEAD = re.compile(
+    r"\b(?:use|in favou?r of|replaced (?:by|with)|superseded by)\s+(?:the\s+)?(?:CONFIG_)?"
+    r"([A-Z][A-Z0-9_]{2,})"
+)
+
+
+def deprecation_replacements(
+    sym: str, info: dict[str, Any], syms: Symbols
+) -> list[tuple[str, str, Confidence]]:
+    """Replacements a deprecated symbol's own help text names ("Deprecated, use
+    UART_NATIVE_PTY_0_ON_STDINOUT instead."), if they exist in `syms`. Zephyr's deprecated
+    choice members select nothing, so this is the Kconfig-level evidence they carry."""
+    if not info.get("deprecated"):
+        return []
+    found = dict.fromkeys(m[1] for m in _USE_INSTEAD.finditer(info.get("help") or ""))
+    return [
+        (n, f"the deprecated {sym}'s help text says to use {n}", Confidence.MEDIUM)
+        for n in found
+        if n != sym and n in syms
+    ]
+
+
 def rename_candidates(sym: str, old: Symbols, new: Symbols) -> list[tuple[str, str, Confidence]]:
     """Likely replacements for a symbol that exists in `old` but not `new`."""
     o = old[sym]
@@ -53,6 +75,8 @@ def rename_candidates(sym: str, old: Symbols, new: Symbols) -> list[tuple[str, s
         for s in o.get("selects", []):
             if s != "DEPRECATED" and s in new:
                 out.setdefault(s, (f"the deprecated {sym} selected {s}", Confidence.MEDIUM))
+    for name, why, conf in deprecation_replacements(sym, o, new):
+        out.setdefault(name, (why, conf))
     word = re.compile(rf"\b(CONFIG_)?{re.escape(sym)}\b")
     prompt = _strip_deprecated(o.get("prompt"))
     for name, info in new.items():
@@ -322,6 +346,16 @@ class KconfigAnalyzer:
                     old=ov.get(sym),
                     new=nv.get(sym),
                 )
+            repl = deprecation_replacements(sym, nk[sym], nk)
+            instead = (
+                {
+                    "candidates": [
+                        {"symbol": c[0], "why": c[1], "confidence": str(c[2])} for c in repl
+                    ]
+                }
+                if repl
+                else None
+            )
             if nk[sym].get("deprecated") and not ok[sym].get("deprecated"):
                 add(
                     "symbol-deprecated",
@@ -331,6 +365,7 @@ class KconfigAnalyzer:
                     Confidence.HIGH,
                     "Move off it before the release that removes it.",
                     ev,
+                    new=instead,
                 )
             elif nk[sym].get("deprecated"):
                 add(
@@ -341,6 +376,7 @@ class KconfigAnalyzer:
                     Confidence.HIGH,
                     "It was already deprecated in the source version; removal is likely soon.",
                     ev,
+                    new=instead,
                 )
 
         for sym in sorted(ctx.usage.kconfig_read):

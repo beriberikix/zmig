@@ -13,7 +13,7 @@ from enum import StrEnum
 from typing import Any
 
 SCHEMA_URI = "https://zmig.dev/schema/report/1"
-SCHEMA_VERSION = "1.4"
+SCHEMA_VERSION = "1.5"
 
 
 class Severity(StrEnum):
@@ -168,6 +168,10 @@ class Finding:
     # Presentation tier (zmig.tiers): act-now / review / fyi. Additive; nothing reads it
     # to decide anything.
     tier: str | None = None
+    # Schema 1.5 (zmig.fixes): where the fix goes and, when the finding's own facts give
+    # it, the edit: {"file", "line", "old", "new", "source", "confidence"}. Additive; it
+    # never changes what is reported or how severe it is (docs/PROPOSAL-CHANGE-DB.md §3).
+    fix: JSON | None = None
 
     @property
     def id(self) -> str:
@@ -202,6 +206,7 @@ class Finding:
             **({"remedy": str(self.remedy)} if self.remedy else {}),
             **({"provenance": self.provenance} if self.provenance else {}),
             **({"tier": self.tier} if self.tier else {}),
+            **({"fix": self.fix} if self.fix else {}),
         }
 
 

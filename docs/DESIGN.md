@@ -137,6 +137,7 @@ Field rules:
   - `medium`: a structured match that relies on naming (subject-line commit match, or a guide entry linked through an RST role such as ``:kconfig:option:`CONFIG_X` ``).
   - `low`: a text heuristic (a free-text guide entry matched by tokens, or an API usage inferred from a source token scan).
 - **`heuristics`** lists every heuristic that contributed, by name (e.g. `["guide.token-match"]`). The report can then explain each low-confidence finding.
+- **`fix`** (schema 1.5, optional; `zmig/fixes.py`): where the fix goes, `{file, line, old, new, source, confidence}`. `old`/`new` are set only when the finding's own facts give the edit, `source` says which facts, and `confidence` is never higher than theirs. `action` is rendered from it. It is additive and never changes a finding's severity, confidence or evidence (docs/PROPOSAL-CHANGE-DB.md §3).
 - **`evidence`** types: `file_line`, `artifact_diff`, `git_commit` (sha, subject, patch-id), `git_conflict` (files), `doc_entry`, `tool_output` (command id plus an excerpt).
 - **`old`/`new`** are opaque JSON values specific to the analyzer. Each analyzer documents them.
 
