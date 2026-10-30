@@ -26,6 +26,7 @@ of the sentence that contains a mention, so they are always tagged as heuristics
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
@@ -182,6 +183,51 @@ def _classify(sentence: str) -> GuideSeverity | None:
     if _RISKY.search(sentence):
         return "risky"
     return None
+
+
+# Guide sections named for a SoC vendor, and what that vendor's SoCs are called in a
+# build's CONFIG_SOC_FAMILY / CONFIG_SOC_SERIES / CONFIG_SOC (the 4.x guides' vendor
+# headings, plus the common ones).
+_VENDOR_SOCS = {
+    "nxp": r"nxp|imx|kinetis|lpc|mcx|s32|rw6",
+    "stm32": r"stm32",
+    "esp32-s3": r"esp32s3",
+    "esp32": r"esp32",
+    "espressif": r"esp32",
+    "infineon": r"infineon|cat1|psoc|xmc|cyw",
+    "raspberry pi": r"rpi|rp2",
+    "silabs": r"silabs|efr32|efm32|siwx|bg2|mg2",
+    "nordic": r"nordic|nrf",
+    "renesas": r"renesas|smartbond|\bra\d|\brz",
+    "microchip": r"microchip|atmel|\bsam|mec|pic32",
+    "ambiq": r"ambiq|apollo",
+}
+
+
+def vendor_mismatch(headings: Sequence[str], config: dict[str, str]) -> str | None:
+    """The vendor heading an entry sits under when the build's SoC isn't that vendor's;
+    None if it is, if no heading names a vendor, or if the build's SoC is unknown
+    (regression: the 4.4 guide's NXP and STM32 entries matched an RP2350 board's DTS,
+    DOGFOOD-12 E3)."""
+    soc = " ".join(
+        config.get(k, "").strip('"').lower() for k in ("SOC_FAMILY", "SOC_SERIES", "SOC")
+    ).strip()
+    if not soc:
+        return None
+    for h in headings:
+        pattern = _VENDOR_SOCS.get(h.strip().lower())
+        if pattern is not None and not re.search(pattern, soc):
+            return h
+    return None
+
+
+def member_qualifiers(sentence: str, value: str) -> list[str]:
+    """The structs a member name is qualified with in a guide sentence
+    (`bt_conn_le_info.interval` -> bt_conn_le_info): the item is that struct's member, not
+    any identifier of that name (regression: `coap_resource.user_data` matched every
+    `user_data` parameter, DOGFOOD-12 E3)."""
+    found = re.findall(rf"\b([A-Za-z_]\w*)\.{re.escape(value)}\b", sentence)
+    return list(dict.fromkeys(found))
 
 
 def _item(role: str | None, body: str) -> tuple[ItemKind, str] | None:

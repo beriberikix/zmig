@@ -1,6 +1,6 @@
 {
  "config": "proves",
- "scored": "DOGFOOD-12 §5 (E1, E2; tuned)",
+ "scored": "DOGFOOD-12 §7 (E1-E3; tuned)",
  "schema_version": "1.5",
  "verdict": "unknown",
  "findings": [
@@ -267,20 +267,20 @@
   },
   {
    "id": "GUIDE-ENTRY-MATCH-34879899",
-   "severity": "breaking",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
    "title": "4.4 migration guide (CoAP): Resource-related metadata for CoAP .well-known/core responses is now configured with a dedicated coap_resource.metadata pointer instead of coap_resource.user_da",
-   "action": "In PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.cpp:292, PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.hpp:102, lib/fprime-zephyr/fprime-zephyr/Drv/LoRa/LoRa.cpp:29: read MG-4.4-0144 and update the lines listed.",
+   "action": "In PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.cpp:292, PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.hpp:102, lib/fprime-zephyr/fprime-zephyr/Drv/LoRa/LoRa.cpp:29: probably not relevant: it's coap_resource.user_data, and your code never uses coap_resource. Read MG-4.4-0144 and update the lines listed.",
    "files": "PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.cpp PROVESFlightControllerReference/Components/Drv/RtcManager/RtcManager.hpp lib/fprime-zephyr/fprime-zephyr/Drv/LoRa/LoRa.cpp"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-3e75e69a",
-   "severity": "breaking",
-   "confidence": "medium",
+   "severity": "info",
+   "confidence": "low",
    "kind": "entry-match",
    "title": "4.4 migration guide (NXP): zephyr,flash chosen property must point to the soc-nv-flash compatible node.",
-   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:65: read MG-4.4-0078 and update the lines listed.",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:65: probably not relevant: it's in the guide's NXP section, and this build's SoC is rp2350a. Read MG-4.4-0078 and update the lines listed.",
    "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
   },
   {
@@ -297,17 +297,17 @@
    "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "4.4 migration guide (Bluetooth Host): bt_conn_le_info.interval has been deprecated. (only in files this build doesn't compile: lib/RadioLib/extras/test/unit/tests/TestModule.cpp)",
-   "action": "In lib/RadioLib/extras/test/unit/tests/TestModule.cpp:98: read MG-4.4-0120 and update the lines listed.",
+   "title": "4.4 migration guide (Bluetooth Host): bt_conn_le_info.interval has been deprecated.",
+   "action": "In lib/RadioLib/extras/test/unit/tests/TestModule.cpp:98: probably not relevant: it's bt_conn_le_info.interval, and your code never uses bt_conn_le_info. Read MG-4.4-0120 and update the lines listed.",
    "files": "lib/RadioLib/extras/test/unit/tests/TestModule.cpp"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-8d41001f",
-   "severity": "breaking",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
    "title": "4.4 migration guide (STM32): SPI operation mode is now selected automatically based on devicetree configuration: instances with either of the cs-gpios or new st,soft-nss property operate in",
-   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:137: read MG-4.4-0102 and update the lines listed.",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:137: probably not relevant: it's in the guide's STM32 section, and this build's SoC is rp2350a. Read MG-4.4-0102 and update the lines listed.",
    "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
   },
   {
@@ -333,17 +333,17 @@
    "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
-   "title": "4.4 release notes (Deprecated APIs and options): bt_conn_le_info.interval has been deprecated. (only in files this build doesn't compile: lib/RadioLib/extras/test/unit/tests/TestModule.cpp)",
-   "action": "In lib/RadioLib/extras/test/unit/tests/TestModule.cpp:98: read RN-4.4-0005 and update the lines listed.",
+   "title": "4.4 release notes (Deprecated APIs and options): bt_conn_le_info.interval has been deprecated.",
+   "action": "In lib/RadioLib/extras/test/unit/tests/TestModule.cpp:98: probably not relevant: it's bt_conn_le_info.interval, and your code never uses bt_conn_le_info. Read RN-4.4-0005 and update the lines listed.",
    "files": "lib/RadioLib/extras/test/unit/tests/TestModule.cpp"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-bd6a5722",
-   "severity": "breaking",
-   "confidence": "medium",
+   "severity": "info",
+   "confidence": "low",
    "kind": "entry-match",
    "title": "4.4 migration guide (NXP): nxp,imx-flexspi-nor compatible nodes now have a soc-nv-flash compatible child node to describe the flash memory.",
-   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:65: read MG-4.4-0077 and update the lines listed.",
+   "action": "In boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi:65: probably not relevant: it's in the guide's NXP section, and this build's SoC is rp2350a. Read MG-4.4-0077 and update the lines listed.",
    "files": "boards/bronco_space/proves_flight_control_board_v5/proves_flight_control_board_v5.dtsi"
   },
   {

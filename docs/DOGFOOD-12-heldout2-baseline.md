@@ -194,3 +194,29 @@ fingerprint changes once.
 
 **No score changes.** ZMK #2 and #5, and CoffeeCaller C1, are scored on other findings
 (DOGFOOD-2/3; §10 of DOGFOOD-11).
+
+## 7. Addendum (2026-10-30): E3 fixed (tuned)
+
+The guide analyzer's gate demotes a match to info, saying why, in two more cases:
+- **Vendor sections:** the entry sits under a section named for a SoC vendor (NXP, STM32,
+  ESP32, Infineon, Raspberry Pi, Silabs, Nordic, …), and the source build's SoC
+  (`CONFIG_SOC_FAMILY`, `_SERIES`, `CONFIG_SOC`) isn't that vendor's.
+- **Struct members:** the item is a struct's member (`coap_resource.user_data`,
+  `bt_conn_le_info.interval`), and the project never names that struct. The extractor had
+  reduced these to the bare member name.
+
+**Re-scan** (`eval/runs/e3`, all 16 configurations; OpenDeck scan and plan), against `e8b`:
+- **Demoted to info, the E3 harmless findings:**
+  - proves: `GUIDE-ENTRY-MATCH-3e75e69a` and `-bd6a5722` (NXP), `-8d41001f` (STM32),
+    `-34879899` (CoAP);
+  - ble-copro: `-664a2463` (CoAP), `-14ca8a29` and `-69d46ce5` (`bt_conn_le_info.interval`).
+- Two findings that were already info (proves' `interval` matches in RadioLib) only
+  changed wording.
+- **Nothing else changed**, including on the four STM32 projects, where STM32 sections
+  still apply.
+
+| | ble-copro, tuned | proves, tuned | Second set (7), tuned |
+|---|---|---|---|
+| Precision | 5/10 → **5/7** | 21/25 → **21/21** | 26/35 → **26/28 (93%)** |
+
+Recall, actionable and fix-actionable are unchanged.

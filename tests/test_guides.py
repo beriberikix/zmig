@@ -151,3 +151,33 @@ def test_crossed_releases_without_a_migration_guide_are_not_checked() -> None:
     assert "only its release notes' Removed/Deprecated sections" in gaps[1].reason
     assert all(g.analyzer == "guide" for g in gaps)
     assert GuideAnalyzer.guide_gaps(["3.5", "3.6"], docs) == []
+
+
+def test_a_vendor_section_applies_only_to_that_vendors_soc() -> None:
+    """DOGFOOD-12 E3, proves (RP2350): the 4.4 guide's "NXP" entries (`soc-nv-flash`) and
+    its "STM32" entry (`cs-gpios`) matched the board's DTS. A section named for a SoC vendor
+    applies to builds on that vendor's SoC (CONFIG_SOC_FAMILY / _SERIES / CONFIG_SOC)."""
+    from zmig.guides import vendor_mismatch
+
+    rp = {"SOC_FAMILY": '"rpi_pico"', "SOC_SERIES": '"rp2350"', "SOC": '"rp2350a"'}
+    stm = {"SOC_FAMILY": '"stm32"', "SOC_SERIES": '"stm32h5x"', "SOC": '"stm32h563xx"'}
+    nxp_heads = ("Device Drivers and Devicetree", "NXP")
+    assert vendor_mismatch(nxp_heads, rp) == "NXP"
+    assert vendor_mismatch(("Device Drivers and Devicetree", "STM32"), rp) == "STM32"
+    assert vendor_mismatch(("Device Drivers and Devicetree", "STM32"), stm) is None
+    assert vendor_mismatch(("Device Drivers and Devicetree", "Raspberry Pi"), rp) is None
+    assert vendor_mismatch(("Networking", "CoAP"), rp) is None  # not a vendor section
+    assert vendor_mismatch(nxp_heads, {}) is None  # no configuration: can't tell
+
+
+def test_a_struct_member_mention_names_its_struct() -> None:
+    """DOGFOOD-12 E3: `coap_resource.user_data` matched every `user_data` parameter, and
+    `bt_conn_le_info.interval` a `bt_le_scan_param` initializer's `.interval`."""
+    from zmig.guides import member_qualifiers
+
+    s = "bt_conn_le_info.interval has been deprecated. Use bt_conn_le_info.interval_us instead."
+    assert member_qualifiers(s, "interval") == ["bt_conn_le_info"]
+    assert member_qualifiers("instead of coap_resource.user_data, which", "user_data") == [
+        "coap_resource"
+    ]
+    assert member_qualifiers("k_work_submit() now returns 1", "k_work_submit") == []

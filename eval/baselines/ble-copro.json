@@ -1,6 +1,6 @@
 {
  "config": "ble-copro",
- "scored": "DOGFOOD-12 §5 (E1, E2; tuned)",
+ "scored": "DOGFOOD-12 §7 (E1-E3; tuned)",
  "schema_version": "1.5",
  "verdict": "needs-changes",
  "findings": [
@@ -78,11 +78,11 @@
   },
   {
    "id": "GUIDE-ENTRY-MATCH-14ca8a29",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
    "title": "4.4 release notes (Deprecated APIs and options): bt_conn_le_info.interval has been deprecated.",
-   "action": "In src/ble_observer.c:101: read RN-4.4-0005 and update the lines listed.",
+   "action": "In src/ble_observer.c:101: probably not relevant: it's bt_conn_le_info.interval, and your code never uses bt_conn_le_info. Read RN-4.4-0005 and update the lines listed.",
    "files": "src/ble_observer.c"
   },
   {
@@ -114,20 +114,20 @@
   },
   {
    "id": "GUIDE-ENTRY-MATCH-664a2463",
-   "severity": "breaking",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
    "title": "4.4 migration guide (CoAP): Resource-related metadata for CoAP .well-known/core responses is now configured with a dedicated coap_resource.metadata pointer instead of coap_resource.user_da",
-   "action": "In include/linky.h:34, src/ble_server.c:113: read MG-4.4-0144 and update the lines listed.",
+   "action": "In include/linky.h:34, src/ble_server.c:113: probably not relevant: it's coap_resource.user_data, and your code never uses coap_resource. Read MG-4.4-0144 and update the lines listed.",
    "files": "include/linky.h src/ble_server.c"
   },
   {
    "id": "GUIDE-ENTRY-MATCH-69d46ce5",
-   "severity": "risky",
+   "severity": "info",
    "confidence": "low",
    "kind": "entry-match",
    "title": "4.4 migration guide (Bluetooth Host): bt_conn_le_info.interval has been deprecated.",
-   "action": "In src/ble_observer.c:101: read MG-4.4-0120 and update the lines listed.",
+   "action": "In src/ble_observer.c:101: probably not relevant: it's bt_conn_le_info.interval, and your code never uses bt_conn_le_info. Read MG-4.4-0120 and update the lines listed.",
    "files": "src/ble_observer.c"
   },
   {

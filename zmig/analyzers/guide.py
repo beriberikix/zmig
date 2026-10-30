@@ -31,7 +31,14 @@ from zmig.findings import (
     file_line,
     plural,
 )
-from zmig.guides import Document, Entry, ItemKind, Mention
+from zmig.guides import (
+    Document,
+    Entry,
+    ItemKind,
+    Mention,
+    member_qualifiers,
+    vendor_mismatch,
+)
 from zmig.scan import ScanContext
 from zmig.usage import Loc, dt_token, resolve
 
@@ -115,6 +122,7 @@ class GuideAnalyzer:
                     if node["status"] in ("okay", "ok"):
                         enabled_compats.add(dt_token(c))
         have_config = ctx.old_img.has(Artifact.CONFIG) and ctx.new_img.has(Artifact.CONFIG)
+        source_config = ctx.old_config if ctx.old_img.has(Artifact.CONFIG) else {}
 
         def enabled(sym: str) -> bool:
             return any(
@@ -127,6 +135,14 @@ class GuideAnalyzer:
             tok = dt_token(value)
             if kind == "compat" and not u.dt_compats.get(tok) and tok not in enabled_compats:
                 return f"your nodes with {value} are disabled in both builds"
+            if vendor := vendor_mismatch(entry.headings, source_config):
+                soc = source_config.get("SOC", "").strip('"')
+                return f"it's in the guide's {vendor} section, and this build's SoC is {soc}"
+            if kind == "ident":
+                quals = [member_qualifiers(m.sentence, value) for m in mentions]
+                if all(quals) and not any(u.identifiers.get(q) for qs in quals for q in qs):
+                    q = quals[0][0]
+                    return f"it's {q}.{value}, and your code never uses {q}"
             if not have_config:
                 return None
             partners = {r.new for r in entry.renames if r.old == value} | {
