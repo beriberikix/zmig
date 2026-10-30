@@ -216,7 +216,7 @@ sha = "f7a43b10cd76930bf7cb24e4ca7987d8c1d02546"  # parent of the v4.2 bump 7aad
 
 [configs.ardep]
 oracle = "docs/oracles/ardep.md"
-scored = "DOGFOOD-11 (zmig 983fe98, tuned)"
+scored = "DOGFOOD-11 §9 (A3, tuned)"
 app = "{src:ardep}/samples/uds"
 board = "ardep"
 from = "v4.3.0"

@@ -79,7 +79,7 @@ packages = ["zmig"]
 exclude = ["zmig/extract/"]
 
 [[tool.mypy.overrides]]
-module = ["west.*"]
+module = ["west.*", "jsonschema.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

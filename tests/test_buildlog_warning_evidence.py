@@ -89,3 +89,65 @@ def test_kconfig_abort_names_the_undefined_assignment() -> None:
          "the value 'y' to the undefined symbol TMP116")
     ]  # fmt: skip
     assert kconfig_abort_causes(KCONFIG_ABORT_LOG.replace("error: Aborting", "x"), {}) == []
+
+
+# scripts/schemas/board-schema.yaml, reduced to the part that changed at v4.4.0: a new
+# board needs `full_name` next to `name` (an extending one needs only `extend`).
+BOARD_SCHEMA_OLD = """\
+type: object
+properties:
+  board: {$ref: "#/$defs/boardSchema"}
+  boards: {type: array, items: {$ref: "#/$defs/boardSchema"}}
+$defs:
+  boardSchema:
+    type: object
+    properties:
+      name: {type: string}
+      full_name: {type: string}
+      extend: {type: string}
+      vendor: {type: string}
+      socs: {type: array}
+"""
+BOARD_SCHEMA_NEW = (
+    BOARD_SCHEMA_OLD
+    + """\
+    oneOf:
+      - required: [name, full_name]
+      - required: [extend]
+"""
+)
+
+
+def test_a_malformed_board_yml_names_the_missing_property(tmp_path: Path) -> None:
+    """ardep A3 (DOGFOOD-8): v4.4.0 says only "Malformed board YAML file ... is not valid
+    under any of the given schemas in $.board". Validating the file against the target's
+    schema names what's missing: `full_name`, at the board's `name:` line. A `boards:` list
+    (a module's board.yml) points at the entry."""
+    from zmig.analyzers.buildlog import board_yaml_causes
+
+    old, new = tmp_path / "old", tmp_path / "new"
+    for z, schema in ((old, BOARD_SCHEMA_OLD), (new, BOARD_SCHEMA_NEW)):
+        (z / "scripts" / "schemas").mkdir(parents=True)
+        (z / "scripts" / "schemas" / "board-schema.yaml").write_text(schema)
+    board = tmp_path / "ardep" / "boards" / "mercedes" / "ardep" / "board.yml"
+    board.parent.mkdir(parents=True)
+    board.write_text(
+        "board:\n  name: ardep\n  vendor: mercedes\n  socs:\n    - name: stm32g474xx\n"
+    )
+    log = (
+        "  Error message: ERROR: Malformed board YAML file:\n"
+        f"  {board}\n\n  {{'name': 'ardep', ...}} is not valid under any of the given "
+        "schemas in $.board\n"
+    )
+    roots = {str(tmp_path / "ardep"): "ardep/"}
+    ((path, line, msg),) = board_yaml_causes(log, new, old, roots)
+    assert (path, line) == ("ardep/boards/mercedes/ardep/board.yml", 2)
+    assert "`full_name`" in msg and "valid at the source" in msg
+
+    board.write_text(
+        "boards:\n  - name: a\n    full_name: A\n    socs: []\n"
+        "  - name: cytron_maker_pi_rp2040\n    vendor: cytron\n    socs: []\n"
+    )
+    ((path, line, msg),) = board_yaml_causes(log, new, old, roots)
+    assert line == 5 and "`full_name`" in msg and "$.boards[1]" in msg
+    assert board_yaml_causes("no such error", new, old, roots) == []

@@ -1,6 +1,6 @@
 {
  "config": "ardep",
- "scored": "DOGFOOD-11 (zmig 983fe98, tuned)",
+ "scored": "DOGFOOD-11 §9 (A3, tuned)",
  "schema_version": "1.5",
  "verdict": "unknown",
  "findings": [
@@ -27,9 +27,9 @@
    "severity": "breaking",
    "confidence": "high",
    "kind": "target-configure-failed",
-   "title": "The target configure fails: CMake Error at $ZMIG_CACHE/workspaces/684c9e8f32e4373a21098559f748f06915f950c9/zephyr/cmake/modules/boards.cmake:191 (message):",
-   "action": "Fix the error in the evidence (often a board or toolchain change), then rerun; Kconfig and devicetree analysis need a configured target.",
-   "files": ""
+   "title": "The target configure fails: add `full_name`: required next to `name` in $.board (the target's board schema; the file is valid at the source)",
+   "action": "In ardep/boards/mercedes/ardep/board.yml:2, add `full_name`: required next to `name` in $.board (the target's board schema; the file is valid at the source), then rerun; Kconfig and devicetree analysis need a configured target.",
+   "files": "ardep/boards/mercedes/ardep/board.yml"
   },
   {
    "id": "GUIDE-COVERAGE-3429ba69",

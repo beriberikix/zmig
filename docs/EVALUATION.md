@@ -68,6 +68,7 @@ The detail is in the DOGFOOD-1 to DOGFOOD-5 reports and the oracles under `oracl
 | ″ | ″ | 6 | **clean**: after Phase 0 (DOGFOOD-9) | 0 | 3 (50%) | 4/5 (80%) | **2** (fix-actionable 0) | ″ | ″ | DOGFOOD-9 §3 |
 | ″ | ″ | 6 | **clean**: change database, steps 1–4 (`eval/runs/step4`) | **2 (33%)** | **5 (83%)** | 8/10 (80%) | **4** (fix-actionable **2**) | ″ | ″ | DOGFOOD-11 §2 |
 | ″ | ″ | 6 | tuned: + `hostap` fix and B3 `va_start` (`eval/runs/b3vb`) | 2 (33%) | 5 (83%) | **8/8 (100%)** | 4 (fix-actionable 2) | ″ | ″ | DOGFOOD-11 §2 |
+| ″ | ″ | 6 | tuned: + board schema cause (A3, `eval/runs/a3`) | **3 (50%)** | 5 (83%) | 8/8 (100%) | **5** (fix-actionable **3**) | ″ | ″ | DOGFOOD-11 §9 |
 | **RIT FSW** `sensor_module` | v4.1.0 → v4.2.0 | 3 | **clean**: DOGFOOD-8 baseline | 0 | 1 (33%) | 3/6 (50%) | 0 (fix-actionable 0) | configure failed (Kconfig) | unknown (low) | DOGFOOD-8 §2 |
 | ″ | ″ | 3 | **clean**: after Phase 0 (DOGFOOD-9) | 0 | 1 (33%) | 3/6 (50%) | 0 (fix-actionable 0) | ″ | ″ | DOGFOOD-9 §3 |
 | ″ | ″ | 3 | tuned: after the detection fixes (DOGFOOD-10) | 0 | 1 (33%) | **3/3 (100%)** | **1** (fix-actionable 0) | ″ | ″ | DOGFOOD-10 §2 |

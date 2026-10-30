@@ -182,6 +182,100 @@ def kconfig_abort_causes(log: str, roots: dict[str, str]) -> list[tuple[str, int
     return out
 
 
+_MALFORMED_BOARD = re.compile(r"Malformed board YAML file:\s*(?P<path>\S+?\.ya?ml)\b")
+BOARD_SCHEMA = Path("scripts", "schemas", "board-schema.yaml")
+
+
+def board_yaml_causes(
+    log: str, new_zephyr: Path, old_zephyr: Path, roots: dict[str, str]
+) -> list[tuple[str, int, str]]:
+    """What's wrong with the board.yml behind "Malformed board YAML file", as (project
+    file, line, message): the file validated against the target's board schema, as
+    list_boards.py does. Zephyr prints only "is not valid under any of the given schemas",
+    which doesn't name the missing property (regression: ardep's `full_name`, required for
+    a new board at v4.4.0, DOGFOOD-8 A3)."""
+    import yaml
+
+    m = _MALFORMED_BOARD.search(log)
+    if not m:
+        return []
+    try:
+        import jsonschema  # the `zephyr` extra: Zephyr's list_boards.py needs it too
+    except ImportError:
+        return []
+    path = Path(m["path"])
+    try:
+        text = path.read_text()
+        data = yaml.safe_load(text)
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
+        return []
+
+    def errors(zephyr: Path) -> list[Any] | None:
+        try:
+            schema = yaml.safe_load((zephyr / BOARD_SCHEMA).read_text())
+        except (OSError, yaml.YAMLError):
+            return None
+        return list(jsonschema.validators.validator_for(schema)(schema).iter_errors(data))
+
+    new_errors, old_errors = errors(new_zephyr), errors(old_zephyr)
+    if not new_errors:
+        return []
+    before = "; the file is valid at the source" if old_errors == [] else ""
+    shown = project_path(os.path.normpath(str(path)), roots)
+    out = []
+    for e in new_errors:
+        where = list(e.absolute_path)
+        msg, key = _schema_error(e)
+        line = _yaml_line(text, [*where, key] if key else where)
+        jpath = "$" + "".join(f"[{p}]" if isinstance(p, int) else f".{p}" for p in where)
+        full = f"{msg} in {jpath} (the target's board schema{before})"
+        out.append((shown, line, full) if shown else ("", 0, f"{path}:{line}: {full}"))
+    return out
+
+
+def _schema_error(e: Any) -> tuple[str, str | None]:
+    """A schema error as a sentence, and the key whose line to cite. For a `oneOf` of
+    required-key branches, the branch the entry already partly satisfies: `name` without
+    `full_name` is a new board missing `full_name`, not one missing `extend`."""
+    inst = e.instance if isinstance(e.instance, dict) else {}
+    branches = [c for c in e.context or [] if c.validator == "required"]
+    if e.validator == "oneOf" and branches:
+        best = max(branches, key=lambda c: (len(set(c.validator_value) & inst.keys()),
+                                            -len(c.validator_value)))  # fmt: skip
+        have = [k for k in best.validator_value if k in inst]
+        missing = [k for k in best.validator_value if k not in inst]
+        if missing and have:
+            names = ", ".join(f"`{k}`" for k in missing)
+            return f"add {names}: required next to `{have[0]}`", have[0]
+    return str(e.message)[:200], None
+
+
+def _yaml_line(text: str, where: list[Any]) -> int:
+    """1-based line of the YAML node at `where` (mapping keys, sequence indexes), or of the
+    deepest one found."""
+    import yaml
+
+    try:
+        node: Any = yaml.compose(text)
+    except yaml.YAMLError:
+        return 0
+    line = 1
+    for step in where:
+        if isinstance(node, yaml.MappingNode):
+            hit = next(((k, v) for k, v in node.value if k.value == step), None)
+            if hit is None:
+                break
+            line, node = hit[0].start_mark.line + 1, hit[1]
+        elif isinstance(node, yaml.SequenceNode) and isinstance(step, int):
+            if step >= len(node.value):
+                break
+            node = node.value[step]
+            line = node.start_mark.line + 1
+        else:
+            break
+    return line
+
+
 # add(kind, subject, title, severity, action, evidence, old, new)
 Add = Callable[..., None]
 _COMPILER_ERROR = re.compile(
@@ -264,7 +358,16 @@ class BuildlogAnalyzer:
                     *(file_line(p, ln, ctx.runner.redact(text)) for p, ln, text in locs),
                     tool_output("first configure error", ctx.runner.redact("\n".join(lines))),
                 )
-            causes = kconfig_abort_causes(log, project_roots(ctx.new, ctx.new_img.dir))
+            roots = project_roots(ctx.new, ctx.new_img.dir)
+            causes = kconfig_abort_causes(log, roots)
+            board = (
+                []
+                if causes
+                else board_yaml_causes(
+                    log, ctx.new.workspace.zephyr, ctx.old.workspace.zephyr, roots
+                )
+            )
+            causes = causes or board
             if causes:
                 ev_first = (
                     *(
@@ -284,7 +387,9 @@ class BuildlogAnalyzer:
                 f"The target configure fails{salvaged}{cause}",
                 Severity.BREAKING,
                 (
-                    f"Fix {at} (see the first configure error), then rerun; "
+                    f"In {at}, {ctx.runner.redact(board[0][2])}, then rerun; "
+                    if board and at
+                    else f"Fix {at} (see the first configure error), then rerun; "
                     if at
                     else "Fix the error in the evidence (often a board or toolchain change), then "
                     "rerun; "

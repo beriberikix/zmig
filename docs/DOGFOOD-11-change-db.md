@@ -179,3 +179,32 @@ one `git log` per file class, not one per symbol.
 removed nothing on the measured set, so §2's numbers stand.
 
 Gaps 3–6 are still open.
+
+## 9. Addendum (2026-10-30): ardep A3 (tuned)
+
+**What changed.** When a target configure fails with "Malformed board YAML file", zmig now
+validates that `board.yml` against the target's own `scripts/schemas/board-schema.yaml`,
+as `list_boards.py` does, and against the source's.
+- Zephyr prints only "is not valid under any of the given schemas".
+- For a `oneOf` of required-key branches, zmig names the missing key of the branch the
+  entry already partly satisfies (`name` without `full_name`), at that key's line.
+
+**ardep's `BUILD-TARGET-CONFIGURE-FAILED-3e867c18`** (ID unchanged) now reads "add
+`full_name`: required next to `name` in $.board (the target's board schema; the file is
+valid at the source)". Its evidence is at `ardep/boards/mercedes/ardep/board.yml:2`, where
+the maintainers added `full_name: ARDEP`.
+
+**A3: partly (b) → caught, actionable, fix-actionable.** Fix-actionable is a judgement
+call: the action states the construct (add `full_name`) but not the value. Any string
+configures the same way.
+
+**Re-scan** (`eval/runs/a3`, all 14 configurations; OpenDeck scan and plan): nothing else
+changed, and `compare` exits 0.
+
+| | ardep, tuned | Held-out total (13), tuned |
+|---|---|---|
+| Strict | 2 → **3** | 5 → **6** |
+| Lenient | 5 | 9 |
+| Precision | 8/8 | 23/23 |
+| Actionable | 4 → **5** | 8 → **9** |
+| Fix-actionable | 2 → **3** | 5 → **6** |
