@@ -40,8 +40,14 @@ _ASSIGNED_BY_DTC = frozenset({"phandle", "linux,phandle"})
 
 
 def _written(node: dict[str, Any]) -> dict[str, Any]:
-    """The properties written in the DTS, without the ones dtc assigns."""
-    return {k: v for k, v in node["raw_values"].items() if k not in _ASSIGNED_BY_DTC}
+    """The properties written in the DTS, without the ones dtc assigns. Whitespace is
+    collapsed: dtlib's rendering wraps long cell lists differently between versions
+    (regression: equal `clocks`/`irq-gpios` reported as changed, DOGFOOD-8 B2)."""
+    return {
+        k: " ".join(v.split()) if isinstance(v, str) else v
+        for k, v in node["raw_values"].items()
+        if k not in _ASSIGNED_BY_DTC
+    }
 
 
 def _dts_view(node: dict[str, Any]) -> tuple[Any, ...]:

@@ -888,3 +888,48 @@ def test_fragments_outside_the_app_dir_count_as_used(tmp_path: Path) -> None:
     out = outside_build([f, other], base)  # type: ignore[arg-type]
     assert out[0].severity is Severity.BREAKING
     assert out[1].severity is Severity.INFO  # a fragment no build merged is still judged unused
+
+
+def test_dts_values_that_differ_only_in_wrapping_are_unchanged(tmp_path: Path) -> None:
+    """DOGFOOD-8 B2, RIT FSW: v4.2's dtlib wraps long cell lists, so `clocks` and
+    `irq-gpios` of three referenced nodes were reported as changed with equal values."""
+    from zmig.analyzers.devicetree import DevicetreeAnalyzer
+    from zmig.diagnostics import parse_log
+    from zmig.usage import Loc, NodeRef
+
+    def node(label: str, raw: dict[str, str]) -> dict[str, Any]:
+        return {"name": label, "labels": [label], "aliases": [], "compats": ["st,stm32-rtc"],
+                "matching_compat": "st,stm32-rtc", "status": "okay", "ord": 5,
+                "binding": "dts/bindings/rtc/st,stm32-rtc.yaml", "props": {}, "raw_props": sorted(raw),
+                "raw_values": raw, "specs": {}}  # fmt: skip
+
+    wrapped = "< &rcc 0x40 0x10000000 >,\n         < &rcc 0x3 0x10c80070 >"
+    flat = "< &rcc 0x40 0x10000000 >, < &rcc 0x3 0x10c80070 >"
+    old = {
+        "nodes": {
+            "/rtc": node("rtc", {"clocks": flat}),
+            "/gpio": node("gpio", {"ngpios": "<0x10>"}),
+        },
+        "chosen": {},
+    }
+    new = {
+        "nodes": {
+            "/rtc": node("rtc", {"clocks": wrapped}),
+            "/gpio": node("gpio", {"ngpios": "<0x8>"}),
+        },
+        "chosen": {},
+    }
+    ctx = SimpleNamespace(
+        old_edt=old, new_edt=new, old_facts=parse_log(""), new_raw_facts=parse_log(""),
+        new_raw=SimpleNamespace(src=tmp_path),
+        usage=SimpleNamespace(app=tmp_path, dt_props_set=[], dt_props_read=[], dt_compats={},
+                              dt_nodes=[(NodeRef("label", "rtc"), Loc("src/a.c", 1, "x")),
+                                        (NodeRef("label", "gpio"), Loc("src/a.c", 2, "y"))]),
+        build_files={"src/a.c"}, old_spec="v4.1.0", new_spec="v4.2.0", scope=("s",),
+        runner=SimpleNamespace(redact=lambda s: s),
+        old_img=SimpleNamespace(has=lambda a: False), new_img=SimpleNamespace(has=lambda a: False),
+    )  # fmt: skip
+    found = DevicetreeAnalyzer().analyze(ctx).findings  # type: ignore[arg-type]
+    changed = [f for f in found if f.kind == "node-changed"]
+    assert len(changed) == 1 and changed[0].subject.endswith("/gpio")  # a real value change
+    assert changed[0].new == {"ngpios": ["<0x10>", "<0x8>"]}
