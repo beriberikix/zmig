@@ -13,6 +13,33 @@ evidence (a file and line, or an artifact diff), and a suggested action. Output 
 zmig never modifies your tree: it clones its own copy of Zephyr into a cache and builds
 copies of your app there.
 
+## Status
+
+**Alpha.** The CLI, the report schema (`report.json`, schema 1.5) and the finding IDs may
+still change.
+
+zmig is measured against hand-written oracles: what each project's maintainers actually
+changed in an upgrade, written down before zmig ran on it. There are 11 open-source
+projects so far: 17 harness build configurations plus OpenDeck ([docs/EVALUATION.md](docs/EVALUATION.md),
+rules in [docs/ORACLE-RULES.md](docs/ORACLE-RULES.md)).
+- **Clean results** (projects no zmig change was informed by) are reported separately from
+  tuned ones.
+- **The latest clean result** (edgehog, Zephyr v4.3 → v4.4, [DOGFOOD-13](docs/DOGFOOD-13-edgehog-baseline.md)):
+  - 4 of 8 upgrade items caught at the line the maintainers changed;
+  - 7 of 8 caught or partly caught;
+  - 38 of 40 breaking or risky findings true.
+
+Main limitations:
+- **A target build that fails early hides most of its comparisons.** zmig falls back on
+  what the Zephyr tree itself says (the change database, `zmig changes`), but compile-level
+  changes need a target that compiles.
+- **Some upgrade items leave no trace in any build:** run-time behaviour, timing, stack
+  sizes, or a dependency's own changes.
+- **The tool has to build your app at both versions.** That needs the toolchains and
+  modules both refs require, and an app that can be built from a copy of its directory.
+
+The audit that shaped the current scoring rules is [AUDIT.md](AUDIT.md), and its responses.
+
 ## Quickstart
 
 **Time:** the first run makes an about 1 GB mirror clone of Zephyr into `~/.cache/zmig`:

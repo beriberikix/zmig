@@ -301,7 +301,7 @@ board = "proves_flight_control_board_v5e/rp2350a/m33"
 from = "v4.3.0"
 to = "v4.4.1"
 # No `sdk`: v4.3.0 rejects SDK 1.x and v4.4.x needs >= 1.0.0 (as for ardep).
-# F´ (fprime-tools 4.1.0, fprime-fpp 3.1.0) must be installed in zmig's venv: CMake finds
+# F´'s tools must be in zmig's venv (the `eval-fprime` extra: uv sync --extra eval-fprime); CMake finds
 # fprime-util and the fpp tools on PATH. The modules are the source manifest's allowlist plus
 # its explicit loramac-node. tinycrypt is in neither Zephyr manifest (removed in v4.3.0), so zmig
 # skips it at both refs; tf-psa-crypto (v4.4 only) is left out, as for ardep.
