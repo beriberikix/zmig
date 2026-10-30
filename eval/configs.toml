@@ -262,3 +262,52 @@ from = "v4.2.0"
 to = "v4.4.0"
 modules = []
 cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:coffeecaller}"]
+
+[sources.ble-copro]
+kind = "git"
+url = "https://github.com/lucasdietrich/zephyr-linux-ble-copro"
+sha = "edee97c18006802ce387229c9c49ab2f9e1a18d7"  # base of PR #3 (Zephyr v4.3.0 -> v4.4.2, merge 2a9919bc17)
+
+[configs.ble-copro]
+oracle = "docs/oracles/ble-copro.md"
+scored = "not yet scored (oracle frozen 2026-10-30)"
+app = "{src:ble-copro}"
+board = "nrf52840dk/nrf52840"
+from = "v4.3.0"
+to = "v4.4.2"
+# No `sdk`: v4.3.0 rejects SDK 1.x and v4.4.x needs >= 1.0.0 (as for ardep).
+# The project's west.yml imports Zephyr with `import: true` (every module); these are the ones
+# this build uses. tf-psa-crypto exists only in the v4.4 manifest (Mbed TLS 4's crypto).
+modules = ["hal_nordic", "cmsis_6", "mbedtls", "tf-psa-crypto"]
+cmake_args = ["-DCMAKE_PREFIX_PATH={sdk:0.17.4};{sdk:1.0.1}"]
+
+[sources.proves]
+kind = "git"
+url = "https://github.com/Open-Source-Space-Foundation/proves-core-reference"
+sha = "5c67bae2fde7a2c43807d6e9b4e04fd89db45cd3"  # base of PR #421 (Zephyr v4.3.0 -> v4.4.1, squash 606eb0ab9e)
+# Not lib/zephyr-workspace/zephyr (zmig supplies Zephyr); the app is the repository root, so
+# these are copied with it.
+submodules = ["lib/fprime", "lib/fprime-zephyr", "lib/fprime-extras", "lib/RadioLib"]
+
+[configs.proves]
+oracle = "docs/oracles/proves.md"
+scored = "not yet scored (oracle frozen 2026-10-30)"
+app = "{src:proves}"
+# AuthDefaultKey.h, which `make generate` creates before CMake runs; and prj.conf:77's MCUboot
+# signing key, which it also creates (keys/proves.pem), points at MCUboot's own sample key in
+# the workspace instead (a private key isn't committed here; F´'s sub-build ignores -DCONFIG_*).
+app_patch = "eval/patches/proves-generated-files.patch"
+board = "proves_flight_control_board_v5e/rp2350a/m33"
+from = "v4.3.0"
+to = "v4.4.1"
+# No `sdk`: v4.3.0 rejects SDK 1.x and v4.4.x needs >= 1.0.0 (as for ardep).
+# F´ (fprime-tools 4.1.0, fprime-fpp 3.1.0) must be installed in zmig's venv: CMake finds
+# fprime-util and the fpp tools on PATH. The modules are the source manifest's allowlist plus
+# its explicit loramac-node. tinycrypt is in neither Zephyr manifest (removed in v4.3.0), so zmig
+# skips it at both refs; tf-psa-crypto (v4.4 only) is left out, as for ardep.
+modules = ["cmsis", "cmsis_6", "hal_rpi_pico", "picolibc", "mbedtls", "tinycrypt", "mcuboot", "fatfs", "hal_st", "loramac-node"]
+cmake_args = [
+    "-DCMAKE_PREFIX_PATH={sdk:0.17.4};{sdk:1.0.1}",
+    "-DCMAKE_TOOLCHAIN_FILE=lib/fprime-zephyr/cmake/toolchain/zephyr.cmake",
+    "-DFPRIME_LIBRARY_LOCATIONS=lib/fprime-zephyr;lib/fprime-extras",
+]

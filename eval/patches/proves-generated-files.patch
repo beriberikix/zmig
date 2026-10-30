@@ -1,0 +1,29 @@
+diff --git a/PROVESFlightControllerReference/Components/TcSecurityDeframer/AuthDefaultKey.h b/PROVESFlightControllerReference/Components/TcSecurityDeframer/AuthDefaultKey.h
+new file mode 100644
+index 0000000..eec3a9b
+--- /dev/null
++++ b/PROVESFlightControllerReference/Components/TcSecurityDeframer/AuthDefaultKey.h
+@@ -0,0 +1,11 @@
++// This file is auto-generated at build time.
++// DO NOT EDIT MANUALLY - it will be overwritten during build.
++
++#ifndef AUTH_DEFAULT_KEY_H
++#define AUTH_DEFAULT_KEY_H
++
++// Default authentication key generated at build time
++// This ensures the code works even if external key files are not available on the satellite
++#define AUTH_DEFAULT_KEY "00000000000000000000000000000000"
++
++#endif  // AUTH_DEFAULT_KEY_H
+diff --git a/prj.conf b/prj.conf
+--- a/prj.conf
++++ b/prj.conf
+@@ -74,7 +74,7 @@
+ CONFIG_FS_FATFS_MOUNT_MKFS=y
+ CONFIG_FS_FATFS_FSTAB_AUTOMOUNT=y
+ CONFIG_FILE_SYSTEM_MKFS=y
+-CONFIG_MCUBOOT_SIGNATURE_KEY_FILE="keys/proves.pem"
++CONFIG_MCUBOOT_SIGNATURE_KEY_FILE="bootloader/mcuboot/root-rsa-2048.pem"
+ 
+ CONFIG_HAPTICS=y
+ CONFIG_HAPTICS_DRV2605=y
