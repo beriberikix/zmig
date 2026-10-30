@@ -108,3 +108,33 @@ RIT FSW and CANnectivity.
   fix" risk.
 - **Next:** fix D1 and D2 (tuned), then Phase 1, the change database, for replacements no
   finding holds today.
+
+## 6. Addendum (2026-10-30): D1 and D2 fixed (tuned)
+
+**D1:** a guide rename now becomes an edit only at an evidence line that contains the old
+name. Otherwise the fix is location-only.
+
+**D2:** a callback's expected and current types come from clang's canonical "aka" form,
+with the pointer declarator removed (`R (*const)(A)` → `R (A)`).
+
+Regression tests:
+- `test_guide_rename_only_on_a_line_that_has_the_old_name`;
+- `test_callback_expected_type_is_canonical_not_a_typedef_name`.
+
+`test_guide_rename_of_a_compatible`, which asserted D1's behaviour, is removed.
+
+**Re-run of all 14 configurations** (`eval/runs/phase0-d1d2`, against `eval/runs/phase0`):
+- every finding's ID, severity, confidence and evidence is unchanged;
+- exactly three fixes changed:
+
+| Finding | Was | Now |
+|---|---|---|
+| CANnectivity C1 `…-4b10a6e3` and C2 `…-b61ee94c` | `void (void *)` → `const state_execution` | `void (void *)` → `enum smf_state_result (void *)` |
+| RIT FSW `GUIDE-ENTRY-MATCH-7f0cd344` | `ti,tmp116` → `ti,tmp11x` at `src/c_sensing_tenant.cpp:20` | location-only (that line doesn't name the compatible) |
+
+**Effect on the scores.** Both fixes were informed by these runs, so all of this is
+**tuned**:
+- CANnectivity N1 is now fix-actionable, which takes the original 44 items to **15 / 44**.
+- RIT FSW's scores are unchanged (still 0 / 0). Its action is now correct, where before it
+  was wrong. RIT FSW is **tuned** from here on. ardep remains the only clean held-out
+  project.

@@ -9,7 +9,7 @@ from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any
 
-from zmig.findings import Category, Confidence, Finding, Severity, doc_entry, file_line, tool_output
+from zmig.findings import Category, Confidence, Finding, Severity, file_line, tool_output
 from zmig.fixes import apply_fixes
 
 
@@ -78,24 +78,6 @@ def test_kconfig_rename_from_a_related_guide_entry() -> None:
     assert out["entry-match"].fix is not None and out["entry-match"].fix["new"] == "CONFIG_NEW_NAME"
 
 
-def test_guide_rename_of_a_compatible() -> None:
-    """RIT F1: the guide names the rename; the finding sits where the node is used."""
-    f = _f("entry-match", Category.GUIDE,
-           (doc_entry("doc/releases/migration-guide-4.2.rst", 351, "v4.2.0", "MG-4.2-0060", "x"),
-            file_line("src/c_sensing_tenant.cpp", 20, "DEVICE_DT_GET(DT_ALIAS(thermometer))")),
-           confidence=Confidence.MEDIUM,
-           action='The guide says ti,tmp116 was renamed to ti,tmp11x: "…"',
-           new={"entry": "MG-4.2-0060", "item": {"kind": "compat", "value": "ti,tmp116"}, "renamed_to": "ti,tmp11x"})  # fmt: skip
-    (g,) = apply_fixes([f], CTX)  # type: ignore[arg-type]
-    assert g.fix is not None
-    assert (g.fix["file"], g.fix["old"], g.fix["new"]) == (
-        "src/c_sensing_tenant.cpp",
-        "ti,tmp116",
-        "ti,tmp11x",
-    )
-    assert g.fix["confidence"] == "medium" and g.fix["source"] == "guide: MG-4.2-0060"
-
-
 def test_callback_definition_gets_the_expected_signature() -> None:
     """ZMK #2: the definition sites and the type Zephyr expects are already known."""
     f = _f("callback-type-changed", Category.API,
@@ -161,3 +143,44 @@ def test_only_action_and_fix_change() -> None:
     assert [g.id for g in out] == [f.id for f in fs]
     for a, b in zip(fs, out, strict=True):
         assert replace(b, action=a.action, fix=None) == a
+
+
+def test_callback_expected_type_is_canonical_not_a_typedef_name() -> None:
+    """DOGFOOD-9 D2, CANnectivity N1: clang's message names the typedef and gives the
+    canonical type in "aka"; a function can't be given a typedef'd pointer type."""
+    f = _f("callback-type-changed", Category.API,
+           (file_line("src/led.c", 192, "led_state_normal_run: definition to change"),),
+           new={"expected": "const state_execution",
+                "message": "incompatible function pointer types initializing 'const state_execution' (aka 'enum smf_state_result (*const)(void *)') with an expression of type 'void (void *)'"})  # fmt: skip
+    (g,) = apply_fixes([f], CTX)  # type: ignore[arg-type]
+    assert g.fix is not None
+    assert (g.fix["old"], g.fix["new"]) == ("void (void *)", "enum smf_state_result (void *)")
+    assert "led_state_normal_run" in g.action and "state_execution" not in g.action
+
+
+def test_guide_rename_only_on_a_line_that_has_the_old_name() -> None:
+    """DOGFOOD-9 D1, RIT FSW F1: the guide's rename was placed at a line that uses the node
+    (`DEVICE_DT_GET(DT_ALIAS(thermometer))`), not one with `ti,tmp116`."""
+    use = file_line("src/c_sensing_tenant.cpp", 20, "DEVICE_DT_GET(DT_ALIAS(thermometer))")
+    new = {
+        "entry": "MG-4.2-0083",
+        "item": {"kind": "compat", "value": "ti,tmp116"},
+        "renamed_to": "ti,tmp11x",
+    }
+    only_use = _f("entry-match", Category.GUIDE, (use,), confidence=Confidence.MEDIUM, new=new,
+                  action='The guide says ti,tmp116 was renamed to ti,tmp11x: "…"')  # fmt: skip
+    (g,) = apply_fixes([only_use], CTX)  # type: ignore[arg-type]
+    assert g.fix is not None and g.fix["old"] is None and g.fix["new"] is None
+    assert g.fix["file"] == "src/c_sensing_tenant.cpp"
+    assert "change `ti,tmp116`" not in g.action
+    # A line that does contain the old name gets the edit, wherever it is in the evidence.
+    dts = file_line("boards/arm/x/x.dts", 202, 'compatible = "ti,tmp116";')
+    both = replace(only_use, evidence=(use, dts))
+    (h,) = apply_fixes([both], CTX)  # type: ignore[arg-type]
+    assert h.fix is not None
+    assert (h.fix["file"], h.fix["line"], h.fix["old"], h.fix["new"]) == (
+        "boards/arm/x/x.dts",
+        202,
+        "ti,tmp116",
+        "ti,tmp11x",
+    )

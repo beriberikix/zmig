@@ -33,7 +33,10 @@ if TYPE_CHECKING:
 
 _RANK = {Confidence.HIGH: 0, Confidence.MEDIUM: 1, Confidence.LOW: 2}
 _DID_YOU_MEAN = re.compile(r"'(?P<old>\w+)' undeclared.*?did you mean '(?P<new>\w+)'")
-_EXPR_TYPE = re.compile(r"with an expression of type '(?P<t>[^']+)'")
+# clang: "initializing 'T' (aka 'canonical T')" / "with an expression of type 'U' (aka …)".
+_INIT_TYPE = re.compile(r"initializing '(?P<t>[^']+)'(?: \(aka '(?P<aka>[^']+)'\))?")
+_EXPR_TYPE = re.compile(r"with an expression of type '(?P<t>[^']+)'(?: \(aka '(?P<aka>[^']+)'\))?")
+_FN_POINTER = re.compile(r"\s*\(\*\s*(?:const\s*|volatile\s*)*\)\s*")
 # Actions that only say "go and find the replacement": dropped once the fix names it.
 _GENERIC = re.compile(
     r"^(?:Find its replacement in the migration guides\.|Remove the assignment, or find its "
@@ -122,6 +125,11 @@ def _kconfig(f: Finding, by_id: dict[str, Finding], place: tuple[str, int, str])
     return None
 
 
+def _function_type(t: str) -> str:
+    """`R (*const)(A)` / `R (*)(A)` -> `R (A)`: the pointer's function type."""
+    return " ".join(_FN_POINTER.sub(" ", t, count=1).split())
+
+
 def _did_you_mean(
     errors: list[JSON], where: tuple[str, int] | None = None
 ) -> tuple[str, int, str, str] | None:
@@ -148,13 +156,23 @@ def _derive(f: Finding, by_id: dict[str, Finding], ctx: ScanContext) -> JSON | N
         if fx := _kconfig(f, by_id, place):
             return fx
     elif f.kind == "entry-match" and (r := _guide_rename(f)):
-        return _fix(place, r[0], r[1], f"guide: {r[2]}", _cap(f.confidence, Confidence.MEDIUM))
+        # Only a line that contains the old name can take the edit (DOGFOOD-9 D1: RIT's
+        # `DEVICE_DT_GET(DT_ALIAS(thermometer))` is where the node is used, not named).
+        names = {r[0], str((new.get("item") or {}).get("value", ""))} - {""}
+        named = re.compile("|".join(rf"(?<![\w,-]){re.escape(n)}(?![\w-])" for n in names))
+        at = next((p for p in places if named.search(p[2])), None)
+        if at is not None:
+            return _fix(at, r[0], r[1], f"guide: {r[2]}", _cap(f.confidence, Confidence.MEDIUM))
     elif f.kind == "callback-type-changed":
         defs = [p for p in places if p[2].endswith(": definition to change")]
-        m = _EXPR_TYPE.search(str(new.get("message", "")))
-        expected = str(new.get("expected", "")).replace(" (*)", " ", 1)
-        if defs and m and expected:
-            return _fix(defs[0], m["t"], expected, "api: the type Zephyr expects", f.confidence)
+        msg = str(new.get("message", ""))
+        want, have = _INIT_TYPE.search(msg), _EXPR_TYPE.search(msg)
+        if defs and want and have:
+            # The canonical type ("aka"), as a function type: a typedef name can't be given
+            # to a function (DOGFOOD-9 D2: `const state_execution`).
+            expected = _function_type(want["aka"] or want["t"])
+            old = _function_type(have["aka"] or have["t"])
+            return _fix(defs[0], old, expected, "api: the type Zephyr expects", f.confidence)
     elif f.kind == "enum-removed":
         for g in by_id.values():
             if g.kind == "target-build-failed" and isinstance(g.new, dict):
