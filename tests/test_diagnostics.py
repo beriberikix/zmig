@@ -102,7 +102,7 @@ def test_value_not_taken_wrapped() -> None:
 
 
 # The same warning from the v4.1.0 and v4.2.0 configures of samples/subsys/settings on
-# native_sim: only the "defined at" line moved (AUDIT.md §5.2).
+# native_sim: only the "defined at" line moved (eval/AUDIT.md §5.2).
 STDOUT_CONSOLE_LOG = """\
 warning: STDOUT_CONSOLE (defined at lib/libc/Kconfig:{line}) was assigned the value 'y' but got the
 value 'n'. Check these unsatisfied dependencies: (!(NATIVE_APPLICATION || (NATIVE_LIBRARY &&
@@ -146,7 +146,7 @@ REQUIRED_LOG = (
 
 
 def test_required_property_missing_names_property_node_and_binding() -> None:
-    """Guide 4.2 "st,stm32-ethernet now requires phy-handle" (AUDIT.md §3 #11): the target
+    """Guide 4.2 "st,stm32-ethernet now requires phy-handle" (eval/AUDIT.md §3 #11): the target
     configure fails, so there is no target edt.pickle to compare; the error is the only
     evidence. Kind stays dt-error so finding IDs don't change."""
     (d,) = parse_log(REQUIRED_LOG).diagnostics
@@ -158,7 +158,7 @@ def test_required_property_missing_names_property_node_and_binding() -> None:
 def test_kconfig_warning_identity_ignores_moved_definitions() -> None:
     """The buildlog analyzer reported the settings sample's STDOUT_CONSOLE warning as new at
     v4.2.0 plus "1 warning resolved": only lib/libc/Kconfig:156 -> :160 differed (the F1
-    class of AUDIT.md, in BuildWarning.key)."""
+    class of eval/AUDIT.md, in BuildWarning.key)."""
     from zmig.diagnostics import parse_warnings
 
     (old,) = parse_warnings(STDOUT_CONSOLE_LOG.format(line=156))

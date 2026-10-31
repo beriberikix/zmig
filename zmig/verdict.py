@@ -1,5 +1,5 @@
-"""The upgrade-path verdict (docs/DESIGN-P1.md §8): can a device running the source build
-take the target build by app OTA?
+"""The upgrade-path verdict (DESIGN.md, "Field-upgrade verdict"): can a device running the
+source build take the target build by app OTA?
 
 Inputs are only what the hazard analyzers recorded (`shared["categories"]`, via
 zmig.hazards.set_category) and the findings. Rules:
@@ -170,7 +170,7 @@ def upgrade_path(
     # A breaking/risky finding in a hazard category without a remedy, or a category an
     # analyzer recorded as a hazard, still rules out direct-ok; its remedy is unknown
     # (regression: B-rak's layout category said "hazard" while the verdict said direct-ok,
-    # docs/DOGFOOD-3-baseline.md M8).
+    # eval/reports/DOGFOOD-3-baseline.md M8).
     hazard_categories = {Category(n) for n in CATEGORIES}
     for f in findings:
         if (
@@ -216,7 +216,7 @@ def upgrade_path(
     if target_status != "ok":
         # Categories then rest on configure-time data and whatever the failed build left;
         # "direct-ok" must not read as established (regression: bms-firmware's native_sim
-        # and OLED targets failed to build, docs/DOGFOOD-3-baseline.md M11).
+        # and OLED targets failed to build, eval/reports/DOGFOOD-3-baseline.md M11).
         confidence = "low"
 
     basis: list[str] = []

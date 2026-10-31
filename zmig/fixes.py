@@ -1,6 +1,6 @@
 """Where the fix goes, and what it is when a finding's own facts say so (schema 1.5).
 
-A pass over every finding after the analyzers have run (docs/PROPOSAL-CHANGE-DB.md §3,
+A pass over every finding after the analyzers have run (DESIGN.md, "The `fix` field",
 Phase 0). It sets `Finding.fix` and renders `action` from it:
 
   {"file", "line", "old", "new", "source", "confidence"}

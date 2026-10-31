@@ -1,11 +1,11 @@
 # DOGFOOD-7: a reproducible evaluation harness, and the last six rows re-measured
 
 2026-10-29. zmig `aa95a10` code (`main` after the audit fixes). Every number here is
-**tuned** (`docs/EVALUATION.md`, "Clean vs tuned").
+**tuned** (`eval/EVALUATION.md`, "Clean vs tuned").
 
 ## 1. The harness
 
-`eval/` (see [eval/README.md](../eval/README.md)) re-runs every scored configuration except
+`eval/` (see [eval/README.md](../README.md)) re-runs every scored configuration except
 OpenDeck, with each input pinned to a public commit.
 
 ### How the invocations were recovered

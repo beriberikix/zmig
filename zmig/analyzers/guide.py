@@ -80,7 +80,7 @@ class GuideAnalyzer:
     def guide_gaps(versions: list[str], docs: list[Document]) -> list[NotChecked]:
         """A "not checked" for every crossed release with no migration guide. Zephyr has
         doc/releases/migration-guide-X.Y.rst only from 3.5 on; before that, a crossing read
-        at most the release notes' Removed/Deprecated sections (AUDIT.md F4: a 2.7 -> 3.7 scan
+        at most the release notes' Removed/Deprecated sections (eval/AUDIT.md F4: a 2.7 -> 3.7 scan
         read no guide for 3.0-3.4 and reported ok)."""
         guides = {d.version for d in docs if d.kind == "guide"}
         notes = {d.version for d in docs if d.kind == "notes"}
@@ -335,7 +335,7 @@ class GuideAnalyzer:
         # Quote the whole entry when it says more than the matching sentence: the rest often
         # holds the remedy (regression: "…_PORT_1_ENABLE has been deprecated." was quoted
         # without "Instead users should instantiate … zephyr,native-pty-uart nodes",
-        # docs/DOGFOOD-3-baseline.md M12). The cited line stays the one naming the item.
+        # eval/reports/DOGFOOD-3-baseline.md M12). The cited line stays the one naming the item.
         full = entry.full
         for i, line in enumerate(sorted({m.line for m in mentions})):
             sentence = next(m.sentence for m in mentions if m.line == line)

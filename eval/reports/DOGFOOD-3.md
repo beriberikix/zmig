@@ -2,7 +2,7 @@
 
 Date: 2026-10-28. zmig `615cbc1` (P2 steps 1–5, plus the M8–M12 output fixes). The
 baseline is [DOGFOOD-3-baseline.md](DOGFOOD-3-baseline.md) (zmig `9c8da4a` code). Scoring
-follows [ORACLE-RULES.md](ORACLE-RULES.md). The oracles weren't edited and no corrections
+follows [ORACLE-RULES.md](../ORACLE-RULES.md). The oracles weren't edited and no corrections
 were needed. libclang 18.1.1 (the `libclang` wheel); `pahole` 1.31 and `abidiff` 2.9.0 were
 installed for this run.
 

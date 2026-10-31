@@ -9,7 +9,7 @@ refs by its function and, for a devicetree device, the node path (ordinals renum
 Reported, for each project init call that exists at both refs: a different init level,
 and calls that swapped sides around it (ran before it and now run after, or the reverse).
 Those are the changes that break an init that relied on a Zephyr service or device being
-ready, as ZMK's behaviors and ext_power did at v3.5 (docs/DOGFOOD-1.md #7, #18).
+ready, as ZMK's behaviors and ext_power did at v3.5 (eval/reports/DOGFOOD-1.md #7, #18).
 """
 
 from __future__ import annotations

@@ -1,12 +1,12 @@
 # Dogfood 4 baseline: CANnectivity, a third unseen project
 
 Date: 2026-10-28. zmig `d4308de`: the code of `4a56a77` (P2 plus round 3), with only oracle
-commits since. Scoring follows [ORACLE-RULES.md](ORACLE-RULES.md).
+commits since. Scoring follows [ORACLE-RULES.md](../ORACLE-RULES.md).
 
 The oracles were committed before zmig was run:
 
-- [oracles/cannectivity.md](oracles/cannectivity.md) for C1 (`459a3c8`);
-- [oracles/cannectivity-c2.md](oracles/cannectivity-c2.md) for C2 (`d4308de`).
+- [oracles/cannectivity.md](../oracles/cannectivity.md) for C1 (`459a3c8`);
+- [oracles/cannectivity-c2.md](../oracles/cannectivity-c2.md) for C2 (`d4308de`).
 
 **This project is clean.** No zmig change has been informed by it. From here on, the only
 changes allowed on it are crash and misleading-output fixes, listed in §5.

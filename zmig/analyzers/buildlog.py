@@ -65,7 +65,7 @@ _LINKER = re.compile(
 )
 # A link error the linker attributes to a source line, printed with or without the "ld:"
 # prefix (regression: CANnectivity's "…/led.c:225: undefined reference to
-# `smf_set_handled'" became "1 error (step)", docs/DOGFOOD-4-baseline.md M14).
+# `smf_set_handled'" became "1 error (step)", eval/reports/DOGFOOD-4-baseline.md M14).
 _LINKER_AT = re.compile(
     r"^(?:.*?\bld(?:\.bfd|\.lld)?: )?(?P<file>[^\s:]+\.(?:c|cc|cpp|S|s|h)):(?P<line>\d+): "
     r"(?P<msg>(?:undefined reference|multiple definition).*)$",
@@ -220,7 +220,7 @@ def error_evidence(
         ):
             # Raised inside a Zephyr header: show the project line that led there
             # (regression: A1-native's '__device_dts_ord_20' undeclared in device.h:96,
-            # docs/DOGFOOD-3-baseline.md M9).
+            # eval/reports/DOGFOOD-3-baseline.md M9).
             raised = redact(f"{e.file}:{e.line}")
             item = file_line(site[0], site[1], f"{e.message} (raised in {raised})")
         else:
@@ -698,7 +698,7 @@ class BuildlogAnalyzer:
         proj = project_roots(ctx.new, ctx.new_img.dir)
         # Kconfig's "Deprecated symbol X is enabled." is the kconfig analyzer's
         # symbol-deprecated finding, which has the assignment's file:line (regression:
-        # reported twice on A1-native, docs/DOGFOOD-3-baseline.md M10).
+        # reported twice on A1-native, eval/reports/DOGFOOD-3-baseline.md M10).
         deprecated = {
             f.subject.removeprefix("CONFIG_")
             for f in ctx.prior

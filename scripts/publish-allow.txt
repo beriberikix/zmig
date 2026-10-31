@@ -10,7 +10,7 @@ email noreply@github.com
 email t@example.com
 email fixture@example.com
 email git@github.com
-# The identity docs/examples/opendeck-patched.sh gives its patch commits
+# The identity eval/scripts/opendeck-patched.sh gives its patch commits
 email patch.sh@zenv.github.com
 # Copyright header of an upstream Zephyr file kept verbatim in a test fixture
 # (tests/fixtures/patch-methods/*/drivers/ethernet/eth_esp32.c)

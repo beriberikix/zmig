@@ -1,4 +1,4 @@
-# Starting points for the hazard checks (docs/DESIGN-P1.md §3): the identifiers whose
+# Starting points for the hazard checks (DESIGN.md, "Field-upgrade verdict"): the identifiers whose
 # definitions decide a format. This is the only Zephyr/MCUboot knowledge zmig brings in.
 # Every seed is located in the source at each ref (git grep at the pinned SHA, under
 # `paths`); a seed that isn't found makes the checks that use it unknown at that ref.

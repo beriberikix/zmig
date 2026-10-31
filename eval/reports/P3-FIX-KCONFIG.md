@@ -311,7 +311,7 @@ cache paths.
 - There's a regression test for each: `tests/test_fix_apply.py` and
   `tests/test_config_index.py`.
 
-Whether they could ever be auto-fixed: [DESIGN-KCONFIG-OVERRIDES.md](DESIGN-KCONFIG-OVERRIDES.md).
+Whether they could ever be auto-fixed: [DESIGN-KCONFIG-OVERRIDES.md](https://github.com/beriberikix/zmig/blob/c07a0bf/docs/DESIGN-KCONFIG-OVERRIDES.md).
 
 ## Remove category end to end, for real (no stubs)
 

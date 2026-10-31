@@ -1,8 +1,8 @@
 # Dogfood 2 baseline: ZMK re-scored, and two held-out projects
 
-Date: 2026-10-28. Scoring follows [ORACLE-RULES.md](ORACLE-RULES.md) (committed `0328e44`).
+Date: 2026-10-28. Scoring follows [ORACLE-RULES.md](../ORACLE-RULES.md) (committed `0328e44`).
 The held-out oracles were committed before zmig ran on them (`a90dc3a`):
-[oracles/golioth.md](oracles/golioth.md) and [oracles/bms-firmware.md](oracles/bms-firmware.md).
+[oracles/golioth.md](../oracles/golioth.md) and [oracles/bms-firmware.md](../oracles/bms-firmware.md).
 
 This is the **baseline**. It was measured with zmig as of DOGFOOD-1 (`ad1a390`; the commits
 after it only add docs). No analyzer was changed for these projects. Results are reported

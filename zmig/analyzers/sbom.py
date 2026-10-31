@@ -191,7 +191,7 @@ class SbomAnalyzer:
             kind, detail = status
             # Only the includes this build compiles: an include in a file that's built for
             # another board or shield says nothing about this build (regression:
-            # bms-firmware's oled.c, docs/DOGFOOD-3-baseline.md).
+            # bms-firmware's oled.c, eval/reports/DOGFOOD-3-baseline.md).
             built = ctx.build_files
             used = [loc for loc in locs if built is None or loc.path in built]
             outside = "" if used else " (only in files this build doesn't compile)"
@@ -208,8 +208,8 @@ class SbomAnalyzer:
                 )
             elif used and api_covers({loc.path for loc in used}, coverage, api_sites):
                 # A byte diff isn't a risk when libclang compared what the project uses from
-                # it and found nothing changed (AUDIT.md F8; bms A1 precision 50% -> 11%,
-                # docs/EVALUATION.md).
+                # it and found nothing changed (eval/AUDIT.md F8; bms A1 precision 50% -> 11%,
+                # eval/EVALUATION.md).
                 add(
                     "header-changed",
                     inc,

@@ -110,7 +110,7 @@ def _identity(d: Diagnostic) -> tuple[str, ...]:
 
 
 def preexisting(d: Diagnostic, source: Iterable[Diagnostic]) -> bool:
-    """True if the source configure printed the same diagnostic (AUDIT.md F1: the
+    """True if the source configure printed the same diagnostic (eval/AUDIT.md F1: the
     settings sample's CONFIG_STDOUT_CONSOLE warning was reported as new at v4.2.0)."""
     return _identity(d) in {_identity(s) for s in source}
 
@@ -212,7 +212,7 @@ def parse_log(text: str) -> LogFacts:
     for m in _DT_ERROR.finditer(text):
         if m.start() not in undeclared:
             # Still a dt-error (finding IDs depend on the kind), with its subject when
-            # edtlib named one (AUDIT.md §6 item 6).
+            # edtlib named one (eval/AUDIT.md §6 item 6).
             r = _DT_REQUIRED.search(m["msg"])
             diags.append(
                 Diagnostic(

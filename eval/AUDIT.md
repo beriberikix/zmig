@@ -520,3 +520,21 @@ The repository's history was rewritten before it was made public (an author addr
 a quoted home directory). Commit SHAs cited above, and in the documents this audit led
 to, are the pre-rewrite ones; [docs/SHA-REMAP.md](docs/SHA-REMAP.md) maps each to its new
 SHA. Nothing in this file above this note was changed.
+
+## Response (2026-10-31): documents moved
+
+This file moved from the repository root to `eval/AUDIT.md`, unchanged above this note, when
+the documentation was reorganized for end users. Paths it cites now live here:
+
+| Cited as | Now |
+|---|---|
+| `docs/DOGFOOD-*.md`, `docs/CI-TEST.md`, `docs/P3-FIX-KCONFIG.md` | `eval/reports/` |
+| `docs/EVALUATION.md`, `docs/ORACLE-RULES.md`, `docs/SHA-REMAP.md` | `eval/` |
+| `docs/oracles/` | `eval/oracles/` |
+| `docs/examples/zmig-watch.yml` | `examples/zmig-watch.yml` |
+| `docs/examples/*.sh` | `eval/scripts/` |
+| `docs/DESIGN*.md`, `docs/PROPOSAL-*.md` | merged into `DESIGN.md` at the root; the originals are at commit `c07a0bf` |
+| `docs/TRY-IT.md` | `CONTRIBUTING.md`, and the "Results on my project" issue template |
+
+The relative links above this note are therefore broken; the table is the way to follow
+them. Nothing above this note was changed.

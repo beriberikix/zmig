@@ -1,4 +1,4 @@
-"""P2 (docs/DESIGN-P2.md) unit tests."""
+"""P2 (DESIGN.md, "API and ABI diff") unit tests."""
 
 from __future__ import annotations
 
@@ -196,7 +196,7 @@ const void *keep = states;
 
 
 def test_callback_findings_cite_definitions_and_uses(tmp_path: Path) -> None:
-    """CANnectivity N1a (docs/oracles/cannectivity.md): the run functions passed to
+    """CANnectivity N1a (eval/oracles/cannectivity.md): the run functions passed to
     SMF_CREATE_STATE no longer match `state_execution`. The finding cited only the
     SMF_CREATE_STATE line (the use); the maintainers changed the definitions."""
     from zmig.analyzers.api import ApiAnalyzer
@@ -403,7 +403,7 @@ def test_parse_cache_key_ignores_build_and_workspace_location(tmp_path: Path) ->
 
 
 def test_parse_coverage_detail_is_the_same_on_a_warm_cache() -> None:
-    """report.json is byte-stable whether or not the cache was warm (docs/DESIGN.md §3):
+    """report.json is byte-stable whether or not the cache was warm (DESIGN.md, "Determinism"):
     "2 parsed, 0 from the parse cache" on a cold run vs "0 parsed, 2 from the parse
     cache" on the next failed test_deterministic once a build-key change made the
     fixture's builds cold."""

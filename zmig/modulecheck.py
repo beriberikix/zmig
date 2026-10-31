@@ -135,7 +135,7 @@ def tree_needs(
     with its modules at `module_paths` ({name: path}). A module the source build already
     used isn't reported: whatever provides it today keeps doing so. `projects` are the
     target manifest's; only those are proposed. A glue path counts only into a project
-    new since `source_projects` (DESIGN-CHANGE-DB §2.4): glue also sets paths into
+    new since `source_projects` (DESIGN.md, "Change database"): glue also sets paths into
     existing modules it merely supports (v4.4.0 mbedtls -> hostap, regression: ardep and
     OpenDeck)."""
     used_files = list(used_files)
@@ -248,7 +248,7 @@ def needed_at_source(
 ) -> list[str]:
     """Of the modules zmig added to the target build, those the source build's own log
     shows it needs too: missing at both refs, so a gap in the scan's module set rather than
-    something the migration requires (AUDIT.md §5.2 run 1, littlefs)."""
+    something the migration requires (eval/AUDIT.md §5.2 run 1, littlefs)."""
     return [n.module for n in diagnose(log, zephyr, manifest, active) if n.module in added]
 
 

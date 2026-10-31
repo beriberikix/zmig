@@ -1,4 +1,4 @@
-"""zmig.changes: Kconfig facts from the tree alone (docs/DESIGN-CHANGE-DB.md, step 1).
+"""zmig.changes: Kconfig facts from the tree alone (DESIGN.md, "Change database").
 Texts are taken from Zephyr's history."""
 
 from __future__ import annotations
@@ -150,7 +150,7 @@ MIRROR = (
 
 @pytest.mark.skipif(not MIRROR.is_dir(), reason="no local Zephyr mirror")
 def test_held_out_renames_on_the_real_tree(tmp_path: Path) -> None:
-    """ardep A1 and RIT FSW F1c, from the mirror: the facts DESIGN-CHANGE-DB §1 relies on."""
+    """ardep A1 and RIT FSW F1c, from the mirror: the facts DESIGN.md, "Change database" relies on."""
     from zmig.cache import Cache
     from zmig.changes import build
     from zmig.refs import resolve_ref
@@ -343,7 +343,7 @@ def _ctx(tmp_path: Path, target_configured: bool, prior: list[Any] | None = None
 def test_changes_analyzer_reports_what_the_skipped_kconfig_analyzer_would(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """DESIGN-CHANGE-DB §4: when the target never reached Kconfig, removed symbols the
+    """DESIGN.md, "Change database": when the target never reached Kconfig, removed symbols the
     project sets, re-declares or reads still get findings, with the IDs the kconfig and
     buildlog analyzers give them."""
     from zmig.analyzers import changes as mod
@@ -428,7 +428,7 @@ diff --git a/dts/bindings/sensor/ti,tmp116.yaml b/dts/bindings/sensor/ti,tmp11x.
 
 
 def test_binding_table_and_renamed_compatibles() -> None:
-    """DESIGN-CHANGE-DB §2.3: compatibles from the bindings' `compatible:` lines; a binding
+    """DESIGN.md, "Change database": compatibles from the bindings' `compatible:` lines; a binding
     file renamed with its compatible pairs them, each with its own (not the sibling's)."""
     table = parse_table(
         'v4.1.0:dts/bindings/sensor/ti,tmp116.yaml:6:compatible: "ti,tmp116"\n'
@@ -558,7 +558,7 @@ def test_a_node_gone_at_the_target_is_not_an_unbound_compatible(
 
 
 def test_glue_paths_and_symbols_moved_into_a_modules_glue() -> None:
-    """DESIGN-CHANGE-DB §2.4. ardep A6: at v4.4.0 the mbedtls glue builds paths into
+    """DESIGN.md, "Change database" ardep A6: at v4.4.0 the mbedtls glue builds paths into
     tf-psa-crypto (a mere variable pass-through, like MLDSA_NATIVE_DIR, isn't a use).
     RIT FSW F2: HAS_CMSIS_CORE_M moved from modules/cmsis/ to modules/cmsis_6/ at v4.2.0."""
     from zmig.changes import glue_paths, moved_into_glue, parse_definitions
@@ -603,7 +603,7 @@ def test_glue_paths_and_symbols_moved_into_a_modules_glue() -> None:
 def test_a_symbol_or_compatible_a_module_defines_at_the_target_is_not_removed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """DESIGN-CHANGE-DB §2.1 (DOGFOOD-11 gap 1): the database covers Zephyr's tree only. A
+    """DESIGN.md, "Change database" (DOGFOOD-11 gap 1): the database covers Zephyr's tree only. A
     symbol (or compatible) that moved into a module the scan uses still exists at the
     target, so it isn't reported removed. The project's own re-declaration (ardep A1) is
     in the project's module, not a workspace module, and doesn't count."""

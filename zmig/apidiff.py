@@ -1,4 +1,4 @@
-"""libclang extraction for the API diff (docs/DESIGN-P2.md §3, §10).
+"""libclang extraction for the API diff (DESIGN.md, "API and ABI diff").
 
 For each project translation unit of the SOURCE build (compile_commands.json entries whose
 file is project code), parse it with that build's flags, and again with the target
@@ -691,7 +691,7 @@ def evaluate_macros(index: Any, file: str, args: list[str], names: list[str]) ->
 
 _COMPARE = {"==", "!=", "<", ">", "<=", ">="}
 _ASSIGN = {"=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="}
-# What a use of a value can do with it (docs/DESIGN-P2.md review of P2, item 3). Only
+# What a use of a value can do with it (DESIGN.md, "API and ABI diff"). Only
 # "other" uses let a changed value be demoted; anything unrecognized stays risky.
 VALUE_USES = ("stored", "passed", "compared", "narrowed", "other", "unknown")
 

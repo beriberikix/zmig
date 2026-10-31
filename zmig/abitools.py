@@ -1,4 +1,4 @@
-"""Optional binary tools for the API diff (docs/DESIGN-P2.md §6, §10.5).
+"""Optional binary tools for the API diff (DESIGN.md, "Optional binary tools").
 
 pahole   the layout the GCC-built ELF really has (DWARF), to cross-check clang's model of
          the structs the project accesses

@@ -1,4 +1,4 @@
-"""Unit regressions from dogfooding on ZMK v3.2 -> v3.5 (docs/DOGFOOD-1.md). The log
+"""Unit regressions from dogfooding on ZMK v3.2 -> v3.5 (eval/reports/DOGFOOD-1.md). The log
 excerpts are copied from the real target configure/build output (paths shortened)."""
 
 # ruff: noqa: E501  (verbatim log lines)
@@ -395,7 +395,7 @@ def test_findings_only_in_unused_input_files_become_info(tmp_path: Path) -> None
 
 
 def test_findings_only_in_uncompiled_sources_become_info(tmp_path: Path) -> None:
-    """AUDIT.md F7/§5.3: echo_server's tunnel.c and vlan.c are only compiled with
+    """eval/AUDIT.md F7/§5.3: echo_server's tunnel.c and vlan.c are only compiled with
     CONFIG_NET_L2_IPIP / CONFIG_NET_VLAN, yet guide matches on them were breaking."""
     from zmig.analyzers import outside_build
     from zmig.findings import Category, Confidence, Finding, Severity, file_line
@@ -459,7 +459,7 @@ FAILED: modules/thingset-zephyr-sdk/CMakeFiles/thingset.dir/src/serial.c.obj
 
 
 def test_build_error_in_a_header_keeps_the_project_call_site() -> None:
-    """bms-firmware native_sim at v4.2 (docs/DOGFOOD-3-baseline.md M9)."""
+    """bms-firmware native_sim at v4.2 (eval/reports/DOGFOOD-3-baseline.md M9)."""
     (e,) = build_errors(DEVICE_ERROR_LOG)
     assert (e.file, e.line) == ("/ws/zephyr/include/zephyr/device.h", 96)
     project = [s for s in e.sites if s[0].startswith("/mod/")]
@@ -467,7 +467,7 @@ def test_build_error_in_a_header_keeps_the_project_call_site() -> None:
 
 
 def test_guide_entry_full_text_keeps_the_remedy() -> None:
-    """The second sentence held the remedy (docs/DOGFOOD-3-baseline.md M12)."""
+    """The second sentence held the remedy (eval/reports/DOGFOOD-3-baseline.md M12)."""
     from zmig.guides import parse
 
     text = (
@@ -520,7 +520,7 @@ def test_report_separates_checked_from_not_checked() -> None:
 
 def test_located_link_errors_keep_their_source_line() -> None:
     """CANnectivity at v4.2: '…/led.c:225: undefined reference' with no 'ld:' prefix was
-    reported as '1 error (step)' (docs/DOGFOOD-4-baseline.md M14)."""
+    reported as '1 error (step)' (eval/reports/DOGFOOD-4-baseline.md M14)."""
     log = (
         "FAILED: [code=1] zephyr/zephyr_pre0.elf zephyr/zephyr_pre0.map\n"
         "/ws/apps/x/app/src/led.c:225: undefined reference to `smf_set_handled'\n"
@@ -537,7 +537,7 @@ def test_located_link_errors_keep_their_source_line() -> None:
 
 
 def test_dtc_assigned_phandles_are_not_node_changes() -> None:
-    """CANnectivity: led0 and counter2 'changed: phandle' (docs/DOGFOOD-4-baseline.md M13)."""
+    """CANnectivity: led0 and counter2 'changed: phandle' (eval/reports/DOGFOOD-4-baseline.md M13)."""
     from zmig.analyzers.devicetree import _dts_view
 
     old = {"labels": ["led_ready"], "raw_values": {"gpios": "<&gpioa 5 0>", "phandle": "<0x12>"}}
@@ -579,7 +579,7 @@ def _kconfig_ctx(old_log: str, new_log: str, assign: str = "STDOUT_CONSOLE") -> 
 def test_value_not_taken_at_both_refs_is_not_a_migration_finding(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AUDIT.md F1/§5.2: samples/subsys/settings sets CONFIG_STDOUT_CONSOLE=y, which
+    """eval/AUDIT.md F1/§5.2: samples/subsys/settings sets CONFIG_STDOUT_CONSOLE=y, which
     native_sim never honours; v4.1.0 printed the same warning as v4.2.0."""
     from tests.test_diagnostics import STDOUT_CONSOLE_LOG
     from zmig.analyzers.kconfig import KconfigAnalyzer
@@ -602,7 +602,7 @@ def test_value_not_taken_at_both_refs_is_not_a_migration_finding(
 
 
 def test_preexisting_promptless_keeps_its_severity(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A fatal Kconfig error at both refs is a defect, not a no-op: per DESIGN-P1 §2.3 it
+    """A fatal Kconfig error at both refs is a defect, not a no-op: per DESIGN.md, "Pre-existing problems" it
     keeps its severity and is marked pre-existing (only value-not-taken drops to info)."""
     from zmig.analyzers.kconfig import KconfigAnalyzer
     from zmig.findings import Severity
@@ -620,7 +620,7 @@ def test_preexisting_promptless_keeps_its_severity(monkeypatch: pytest.MonkeyPat
 
 
 def test_preexisting_devicetree_errors_keep_their_severity(tmp_path: Path) -> None:
-    """DESIGN-P1 §2.3 for the devicetree configure errors: same error at both refs ->
+    """DESIGN.md, "Pre-existing problems" for the devicetree configure errors: same error at both refs ->
     pre-existing, severity unchanged."""
     from zmig.analyzers.devicetree import DevicetreeAnalyzer
     from zmig.diagnostics import parse_log
@@ -664,7 +664,7 @@ def test_preexisting_devicetree_errors_keep_their_severity(tmp_path: Path) -> No
 def test_module_required_at_both_refs_is_preexisting(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AUDIT.md §5.2 run 1: the settings sample built without littlefs fails at v4.1.0 and
+    """eval/AUDIT.md §5.2 run 1: the settings sample built without littlefs fails at v4.1.0 and
     v4.2.0 alike; "the target build needs module littlefs" was breaking/act-now."""
     from zmig.analyzers import modules
     from zmig.findings import Severity
@@ -724,7 +724,7 @@ def test_binding_spec_changes() -> None:
 def test_devicetree_binding_checks_for_read_properties_and_required_errors(
     tmp_path: Path,
 ) -> None:
-    """AUDIT.md §6 item 6: binding changes to properties the app's C code reads (type,
+    """eval/AUDIT.md §6 item 6: binding changes to properties the app's C code reads (type,
     deprecation), and the cause of a "marked as required" configure error."""
     from tests.test_diagnostics import REQUIRED_LOG
     from zmig.analyzers.devicetree import DevicetreeAnalyzer
@@ -791,7 +791,7 @@ def test_devicetree_binding_checks_for_read_properties_and_required_errors(
 def test_dependency_expression_changes_are_one_info_finding(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AUDIT.md §6 item 5, as info: on echo_server v4.1.0 -> v4.2.0, 18 app-referenced
+    """eval/AUDIT.md §6 item 5, as info: on echo_server v4.1.0 -> v4.2.0, 18 app-referenced
     symbols changed depends/selects/implies, mostly SoC lists and symbols set only in
     overlays the build doesn't use; any change that takes effect in this build already
     shows as a value change. One finding lists the ones this build's inputs use, and

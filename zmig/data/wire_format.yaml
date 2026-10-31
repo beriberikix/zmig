@@ -1,4 +1,4 @@
-# Wire-format allowlist (docs/DESIGN-P1.md §7): options whose value is seen by a peer
+# Wire-format allowlist (DESIGN.md, "Field-upgrade verdict"): options whose value is seen by a peer
 # (phone app, gateway, host PC, mcumgr client). A change can break communication with
 # deployed peers even when the device itself works.
 #

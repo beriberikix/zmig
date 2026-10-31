@@ -1,8 +1,8 @@
 # DOGFOOD-11: the change database (PROPOSAL-CHANGE-DB Phase 1), measured
 
-2026-10-30. zmig `983fe98`, on `main` `2341504`. [DESIGN-CHANGE-DB.md](DESIGN-CHANGE-DB.md)
+2026-10-30. zmig `983fe98`, on `main` `2341504`. [DESIGN-CHANGE-DB.md](https://github.com/beriberikix/zmig/blob/c07a0bf/docs/DESIGN-CHANGE-DB.md)
 steps 1–4 are implemented; this report is step 5. Scoring follows
-[ORACLE-RULES.md](ORACLE-RULES.md), including §5.
+[ORACLE-RULES.md](../ORACLE-RULES.md), including §5.
 
 Commits:
 - `8366fd9`: Kconfig facts and `zmig changes`.

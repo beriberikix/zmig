@@ -171,7 +171,7 @@ def test_select_of_an_absent_module_symbol(tmp_path: Path) -> None:
     assert diagnose(MBEDTLS_LOG, zephyr, manifest, active={"mbedtls"}) == []
 
 
-# The v4.1.0 configure of samples/subsys/settings without littlefs (AUDIT.md §5.2 run 1);
+# The v4.1.0 configure of samples/subsys/settings without littlefs (eval/AUDIT.md §5.2 run 1);
 # v4.2.0 printed the same.
 LITTLEFS_LOG = """\
 warning: FILE_SYSTEM_LITTLEFS (defined at subsys/fs/Kconfig.littlefs:6) was assigned the value 'y'
@@ -199,7 +199,7 @@ def test_modules_the_source_build_needs_too(tmp_path: Path) -> None:
 
 
 def test_modules_the_zephyr_tree_says_the_target_needs() -> None:
-    """DESIGN-CHANGE-DB §2.4/§6, from the tree alone. ardep A6: the source build compiles
+    """DESIGN.md, "Change database", from the tree alone. ardep A6: the source build compiles
     mbedtls, whose v4.4.0 glue uses files of tf-psa-crypto. RIT FSW F2: the source build
     enables HAS_CMSIS_CORE_M, which v4.2.0 defines only in cmsis_6's glue, and compiles
     nothing from cmsis_6. A module the source build already uses isn't reported."""
@@ -225,7 +225,7 @@ def test_modules_the_zephyr_tree_says_the_target_needs() -> None:
     config = {"HAS_CMSIS_CORE_M": "y", "HAS_MCUX": "y", "OFF": "n"}
     projects = {"mbedtls", "tf-psa-crypto", "cmsis", "cmsis_6", "hal_nxp", "hal_y", "hal_z",
                 "hostap"}  # fmt: skip
-    # Glue paths count only into a project new in Zephyr's manifest (DESIGN-CHANGE-DB
+    # Glue paths count only into a project new in Zephyr's manifest (DESIGN.md, "Change database"
     # §2.4): v4.4.0's mbedtls glue also sets a path into hostap, unconditionally, but
     # hostap (in the manifest before) isn't needed (regression: ardep and OpenDeck).
     source_projects = projects - {"tf-psa-crypto"}

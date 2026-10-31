@@ -1,4 +1,4 @@
-# Every scored zmig evaluation configuration (docs/EVALUATION.md), with its inputs pinned to
+# Every scored zmig evaluation configuration (eval/EVALUATION.md), with its inputs pinned to
 # public commits and its invocation exactly as scored. eval/run.py reads this file.
 #
 # Placeholders in app/cmake_args/from/to: {src:NAME} is the checkout of [sources.NAME].
@@ -58,7 +58,7 @@ sha = "339570e2393b108bf8f9241018ecaf5615c25469"  # v3.5.0 + 21 fork commits
 # baseline in eval/baselines/<name>.json was taken from.
 
 [configs.golioth-B]
-oracle = "docs/oracles/golioth.md"
+oracle = "eval/oracles/golioth.md"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 app = "{src:golioth}/examples/zephyr/hello"
 board = "nucleo_h563zi/stm32h563xx"
@@ -69,7 +69,7 @@ modules = ["hal_stm32", "cmsis", "cmsis_6", "mbedtls", "zcbor"]
 cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}"]
 
 [configs.golioth-B-rak]
-oracle = "docs/oracles/golioth-configs.md"
+oracle = "eval/oracles/golioth-configs.md"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 app = "{src:golioth}/examples/zephyr/hello"
 board = "rak5010/nrf52840"
@@ -80,7 +80,7 @@ modules = ["hal_nordic", "cmsis", "cmsis_6", "mbedtls", "zcbor"]
 cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}"]
 
 [configs.golioth-B-esp]
-oracle = "docs/oracles/golioth-configs.md"
+oracle = "eval/oracles/golioth-configs.md"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 app = "{src:golioth}/examples/zephyr/hello"
 board = "nrf52840dk/nrf52840"
@@ -91,7 +91,7 @@ modules = ["hal_nordic", "cmsis", "cmsis_6", "mbedtls", "zcbor"]
 cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}", "-DSHIELD=golioth_esp_at"]
 
 [configs.golioth-B-native]
-oracle = "docs/oracles/golioth-configs.md"
+oracle = "eval/oracles/golioth-configs.md"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 app = "{src:golioth}/examples/zephyr/hello"
 board = "native_sim"
@@ -101,7 +101,7 @@ modules = ["mbedtls", "zcbor"]
 cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:golioth}"]
 
 [configs.bms-A1]
-oracle = "docs/oracles/bms-firmware.md"
+oracle = "eval/oracles/bms-firmware.md"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 app = "{src:bms-firmware}/app"
 board = "bms_16s100_sc"
@@ -112,7 +112,7 @@ modules = ["cmsis", "hal_stm32", "zcbor"]
 cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:bms-firmware};{src:thingset-zephyr-sdk};{src:thingset-node-c}"]
 
 [configs.bms-A1-native]
-oracle = "docs/oracles/bms-firmware-configs.md"
+oracle = "eval/oracles/bms-firmware-configs.md"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 app = "{src:bms-firmware}/app"
 board = "native_sim"
@@ -122,7 +122,7 @@ modules = ["tinycrypt", "zcbor"]
 cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:bms-firmware};{src:thingset-zephyr-sdk};{src:thingset-node-c}"]
 
 [configs.bms-A1-oled]
-oracle = "docs/oracles/bms-firmware-configs.md"
+oracle = "eval/oracles/bms-firmware-configs.md"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 app = "{src:bms-firmware}/app"
 board = "bms_8s50_ic@0.2"
@@ -137,7 +137,7 @@ cmake_args = [
 ]
 
 [configs.cannectivity-C1]
-oracle = "docs/oracles/cannectivity.md"
+oracle = "eval/oracles/cannectivity.md"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 app = "{src:cannectivity}/app"
 board = "usb2canfdv1"
@@ -148,7 +148,7 @@ modules = ["cmsis", "hal_stm32"]
 cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:cannectivity}", "-DFILE_SUFFIX=usbd_next"]
 
 [configs.cannectivity-C2]
-oracle = "docs/oracles/cannectivity-c2.md"
+oracle = "eval/oracles/cannectivity-c2.md"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 app = "{src:cannectivity}/app"
 board = "candlelight"
@@ -160,7 +160,7 @@ cmake_args = ["-DZEPHYR_EXTRA_MODULES={src:cannectivity}"]
 
 # ZMK is scored as one item set over both builds (corne ∪ niceview).
 [configs.zmk-corne]
-oracle = "docs/DOGFOOD-2-baseline.md §1"
+oracle = "eval/reports/DOGFOOD-2-baseline.md §1"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 group = "zmk"
 app = "{src:zmk}/app"
@@ -172,7 +172,7 @@ modules = ["hal_nordic", "cmsis", "tinycrypt", "lvgl"]
 cmake_args = ["-DSHIELD=corne_left"]
 
 [configs.zmk-niceview]
-oracle = "docs/DOGFOOD-2-baseline.md §1"
+oracle = "eval/reports/DOGFOOD-2-baseline.md §1"
 scored = "DOGFOOD-9 to 11 (zmig 983fe98; findings unchanged since DOGFOOD-10)"
 group = "zmk"
 app = "{src:zmk}/app"
@@ -215,7 +215,7 @@ url = "https://github.com/RIT-Launch-Initiative/FSW"
 sha = "f7a43b10cd76930bf7cb24e4ca7987d8c1d02546"  # parent of the v4.2 bump 7aada9dfd3
 
 [configs.ardep]
-oracle = "docs/oracles/ardep.md"
+oracle = "eval/oracles/ardep.md"
 scored = "DOGFOOD-11 §11 (A2, tuned)"
 app = "{src:ardep}/samples/uds"
 board = "ardep"
@@ -230,7 +230,7 @@ cmake_args = [
 ]
 
 [configs.rit-fsw-sensor]
-oracle = "docs/oracles/rit-fsw.md"
+oracle = "eval/oracles/rit-fsw.md"
 scored = "DOGFOOD-11 (zmig 983fe98, tuned)"
 app = "{src:rit-fsw}/app/backplane/sensor_module"
 app_patch = "eval/patches/rit-fsw-fsw-root.patch"  # FSW_ROOT from the command line
@@ -251,10 +251,10 @@ url = "https://github.com/Alicipy/CoffeeCaller"
 sha = "2b0a8f25b168680b883ab0df4d4ec87264c367cd"  # 0aefa36^1, parent of PR #16 (Zephyr 4.4 upgrade)
 
 # bridle is deliberately not a source: the native_sim build doesn't use it, and bridle v4.2.1
-# (d12204cf20b8c1039337f0afe67d64291c0674e4) breaks both builds when added (docs/oracles/coffeecaller.md).
+# (d12204cf20b8c1039337f0afe67d64291c0674e4) breaks both builds when added (eval/oracles/coffeecaller.md).
 
 [configs.coffeecaller-native]
-oracle = "docs/oracles/coffeecaller.md"
+oracle = "eval/oracles/coffeecaller.md"
 scored = "DOGFOOD-11 §10 (C1, tuned)"
 app = "{src:coffeecaller}/applications/coffeecaller"
 board = "native_sim"
@@ -269,7 +269,7 @@ url = "https://github.com/lucasdietrich/zephyr-linux-ble-copro"
 sha = "edee97c18006802ce387229c9c49ab2f9e1a18d7"  # base of PR #3 (Zephyr v4.3.0 -> v4.4.2, merge 2a9919bc17)
 
 [configs.ble-copro]
-oracle = "docs/oracles/ble-copro.md"
+oracle = "eval/oracles/ble-copro.md"
 scored = "DOGFOOD-12 §8 (E1-E4; tuned)"
 app = "{src:ble-copro}"
 board = "nrf52840dk/nrf52840"
@@ -290,7 +290,7 @@ sha = "5c67bae2fde7a2c43807d6e9b4e04fd89db45cd3"  # base of PR #421 (Zephyr v4.3
 submodules = ["lib/fprime", "lib/fprime-zephyr", "lib/fprime-extras", "lib/RadioLib"]
 
 [configs.proves]
-oracle = "docs/oracles/proves.md"
+oracle = "eval/oracles/proves.md"
 scored = "DOGFOOD-12 §7 (E1-E3; tuned)"
 app = "{src:proves}"
 # AuthDefaultKey.h, which `make generate` creates before CMake runs; and prj.conf:77's MCUboot
@@ -336,7 +336,7 @@ url = "https://github.com/zephyrproject-rtos/lz4"
 sha = "0ad20d0fc4ec70d6f4c3d399357e59d0544cf07f"  # branch `zephyr` tip since 2026-04-29, both sides
 
 [configs.edgehog]
-oracle = "docs/oracles/edgehog.md"
+oracle = "eval/oracles/edgehog.md"
 scored = "DOGFOOD-13 §6 (F1-F3; tuned)"
 app = "{src:edgehog}/e2e"
 # e2e/ reaches ../samples, ../lib and ../Kconfig, which aren't in zmig's copy of the app: the

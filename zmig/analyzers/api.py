@@ -1,4 +1,4 @@
-"""Public API changes the project's compiled code depends on (docs/DESIGN-P2.md).
+"""Public API changes the project's compiled code depends on (DESIGN.md, "API and ABI diff").
 
 Step 1 (§5.1): the project's own system calls. Zephyr turns each `__syscall` declaration
 it scans into generated wrappers (`syscalls/<header>.h`) and lists it in
@@ -294,7 +294,7 @@ class ApiAnalyzer:
             "tus": len(src_entries),
             "not_interpreted": len(uninterpreted),
             # Compared at both refs without parse errors (or no included file changed):
-            # the sbom analyzer trusts these TUs' "no declaration changed" (AUDIT.md F8).
+            # the sbom analyzer trusts these TUs' "no declaration changed" (eval/AUDIT.md F8).
             "clean_tus": sorted(set(todo_all) - uninterpreted),
         }
         for rel in sorted(set(src_entries) - set(todo_all)):
@@ -371,7 +371,7 @@ class ApiAnalyzer:
         callback_diags = [d for d in new_diags if d.get("kind", "callback") == "callback"]
         truncations = [d for d in new_diags if d.get("kind") == "truncation"]
         # Project callbacks whose function-pointer type no longer matches at the target:
-        # their definitions are what has to change (N1a in docs/oracles/cannectivity.md).
+        # their definitions are what has to change (N1a in eval/oracles/cannectivity.md).
         old_mismatch = {(m["function"], m["at"]) for t in src for m in t.get("fn_values", [])}
         new_mismatch = [
             m
@@ -729,7 +729,7 @@ class ApiAnalyzer:
         """A devicetree device the project takes (DEVICE_DT_GET, DT_CHOSEN, ...) that the
         target defines no device for: the node, its status at both refs, and the chosen
         property naming it (regression: bms-firmware native_sim, ThingSet's serial.c on a
-        uart1 that v4.2 leaves disabled, docs/DOGFOOD-3-baseline.md B5)."""
+        uart1 that v4.2 leaves disabled, eval/reports/DOGFOOD-3-baseline.md B5)."""
         try:
             new_nodes = ctx.new_edt["nodes"]
             old_nodes = ctx.old_edt["nodes"]
@@ -919,7 +919,7 @@ def coverage_detail(
     version: str, src: tuple[int, int], tgt: tuple[int, int], stats: dict[str, int]
 ) -> str:
     """The parse-coverage record: (TUs, with errors) per side. Parses served from zmig's
-    parse cache count as parsed, so a warm cache doesn't change report.json (docs/DESIGN.md
+    parse cache count as parsed, so a warm cache doesn't change report.json (DESIGN.md
     §3); the split is logged."""
     parsed = stats.get("parsed", 0) + stats.get("cached", 0)
     return (

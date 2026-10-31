@@ -135,7 +135,7 @@ def test_release_notes_section_filter() -> None:
 
 
 def test_crossed_releases_without_a_migration_guide_are_not_checked() -> None:
-    """AUDIT.md F4: Zephyr has doc/releases/migration-guide-X.Y.rst only from 3.5 on, so a
+    """eval/AUDIT.md F4: Zephyr has doc/releases/migration-guide-X.Y.rst only from 3.5 on, so a
     2.7 -> 3.7 scan read no guide for 3.0-3.4 and still reported the guide analyzer ok."""
     from zmig.analyzers.guide import GuideAnalyzer
     from zmig.guides import Document

@@ -2,8 +2,8 @@
 
 2026-10-30. zmig `d0567c6` (`main`; zmig code as at `aa95a10`). These are the first zmig
 runs on these projects. Their oracles were committed and pushed before the runs
-(`5ce3547`, `d0567c6`): [ardep](oracles/ardep.md), [rit-fsw](oracles/rit-fsw.md),
-[coffeecaller](oracles/coffeecaller.md). Scoring follows [ORACLE-RULES.md](ORACLE-RULES.md),
+(`5ce3547`, `d0567c6`): [ardep](../oracles/ardep.md), [rit-fsw](../oracles/rit-fsw.md),
+[coffeecaller](../oracles/coffeecaller.md). Scoring follows [ORACLE-RULES.md](../ORACLE-RULES.md),
 including §5 (actionable and fix-actionable).
 
 **These results are clean.** They are the "before" numbers for PROPOSAL-CHANGE-DB's Phase 0.

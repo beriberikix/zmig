@@ -1,4 +1,4 @@
-"""Bluetooth bonds and identity across the migration (docs/DESIGN-P1.md §7).
+"""Bluetooth bonds and identity across the migration (DESIGN.md, "Field-upgrade verdict").
 
 Active when the app enables a Bluetooth symbol (defined under subsys/bluetooth) that
 depends on or selects SETTINGS: then bonds, identity and GATT state persist in settings.

@@ -1,247 +1,331 @@
 # zmig
 
-A migration assistant for Zephyr RTOS upgrades. Instead of summarizing everything that
-changed in Zephyr, it tells you **what changed for your project**: it builds your app at
-both versions and compares the results, intersects the migration guides with what your
-code actually uses, and classifies your fork's local patches against the target.
+A migration assistant for Zephyr RTOS upgrades. Zephyr's release notes cover everything
+that changed. zmig tells you **what changed for your project**: which of your settings,
+devicetree references, includes and API calls are affected, at which line, and what to do
+about it.
 
-Findings come from real artifacts (resolved `.config`, the final devicetree, SPDX SBOMs,
-git objects, Zephyr's own docs), never from a model. Each one has a severity, a confidence,
-evidence (a file and line, or an artifact diff), and a suggested action. Output is
-`report.json` (versioned schema), a `MIGRATION.md` checklist, and SARIF.
+It works from real artifacts, never from a model. zmig builds your app at both Zephyr
+versions and compares what the builds produced. It reads each version's own Kconfig and
+devicetree tooling, and it matches the migration guides against what your code actually
+uses. Every finding has:
+- a severity (`breaking`, `risky`, `info`) and a confidence;
+- evidence: a file and line in your project, an artifact diff, or a guide entry;
+- a suggested action, and an exact edit when the evidence gives one.
 
-zmig never modifies your tree: it clones its own copy of Zephyr into a cache and builds
+zmig never modifies your tree. It clones its own copy of Zephyr into a cache and builds
 copies of your app there.
 
 ## Status
 
-**Alpha.** The CLI, the report schema (`report.json`, schema 1.5) and the finding IDs may
-still change.
+**Alpha.** The CLI, the report schema (`report.json`, schema 1.5) and finding IDs may still
+change.
 
-zmig is measured against hand-written oracles: what each project's maintainers actually
-changed in an upgrade, written down before zmig ran on it. There are 11 open-source
-projects so far: 17 harness build configurations plus OpenDeck ([docs/EVALUATION.md](docs/EVALUATION.md),
-rules in [docs/ORACLE-RULES.md](docs/ORACLE-RULES.md)).
-- **Clean results** (projects no zmig change was informed by) are reported separately from
-  tuned ones.
-- **The latest clean result** (edgehog, Zephyr v4.3 → v4.4, [DOGFOOD-13](docs/DOGFOOD-13-edgehog-baseline.md)):
-  - 4 of 8 upgrade items caught at the line the maintainers changed;
-  - 7 of 8 caught or partly caught;
-  - 38 of 40 breaking or risky findings true.
+zmig is measured against real upgrades of open-source Zephyr projects. For each one, what
+the maintainers changed is written down before zmig runs on it, then zmig's findings are
+scored against that list ([eval/EVALUATION.md](eval/EVALUATION.md)). The latest result on
+a project no zmig change was tuned for (edgehog, v4.3 → v4.4,
+[report](eval/reports/DOGFOOD-13-edgehog-baseline.md)):
+- 4 of 8 upgrade items caught at the line the maintainers changed;
+- 7 of 8 caught or partly caught;
+- 38 of 40 breaking or risky findings true.
 
-Main limitations:
-- **A target build that fails early hides most of its comparisons.** zmig falls back on
-  what the Zephyr tree itself says (the change database, `zmig changes`), but compile-level
-  changes need a target that compiles.
-- **Some upgrade items leave no trace in any build:** run-time behaviour, timing, stack
-  sizes, or a dependency's own changes.
-- **The tool has to build your app at both versions.** That needs the toolchains and
-  modules both refs require, and an app that can be built from a copy of its directory.
+See [Limitations](#limitations) before relying on it.
 
-The audit that shaped the current scoring rules is [AUDIT.md](AUDIT.md), and its responses.
+## Install
+
+**Prerequisites:** Linux, Python 3.12+, git ≥ 2.38, CMake, Ninja, `dtc`, and a host GCC
+with 32-bit multilib for `native_sim` (`apt install gcc-multilib`). Other boards also need
+their toolchain, from the Zephyr SDK.
+
+zmig isn't on PyPI yet. Install it from GitHub:
+
+```sh
+python3 -m venv .venv && . .venv/bin/activate
+pip install "zmig[zephyr,api] @ git+https://github.com/beriberikix/zmig"
+```
+
+| Extra | What for |
+|---|---|
+| `zephyr` | Python packages Zephyr's build scripts import. zmig runs `west build` with its own interpreter, so these are needed |
+| `api` | libclang, for the API diff. Without it the `api` analyzer is skipped |
+| `mcuboot` | MCUboot's imgtool dependencies, for sysbuild builds with MCUboot |
+
+The first `scan` or `plan` clones Zephyr into `~/.cache/zmig`: about 1 GB, roughly 20
+minutes at 1 MB/s. Later runs reuse the clone and every build.
 
 ## Quickstart
 
-**Time:** the first run makes an about 1 GB mirror clone of Zephyr into `~/.cache/zmig`:
-roughly 20 minutes at 1 MB/s, hours on slow wifi. How long later runs take hasn't been
-measured yet (docs/EVALUATION.md).
-
-**Prerequisites:** Linux, Python 3.12+, git ≥ 2.38, CMake, Ninja, `dtc`, and a host GCC
-with 32-bit multilib (for `native_sim`; e.g. `apt install gcc-multilib`). Other boards
-also need their toolchain (the Zephyr SDK).
-
 ```sh
-git clone <this repo> zmig && cd zmig
-uv venv --python 3.12 .venv            # or: python3 -m venv .venv
-uv pip install --python .venv/bin/python -e '.[zephyr]'
-. .venv/bin/activate
+# 0. Check the machine: host tools, Python packages, the board's toolchain.
+zmig doctor --board native_sim
+
+# 1. What happens to your west workspace and your local patches?
+zmig plan --workspace ~/my-workspace --from v4.3.0 --to v4.4.0 --out out/plan
+
+# 2. What changes for your app on your board?
+zmig scan --app path/to/app --board nrf52840dk/nrf52840 \
+          --from v4.3.0 --to v4.4.0 --out out/scan
 ```
 
-The `zephyr` extra installs the Python packages Zephyr's own build scripts import
-(pyelftools, PyYAML, pykwalify, …, reuse for `west spdx`), because zmig runs `west build`
-with its own interpreter.
+Then read, in this order:
+1. **The terminal summary:** counts, whether the target built, and "Do these first".
+2. **`out/scan/MIGRATION.md`:** a checklist grouped by tier (act now, review, FYI) and
+   category, worst first, with links to your files.
+3. **`out/scan/logs/`:** every command zmig ran, with its output. Look here when a finding
+   doesn't make sense.
 
-**0. Check the machine**
-
-```sh
-zmig doctor --board native_sim_64     # or the board you will scan, and --sdk <dir>
-```
-
-This checks git (≥ 2.38), CMake, Ninja, `dtc`, the host GCC (32-bit for `native_sim`), the
-Python packages, and a Zephyr SDK with the board's toolchain. Each failed check says what
-to install. The SDK check reads the board's architecture from the cached Zephyr mirror, so
-it can only match the board after the first `scan` or `plan`.
-
-If `PYTHONPATH` is set (ROS sets it, for example), zmig warns and removes it from every
-command it runs. If zmig itself then fails to import, run it as
-`env -u PYTHONPATH zmig …`.
-
-**1. Plan: what happens to your workspace and patches?**
+To try it without a project of your own, scan the bundled fixture, a `native_sim` app that
+touches real v3.6 → v3.7 changes:
 
 ```sh
-zmig plan --from v3.6.0 --to v3.7.0 --workspace ~/my-zephyr-workspace --out out/plan
-```
-
-Reports modules added, removed or re-pinned in `west.yml`; for each project you've
-forked or patched, which local commits are already upstream (by patch-id, or by subject),
-which apply cleanly to the target, and which conflict (and in which files); uncommitted or
-unrecorded changes; and a suggested upgrade path through LTS releases for large jumps.
-
-**2. Scan: what changes for your app on your board?**
-
-```sh
-zmig scan --app path/to/app --board native_sim_64 --from v3.6.0 --to v3.7.0 --out out/scan
-```
-
-The first run clones Zephyr (about 1 GB: roughly 20 minutes at 1 MB/s, hours on slow wifi)
-into `~/.cache/zmig`; later runs reuse it and every build. Add `--module <name>` for each west module your app needs, `--fast` for a
-configure-only comparison, and `--to-board` if you know the target board name.
-
-**3. Read the results**
-
-- Terminal: a summary with "Do these first".
-- `out/scan/MIGRATION.md`: the checklist, grouped by category, worst first.
-- `out/scan/report.json`: everything, for scripts or an agent.
-- `out/scan/report.sarif`: findings located in your files, for code-scanning UIs.
-- `out/scan/logs/`: every command zmig ran, with its output.
-
-Try it on the bundled fixture (a native_sim app touching real v3.6 → v3.7 changes; see
-`tests/fixtures/app/README.md`):
-
-```sh
+git clone https://github.com/beriberikix/zmig && cd zmig
 zmig scan --app tests/fixtures/app --board native_sim_64 --module zcbor \
           --from v3.6.0 --to v3.7.0 --out out/fixture
 ```
 
-## What `scan` checks
+## Commands
 
-| Analyzer | Compares | Examples |
-|---|---|---|
-| board | `boards/deprecated.cmake` (incl. aliases dropped in later releases), app files each build applied | `native_sim_64` → `native_sim/native/64` |
-| kconfig | final `.config` and each tree's Kconfig metadata (via its own kconfiglib) | symbol you set was removed (with likely replacement), value no longer takes effect, deprecated, value your code reads changed, a symbol your settings depend on/select changed (with the chain) |
-| devicetree | final devicetree (via each tree's edtlib) against your overlays and `DT_*` macros | node your code references is gone, property you read has no value, property you set is deprecated |
-| buildlog | the target build | configure/compile failures with the real errors, new warnings (a warning raised in a Zephyr header is reported at your call site), ROM/RAM delta with top symbols |
-| initorder | the init calls in both ELFs, read by each version's own `check_init_priorities.py` (v3.5+) | your `SYS_INIT`/device init now runs at another level, or Zephyr inits it relied on now run after it |
-| sbom | `west spdx` at both versions | modules added/dropped/re-pinned, compiled files added/removed/changed, upstream commits touching them, headers you include that changed |
-| guide | migration guides and release notes for every release crossed | entries mentioning symbols, compatibles, headers or APIs you use, with guide line and your line |
-
-Your own modules (passed with `--cmake-arg=-DZEPHYR_EXTRA_MODULES=...`) count as your code:
-findings in them are shown as `<module>/<path>:<line>`. Findings whose only evidence is in
-`.conf`/overlay/devicetree files this build doesn't use (another board's `.conf`, say) are
-kept as info and say so. Long steps (clones, builds) print progress every minute.
-
-If the target build fails because it needs a Zephyr module the scan wasn't given (a header
-only that module's glue ships, a Kconfig dependency on `ZEPHYR_<X>_MODULE`, or a CMake error
-naming it), zmig reports the module, where it's required and where the target's `west.yml`
-declares it, then rebuilds the target with it so the rest of the analysis still runs.
-
-When the target configure fails (Zephyr turns Kconfig and devicetree warnings into
-errors, so it usually does), zmig reports Zephyr's errors as findings, then disables
-exactly those lines in a copy of your app and compares the rest. The report lists every
-disabled line.
-
-## Field-upgrade verdict (`--sysbuild` builds, or any build with persistent state)
-
-`scan` also answers: can a device running the `--from` build take the `--to` build by app
-OTA? The report's `upgrade_path` (and the "Field-upgrade verdict" section of MIGRATION.md) gives
-one verdict: `direct-ok`, `needs-changes`, `blocked` or `unknown`. It is never OK by
-default: every category below must be checked clean or shown not to apply.
-
-| Category | What is compared |
+| Command | What it does |
 |---|---|
-| `layout` | flash partitions in the bootloader's final devicetree: moved, resized, removed, reordered; storage partitions left behind |
-| `mcuboot` | whether the deployed (source) MCUboot accepts the target's signed image: header/TLV layout read from `image.h` at each MCUboot pin, measured on both signed `.bin` files; app/bootloader mode agreement; slot geometry from `boot_slots_compatible()` |
-| `storage` | settings/NVS/ZMS/secure-storage backends enabled, implicit enables via `select`/`imply`, on-media definitions; remedies verified by re-resolving the target Kconfig |
-| `ble` | Bluetooth settings keys, persisted key structs, identity options |
-| `wire` | a documented allowlist (`zmig/data/wire_format.yaml`, extend with `--wire-allowlist`) of values peers see |
-| `sysbuild`, `images`, `crossimage` | `SB_CONFIG` changes and how they reach images; bootloader added/removed; app/bootloader disagreements |
+| [`zmig doctor`](#zmig-doctor) | Checks the host tools and the toolchain a board needs |
+| [`zmig plan`](#zmig-plan) | Workspace and fork triage: module changes in `west.yml`, and what happens to each of your local patches |
+| [`zmig scan`](#zmig-scan) | Builds your app at both versions and reports what changed for it |
+| [`zmig changes`](#zmig-changes) | What Zephyr removed, renamed or deprecated between two refs, from the tree alone (no build) |
+| [`zmig fix kconfig`](#zmig-fix-kconfig) | Renames or removes Kconfig assignments where Kconfig itself says what replaced them |
+| [`zmig watch`](#zmig-watch) | CI mode: scans, compares with a committed baseline, and fails on new findings |
 
-Each hazard finding carries a `remedy` (`config-pin`, `app-change`, `intermediate-hop`,
-`bootloader-update`, `reflash`, `unknown`), its evidence and provenance, and whether the
-migration introduced it. Assumptions (e.g. "the deployed bootloader is the source build's
-MCUboot") and what isn't checked are listed in the report.
+Options every command takes:
+- `--out DIR`: write `report.json`, `MIGRATION.md`, `report.sarif` and `logs/` there.
+- `--format human|json|markdown|sarif`: what goes to stdout (default `human`).
+- `--cache-dir DIR`: the cache root (default `$ZMIG_CACHE` or `~/.cache/zmig`).
+- `-v`: verbose.
 
-- `--sdk <dir>`: build with this Zephyr SDK (recorded in the report; the build fails if any
-  image used another).
-- `--deployed-image <file.bin>`: compare against a signed image read from a device instead of
-  the source build's.
-- `--wire-allowlist <file.yaml>`: extra wire-format entries.
+`--from` and `--to` accept a tag, a SHA, a branch, or a path to a local Zephyr checkout
+(uncommitted changes included).
 
-Design: [docs/DESIGN-P1.md](docs/DESIGN-P1.md).
-
-## `zmig fix kconfig`: renames with Kconfig evidence only
+### `zmig doctor`
 
 ```sh
-zmig fix kconfig --app path/to/app --board <board> --from v3.6.0 --to v3.7.0          # dry run
-zmig fix kconfig --app path/to/app --board <board> --from v3.6.0 --to v3.7.0 --apply  # commit
+zmig doctor --board <board> [--sdk <dir>]
 ```
 
-It takes the same arguments as `scan`. It checks every assignment in your own Kconfig
-fragments: `prj.conf`, board `.conf` and defconfig files, per-image files such as
-`sysbuild/mcuboot.conf`, `EXTRA_CONF_FILE`/`OVERLAY_CONFIG` fragments, and `SB_CONFIG_*`
-in `sysbuild.conf`.
+Checks git, CMake, Ninja, `dtc`, the host GCC, Zephyr's Python packages, and a Zephyr SDK
+with the board's toolchain. Each failed check says what to install. Exit 1 if any check
+failed. The SDK check reads the board's architecture from the cached Zephyr clone, so it
+can only match the board after the first `scan` or `plan`.
 
-It renames a symbol only when all of these hold:
-
-- the target's Kconfig tree no longer defines it;
-- the source tree shows what replaced it: the old symbol was deprecated and selects the
-  new one, or one is `default` the other;
-- the replacement has the same type and a prompt;
-- the target's own kconfiglib gives it the assigned value;
-- no migration-guide entry about either symbol mentions a value or unit change.
-
-Everything else is listed, not edited:
-
-- renames only the guide names;
-- symbols that are still defined but whose dependencies are unmet;
-- fragments outside the project.
-
-`--apply` refuses a dirty tree. It commits each kind of evidence separately on a new
-branch, then rebuilds the target and reruns the analyzers. It exits 3 only if the fix
-introduced a finding; findings that an earlier configure failure had hidden are reported
-as revealed. Results: [docs/P3-FIX-KCONFIG.md](docs/P3-FIX-KCONFIG.md).
-
-## Determinism and trust
-
-- Same inputs → byte-identical `report.json` (no timestamps or machine paths; finding ids
-  are hashes of what they are about).
-- Each finding's `confidence` says how it was derived: `high` from build artifacts or git
-  identity; `medium`/`low` from names or wording, with the heuristics listed.
-- An analyzer that can't run is reported as skipped with the reason, never dropped.
-
-## Development
+### `zmig plan`
 
 ```sh
-uv pip install --python .venv/bin/python pytest ruff mypy types-PyYAML jsonschema
-pytest                    # unit tests (seconds)
-pytest -m build           # real Zephyr builds of the fixture (minutes; network on first run)
-pytest -m network         # plan fixture (clones modules; ~1 minute)
-ruff check zmig tests && mypy
+zmig plan --workspace <west topdir> --from <ref> --to <ref> [--out DIR]
 ```
 
-Fixtures:
+Reports, without building anything:
+- modules added, removed or re-pinned in `west.yml`;
+- for every project you've forked or patched, each local commit as **upstreamed**
+  (already in the target), **applies cleanly**, or **conflicts** (with the files);
+- uncommitted or unrecorded changes in your checkouts;
+- a suggested path through LTS releases for large jumps.
 
-- `tests/fixtures/app` (native_sim, v3.6.0 → v3.7.0); `tests/fixtures/xapp`
-  (nrf52840dk/nrf52840 with sysbuild + MCUboot, cross-compiled, v4.4.0 → v4.5.0-rc3),
-  `xapp-mismatch` (app and bootloader disagree on a partition: the cross-image true
-  positive) and `xapp-salvage` (a removed symbol per image): see each README.
-- The fork workspace for `plan` is generated, not committed. It is built from real
-  v3.6.0..v3.7.0 history with fixed identities and dates, so it is identical on every
-  machine (a test regenerates it and compares):
+If your project applies patch files with `git apply`, pass
+`--patch-method git-apply --patch-dir <dir>` so findings name the patch file.
 
-  ```sh
-  python tests/fixtures/make_fork.py /tmp/fork-ws ~/.cache/zmig/mirrors/github.com_zephyrproject-rtos_zephyr.git
-  zmig plan --from v3.6.0 --to v3.7.0 --workspace /tmp/fork-ws
-  ```
+### `zmig scan`
 
-  `expected.json` in the generated workspace lists the classification each commit
-  should get.
+```sh
+zmig scan --app <dir> --board <board> --from <ref> --to <ref> [options] --out DIR
+```
 
-If your shell sets `PYTHONPATH` (ROS does), unset it for pytest: `env -u PYTHONPATH pytest`.
-zmig itself unsets it for builds.
+| Option | Use |
+|---|---|
+| `--module NAME` | a west project the app needs, cloned into zmig's workspaces (repeatable). zmig also adds one itself when the target build needs it |
+| `--cmake-arg=-D...` | passed to CMake at both versions, e.g. `-DEXTRA_CONF_FILE=…`, `-DSHIELD=…`, `-DFILE_SUFFIX=…`, `-DZEPHYR_EXTRA_MODULES=…` (repeatable) |
+| `--sysbuild` | build with sysbuild; adds the field-upgrade verdict |
+| `--sdk DIR` | the Zephyr SDK to build with |
+| `--to-board NAME` | the board's name at the target, if zmig can't map it |
+| `--fast` | configure only: quicker, but skips the analyzers that need a compiled build |
+| `--shallow` | fetch modules without history |
+| `--analyzers a,b` | run only these analyzers (or `none`, to just build) |
+| `--all-guide-entries` | also list migration-guide entries that don't match your app |
+| `--deployed-image FILE` | a signed image read from a device, for the MCUboot checks |
+| `--wire-allowlist FILE` | extra wire-format values your peers depend on |
 
-Design, findings schema and analyzer interface: [docs/DESIGN.md](docs/DESIGN.md).
-Analyzers are plugins: register a class under the `zmig.analyzers` entry-point group.
+What it checks:
 
-Not implemented yet (extension points exist): `verify`, codemods for C sources (the fix
-command renames Kconfig assignments only), security advisories.
+| Area | Examples |
+|---|---|
+| Board | the board was renamed (`native_sim_64` → `native_sim/native/64`); board-specific files that no longer apply |
+| Kconfig | a symbol you set was removed (with its replacement), is deprecated, or no longer takes effect because of a new dependency; a default you rely on changed |
+| Devicetree | a node, label or property your code references is gone; a compatible lost its binding; a property you set is deprecated |
+| Build | configure and compile errors and new warnings, at your lines; a missing `#include`; ROM/RAM growth |
+| API | a Zephyr function, macro, struct or type you use changed signature, type or layout, at your call sites |
+| Modules | a module the target needs that your build or manifest doesn't have |
+| Init order | your `SYS_INIT` or device now runs at another level, or after something it relied on |
+| Compiled files | modules and files that joined or left the build; upstream changes to files you compile |
+| Migration guides | guide and release-note entries that mention what you use, with the guide line and yours |
+| Field upgrade | with `--sysbuild` or persistent state: can a device running the old build take the new one over the air? (below) |
+
+If the target doesn't build, which is normal for a real upgrade, zmig reports Zephyr's
+errors as findings, disables exactly those lines in its own copy of your app, and compares
+the rest. The report lists every line it disabled.
+
+**Field-upgrade verdict.** `scan` also answers whether a device running the `--from` build
+can take the `--to` build by OTA: `direct-ok`, `needs-changes`, `blocked` or `unknown`. It
+compares flash partitions, MCUboot's image format (measured on both signed images), storage
+backends, Bluetooth settings and keys, and values peers see on the wire. It's never OK by
+default: every category has to be checked clean or shown not to apply.
+
+Exit codes: 0 ok, 1 tool error, 2 usage error.
+
+### `zmig changes`
+
+```sh
+zmig changes --from <ref> --to <ref> [--symbol CONFIG_X|vnd,name ...]
+```
+
+Lists what the Zephyr tree itself records between two refs, with no build:
+- Kconfig symbols removed, with the symbols that replaced them and when those apply;
+- symbols newly deprecated;
+- devicetree compatibles whose binding was removed or renamed;
+- symbols that moved into a module.
+
+`scan` uses the same database when the target build fails too early to compare.
+
+### `zmig fix kconfig`
+
+```sh
+zmig fix kconfig <the same arguments as scan>            # dry run: the plan and a diff
+zmig fix kconfig <the same arguments as scan> --apply    # commit on a new branch
+```
+
+Edits your own Kconfig fragments (`prj.conf`, board `.conf` and defconfig files, per-image
+files such as `sysbuild/mcuboot.conf`, extra conf fragments, `sysbuild.conf`) only where
+Kconfig evidences the change:
+- a rename, when the target no longer defines the symbol, the source tree shows the
+  replacement, the types match, and the target resolves the replacement to your value;
+- a removal with no replacement, which it comments out with a note.
+
+Everything else is listed under "Needs a human". `--apply` refuses a dirty tree, commits
+each kind of fix separately on `zmig/fix-kconfig-<target>` (or `--branch`), then rebuilds
+and re-runs the analyzers. Exit 3 means the fix introduced a finding. To undo:
+`git switch -` and delete the branch.
+
+### `zmig watch`
+
+```sh
+zmig watch --app <dir> --board <board> --to <ref> --init --reason "why"  # create .zmig/baseline.json
+zmig watch --app <dir> --board <board>                    # compare; exit 3 on new findings
+zmig watch ... --update-baseline --reason "why"           # accept the current findings
+```
+
+For CI. `--from` defaults to the Zephyr revision your `west.yml` pins, and `--to` to the
+target recorded in the baseline. A nightly job can use `--to track:next-release` or `track:main` instead.
+Findings are matched across runs by fingerprint, so line moves don't count as new. Accepted
+findings can expire (`--until`), and a new use site of an accepted finding still fails.
+
+| Exit | Meaning |
+|---|---|
+| 0 | nothing new |
+| 2 | usage error, a config mismatch, or no baseline |
+| 3 | a new breaking finding (`--fail-on risky` to include risky) |
+| 4 | inconclusive: something couldn't be checked (`--allow-inconclusive` to pass) |
+
+It writes a PR comment (`--pr-comment`) and SARIF (`--sarif`).
+[examples/zmig-watch.yml](examples/zmig-watch.yml) is a GitHub Actions workflow to start
+from, with PR and nightly runs and caching.
+
+## How it works
+
+The key techniques, grouped. [DESIGN.md](DESIGN.md) has the detail.
+
+- **Build both versions, compare what the builds produced.** zmig compares the resolved
+  `.config`, the final devicetree, the ELF (sizes, init calls), SPDX SBOMs and the build
+  logs, not source text.
+  [Builds](DESIGN.md#builds), [Analyzers](DESIGN.md#analyzers).
+- **Use each Zephyr version's own tools.** Kconfig and devicetree are read with each ref's
+  own kconfiglib and edtlib, in a subprocess, so the result matches what that version's
+  build does. Board renames come from Zephyr's own `boards/deprecated.cmake`, and init
+  order from its `check_init_priorities.py`. [Builds](DESIGN.md#builds).
+- **Scope everything to what your project uses.** A usage index records every setting your
+  fragments assign, every `CONFIG_` your code reads, every devicetree label, path and
+  compatible you reference, your includes, the Zephyr symbols your object files link
+  against, and the files you compile. Changes outside it are counted, not reported.
+  [Project usage](DESIGN.md#project-usage).
+- **Read Zephyr's own record of what changed.**
+  - Kconfig: removed symbols, newly deprecated ones (`select DEPRECATED`), and their
+    replacements, from deprecation `select`s, `default` aliases and help text.
+  - Devicetree: bindings that were removed or renamed.
+  - Modules: symbols that moved into a module's glue.
+  - Migration guides and release notes for every release crossed. Entries are parsed and
+    matched to your usage, and gated by build facts: an entry about a vendor's SoCs or a
+    disabled subsystem doesn't apply to your build.
+
+  [Change database](DESIGN.md#change-database),
+  [Migration-guide parsing](DESIGN.md#migration-guide-parsing).
+- **Diff the public API at your call sites.** zmig parses Zephyr's headers with libclang
+  at both refs, for the declarations your compiled code uses. It reports signature, type
+  and struct-layout changes where you use them, and follows compatibility aliases so a
+  rename that still compiles isn't reported as broken. [API and ABI diff](DESIGN.md#api-and-abi-diff).
+- **Keep going when the target build breaks.** zmig turns configure errors into findings,
+  disables the offending lines in its own copy of your app, and builds again. It adds
+  modules the target turns out to need. When the target can't be built at all, it falls
+  back on the change database. [Builds](DESIGN.md#builds).
+- **Put each error and warning at your line.** A warning raised inside a Zephyr header is
+  reported at your call site, using the compiler's include chain and macro-expansion notes.
+  A CMake warning about a `CONFIG_` value is reported at your assignment.
+  [Analyzers](DESIGN.md#analyzers).
+- **Triage forks with git plumbing.** zmig matches upstreamed commits by patch-id, subject
+  and content similarity, and trial-applies the rest with `git merge-tree`, in its own
+  clone. [Analyzers](DESIGN.md#analyzers).
+- **Check field upgrades category by category.** It compares partitions in the
+  bootloader's devicetree, MCUboot's header and TLV layout measured on the signed images,
+  storage backends, Bluetooth key state and wire values. Anything not positively checked
+  makes the verdict `unknown`. [Field-upgrade verdict](DESIGN.md#field-upgrade-verdict).
+- **Only evidenced fixes.** A fix's edit is filled in only when the finding's own facts
+  give it. `fix kconfig` applies only renames Kconfig evidences, and verifies them by
+  rebuilding. [Kconfig fixes](DESIGN.md#kconfig-fixes).
+- **Stable, reproducible output.** The same inputs give a byte-identical `report.json`,
+  with no timestamps or machine paths. Finding IDs are hashes of what they're about, which
+  lets `watch` compare runs. [Findings and reports](DESIGN.md#findings-and-reports),
+  [CI mode](DESIGN.md#ci-mode-zmig-watch).
+
+## Output
+
+With `--out DIR`:
+
+| File | For |
+|---|---|
+| `MIGRATION.md` | people: a checklist by tier and category, with the field-upgrade verdict |
+| `report.json` | scripts and agents: every finding, with evidence, inputs and analyzer status (versioned schema in `zmig/schema/`) |
+| `report.sarif` | code-scanning UIs: findings located in your files |
+| `logs/` | every command zmig ran, with its output (`invocations.json` lists them) |
+
+An analyzer that can't run is listed as skipped, with the reason, never silently dropped.
+Each finding's `confidence` says how it was derived:
+- `high`: from a build artifact or git identity;
+- `medium` or `low`: from names or wording, with the heuristics used listed.
+
+## Limitations
+
+- **A target build that fails early hides most comparisons.** zmig falls back on the
+  change database, but compile-level changes need a target that compiles.
+- **Some upgrade items leave no trace in any build:** run-time behaviour, timing, stack
+  sizes, or a dependency's own changes.
+- **zmig has to build your app at both versions.** That needs the toolchains and modules
+  both refs require, and an app that can be built from a copy of its directory.
+- **Linux only so far.**
+- If `PYTHONPATH` is set (ROS sets it, for example), zmig removes it from the commands it
+  runs. If zmig itself then fails to import, run it as `env -u PYTHONPATH zmig …`.
+
+Not implemented yet: `zmig verify`, code changes beyond Kconfig assignments, and security
+advisories. Open work is tracked in [GitHub issues](https://github.com/beriberikix/zmig/issues).
+
+## More
+
+- [DESIGN.md](DESIGN.md): how zmig works, and why.
+- [DEVELOPMENT.md](DEVELOPMENT.md): setting up, tests, fixtures, the evaluation harness.
+- [CONTRIBUTING.md](CONTRIBUTING.md): reporting results on your project, and changes.
+- [eval/](eval/): how zmig is measured, and every result so far.
+
+Licensed under [Apache-2.0](LICENSE).

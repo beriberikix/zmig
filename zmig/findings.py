@@ -52,7 +52,7 @@ class Category(StrEnum):
 
 
 class Remedy(StrEnum):
-    """What resolves a field-upgrade hazard (docs/DESIGN-P1.md §8.1)."""
+    """What resolves a field-upgrade hazard (DESIGN.md, "Field-upgrade verdict")."""
 
     CONFIG_PIN = "config-pin"
     APP_CHANGE = "app-change"
@@ -160,7 +160,7 @@ class Finding:
     # whole), which keeps reports of plain builds unchanged.
     image: str | None = None
     # Schema 1.2. True when the migration caused the problem; False when the source build
-    # already had it, unchanged (docs/DESIGN-P1.md §2.3).
+    # already had it, unchanged (DESIGN.md, "Pre-existing problems").
     introduced_by_migration: bool = True
     # Hazard findings only: what resolves it, and where the evidence and role came from.
     remedy: Remedy | None = None
@@ -170,7 +170,7 @@ class Finding:
     tier: str | None = None
     # Schema 1.5 (zmig.fixes): where the fix goes and, when the finding's own facts give
     # it, the edit: {"file", "line", "old", "new", "source", "confidence"}. Additive; it
-    # never changes what is reported or how severe it is (docs/PROPOSAL-CHANGE-DB.md §3).
+    # never changes what is reported or how severe it is (DESIGN.md, "The `fix` field").
     fix: JSON | None = None
 
     @property

@@ -1,4 +1,4 @@
-"""MCUboot and the signed image format across the migration (docs/DESIGN-P1.md §5).
+"""MCUboot and the signed image format across the migration (DESIGN.md, "Field-upgrade verdict").
 
 A field device keeps its bootloader. So the main question (direction a) is whether the
 *deployed* bootloader, assumed to be the source build's MCUboot, accepts the *target*

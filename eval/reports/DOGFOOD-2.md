@@ -1,12 +1,12 @@
 # Dogfood 2: after Step 2, compared with the baseline
 
-Date: 2026-10-28. Scoring follows [ORACLE-RULES.md](ORACLE-RULES.md). The baseline is
+Date: 2026-10-28. Scoring follows [ORACLE-RULES.md](../ORACLE-RULES.md). The baseline is
 [DOGFOOD-2-baseline.md](DOGFOOD-2-baseline.md) (zmig `0cb691a`). The oracles weren't edited
 after the runs, and no corrections were needed. ZMK, Golioth (B) and bms-firmware (A1) are
 reported separately.
 
 Step 3 (P2, public API/ABI diff) isn't implemented yet. Its design is in
-[DESIGN-P2.md](DESIGN-P2.md), awaiting review. §6 will hold the after-P2 numbers.
+[DESIGN-P2.md](https://github.com/beriberikix/zmig/blob/c07a0bf/docs/DESIGN-P2.md), awaiting review. §6 will hold the after-P2 numbers.
 
 ---
 

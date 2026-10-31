@@ -365,7 +365,7 @@ def test_verdict_with_unchecked_categories_is_a_lower_bound() -> None:
 
 def test_verdict_confidence_low_when_the_target_did_not_build() -> None:
     """bms-firmware native_sim/OLED were direct-ok (medium) with failed target builds
-    (docs/DOGFOOD-3-baseline.md M11)."""
+    (eval/reports/DOGFOOD-3-baseline.md M11)."""
     from zmig.verdict import upgrade_path
 
     ok = upgrade_path(_clean_shared(), [], _ok())

@@ -1,4 +1,4 @@
-"""P2 optional tools (docs/DESIGN-P2.md §6, §10.5): both the tools-present and the
+"""P2 optional tools (DESIGN.md, "Optional binary tools"): both the tools-present and the
 tools-absent paths."""
 
 from __future__ import annotations

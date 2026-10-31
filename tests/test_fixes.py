@@ -1,5 +1,5 @@
 """zmig.fixes: where the fix goes, and the edit when a finding's own facts give it
-(docs/PROPOSAL-CHANGE-DB.md §3). Shapes are taken from findings on the oracle projects."""
+(DESIGN.md, "The `fix` field"). Shapes are taken from findings on the oracle projects."""
 
 # ruff: noqa: E501  (verbatim compiler messages and Kconfig help text)
 
@@ -132,7 +132,7 @@ def test_no_project_location_no_fix() -> None:
 
 def test_only_action_and_fix_change() -> None:
     """The invariant Phase 0's measurement depends on: no finding is added, dropped or
-    re-graded, so recall and precision can't move (docs/PROPOSAL-CHANGE-DB.md §3)."""
+    re-graded, so recall and precision can't move (DESIGN.md, "The `fix` field")."""
     fs = [
         _f("symbol-removed", Category.KCONFIG, (file_line("prj.conf", 1, "CONFIG_A=y"),), subject="CONFIG_A",
            new={"candidates": [{"symbol": "B", "why": "w", "confidence": "low"}]}),

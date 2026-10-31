@@ -168,7 +168,7 @@ def propose(ctx: ScanContext, col: Collected) -> list[Proposal]:
 class Override:
     """A Kconfig-file override of a symbol the target no longer defines, from the target
     build's own Kconfig warning (the scan's `kconfig-override-orphaned` finding). Never
-    edited: see docs/DESIGN-KCONFIG-OVERRIDES.md."""
+    edited: see DESIGN.md, "Kconfig fixes"."""
 
     symbol: str
     locations: tuple[str, ...]  # app-relative path:line, every one the build names

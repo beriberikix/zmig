@@ -38,7 +38,7 @@ def _ev(locs: list[Loc]) -> tuple[JSON, ...]:
 
 # Numbers dtc assigns to referenced nodes: a renumbering between builds changes nothing
 # (regression: CANnectivity's led0 and counter2 "changed: phandle",
-# docs/DOGFOOD-4-baseline.md M13).
+# eval/reports/DOGFOOD-4-baseline.md M13).
 _ASSIGNED_BY_DTC = frozenset({"phandle", "linux,phandle"})
 
 
@@ -134,7 +134,7 @@ class DevicetreeAnalyzer:
             )
 
         # Diagnostics: the target configure rejected the app's devicetree. The same error
-        # at the source is pre-existing; it keeps its severity (docs/DESIGN-P1.md §2.3).
+        # at the source is pre-existing; it keeps its severity (DESIGN.md, "Pre-existing problems").
         overlays = list(app_relative(ctx.new_raw_facts.overlays, ctx.new_raw.src))
         for d in ctx.new_raw_facts.diagnostics:
             pre = preexisting(d, ctx.old_facts.diagnostics)
@@ -197,7 +197,7 @@ class DevicetreeAnalyzer:
         for ref, loc in ctx.usage.dt_nodes:
             # A reference in a source file this build doesn't compile isn't this build's
             # (regression: CANnectivity's src/dfu.c, only built with MCUboot DFU,
-            # docs/DOGFOOD-4-baseline.md M15). Overlays are judged by outside_build().
+            # eval/reports/DOGFOOD-4-baseline.md M15). Overlays are judged by outside_build().
             if built is not None and loc.path.endswith(SOURCE_SUFFIXES) and loc.path not in built:
                 continue
             by_ref.setdefault(ref, []).append(loc)
@@ -328,7 +328,7 @@ class DevicetreeAnalyzer:
             d.symbol for d in ctx.new_raw_facts.diagnostics if d.kind == "dt-undeclared-property"
         }
         # Binding spec changes of properties the app uses, one finding per (kind, property)
-        # whether the overlay sets it, the C code reads it, or both (AUDIT.md §6 item 6).
+        # whether the overlay sets it, the C code reads it, or both (eval/AUDIT.md §6 item 6).
         spec_seen: set[tuple[str, str]] = set()
 
         def type_changed(pn: str, prop: str, was: str, now: str, locs: list[Loc]) -> None:

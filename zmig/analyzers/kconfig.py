@@ -149,7 +149,7 @@ def new_dependencies_off(
 
 
 def expression_note(old: Symbols, new: Symbols, sym: str, spec: str) -> str:
-    """ " Its definition changed in <spec>: ..." for a finding's action, or "" (AUDIT.md
+    """ " Its definition changed in <spec>: ..." for a finding's action, or "" (eval/AUDIT.md
     §6 item 5: the value findings say why)."""
     if sym not in old or sym not in new:
         return ""
@@ -286,11 +286,11 @@ class KconfigAnalyzer:
                 )
                 continue
             # The source configure printing the same diagnostic makes it a condition of
-            # the app, not of the migration (docs/DESIGN-P1.md §2.3).
+            # the app, not of the migration (DESIGN.md, "Pre-existing problems").
             pre = d is not None and preexisting(d, source_diags)
             if d is not None and d.kind == "kconfig-not-taken" and pre:
                 # Never took effect, so nothing the app relies on changes: info, unlike
-                # §2.3's pre-existing defects (AUDIT.md F1, the settings sample's
+                # §2.3's pre-existing defects (eval/AUDIT.md F1, the settings sample's
                 # CONFIG_STDOUT_CONSOLE on native_sim).
                 add(
                     "value-not-taken",
@@ -497,7 +497,7 @@ class KconfigAnalyzer:
         """One info finding for the depends/selects/implies changes of symbols this build's
         inputs set (applied fragments) or read (compiled files). Any that took effect in
         this build is also a value change, reported on its own; the rest matter for other
-        boards and configurations (AUDIT.md §6 item 5: as risky, echo_server would get 18,
+        boards and configurations (eval/AUDIT.md §6 item 5: as risky, echo_server would get 18,
         mostly SoC lists and overlays the build doesn't apply)."""
         ok, nk = ctx.old_kconfig, ctx.new_kconfig
         applied = set(app_relative(ctx.old_facts.configs, ctx.old.src))

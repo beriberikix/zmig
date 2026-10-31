@@ -38,14 +38,14 @@ mcuboot = [
     "pyyaml",
 ]
 
-# libclang for the public API/ABI diff (docs/DESIGN-P2.md). The wheel bundles libclang.so;
-# ZMIG_LIBCLANG=/path/to/libclang.so selects a system one instead.
 # Not needed to use zmig: only to re-run the `proves` evaluation configuration
 # (eval/configs.toml), an F´ deployment whose build needs F´'s code generators on PATH.
 eval-fprime = [
     "fprime-tools==4.1.0",
     "fprime-fpp==3.1.0",
 ]
+# libclang for the public API/ABI diff (DESIGN.md, "API and ABI diff"). The wheel bundles
+# libclang.so; ZMIG_LIBCLANG=/path/to/libclang.so selects a system one instead.
 api = [
     "libclang==18.1.1",
 ]

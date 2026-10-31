@@ -1,4 +1,4 @@
-"""Flash partition layout across the migration (field-upgrade hazard, docs/DESIGN-P1.md §4).
+"""Flash partition layout across the migration (DESIGN.md, "Field-upgrade verdict").
 
 The bootloader owns the layout: a deployed bootloader keeps looking for its slots where
 the source build put them. So the source and target layouts are compared from the

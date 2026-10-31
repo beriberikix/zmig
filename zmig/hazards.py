@@ -1,4 +1,4 @@
-"""Shared pieces of the field-upgrade hazard analyzers (docs/DESIGN-P1.md).
+"""Shared pieces of the field-upgrade hazard analyzers (DESIGN.md, "Field-upgrade verdict").
 
 Role evidence: how sure we are which image is the bootloader the device runs.
   strong   the image's own .config says it is MCUboot (CONFIG_MCUBOOT=y)

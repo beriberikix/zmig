@@ -7,7 +7,7 @@ propagation directives in share/sysbuild/image_configurations (zmig.sysbuild_rul
 An *option* change is reported from the SB_CONFIG diff. Whether *behavior* changed is
 decided only from the resolved image options the SB_CONFIG symbol propagates to: if
 they are identical at both refs, the finding says "behavior unchanged", whatever the
-SB_CONFIG names did (docs/DESIGN-P1.md §2.1). An image option that is itself renamed in
+SB_CONFIG names did (DESIGN.md, "Field-upgrade verdict"). An image option that is itself renamed in
 step (deprecated at the target, its help naming a replacement that takes its value) is
 a rename, not a behavior change.
 

@@ -107,7 +107,7 @@ def test_map_board() -> None:
 
 
 def test_header_changed_needs_api_coverage_to_be_demoted() -> None:
-    """AUDIT.md F8/§5.2: <zephyr/settings/settings.h> changed (+51/-9) but libclang
+    """eval/AUDIT.md F8/§5.2: <zephyr/settings/settings.h> changed (+51/-9) but libclang
     compared every declaration src/main.c uses and found none changed; a byte diff alone
     is not a risk. Conservative: every including site must be a TU compared cleanly at
     both refs with no API finding in it."""

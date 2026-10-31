@@ -1,8 +1,8 @@
 # DOGFOOD-6: re-measurement after the audit fixes
 
-2026-10-29. zmig `aa95a10` (`main` after PR #1, the `AUDIT.md` fixes). Every number here is
+2026-10-29. zmig `aa95a10` (`main` after PR #1, the `eval/AUDIT.md` fixes). Every number here is
 **tuned**: these projects were scored before, and some fixes since then were informed by
-them (`docs/EVALUATION.md`, "Clean vs tuned"). The audit's `header-changed` fix was
+them (`eval/EVALUATION.md`, "Clean vs tuned"). The audit's `header-changed` fix was
 motivated partly by bms A1's published precision.
 
 ## Method

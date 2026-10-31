@@ -1,6 +1,6 @@
 """Definitions in C sources at a pinned SHA, and how they differ between two SHAs.
 
-docs/DESIGN-P1.md §3. Reads go through `git grep`/`git show` at the SHA (never a
+DESIGN.md, "Field-upgrade verdict". Reads go through `git grep`/`git show` at the SHA (never a
 checkout). Seeds (zmig/data/hazard_seeds.yaml) say what to look for:
 
   define         every `#define NAME ...` (conditional definitions are all kept)

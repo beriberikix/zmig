@@ -1,4 +1,4 @@
-"""Presentation tiers: act-now / review / fyi (docs/PROPOSAL-TIERS.md).
+"""Presentation tiers: act-now / review / fyi (DESIGN.md, "Tiers").
 
 An additive label on each finding, for grouping output. Nothing else reads it: the
 verdict, exit codes, watch fingerprints and every other field are computed without it.

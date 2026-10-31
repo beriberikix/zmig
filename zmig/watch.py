@@ -1,4 +1,4 @@
-"""`zmig watch`: compare a scan against a committed baseline (docs/DESIGN-WATCH.md).
+"""`zmig watch`: compare a scan against a committed baseline (DESIGN.md, "CI mode (zmig watch)").
 
 Everything here works on report JSON (`Report.to_json()` or a report.json read back), so
 the comparison can be re-run on saved reports without building anything.

@@ -8,7 +8,7 @@ the target needs although the target build never got far enough to say so:
   missing from the scan's module set, target has no .config   module-required (same ID)
   in the scan's module set, missing from the user's allowlist module-not-in-manifest
 
-(docs/DESIGN-CHANGE-DB.md §2.4, §6: ardep A6 tf-psa-crypto; RIT FSW F2 cmsis_6.)"""
+(DESIGN.md, "Change database": ardep A6 tf-psa-crypto; RIT FSW F2 cmsis_6.)"""
 
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ class ModulesAnalyzer:
         ) -> None:
             added = need.module in ctx.modules_added
             # Needed at both refs: the scan's module set lacked it, the migration didn't
-            # change anything (AUDIT.md §5.2 run 1; docs/DESIGN-P1.md §2.3).
+            # change anything (eval/AUDIT.md §5.2 run 1; DESIGN.md, "Pre-existing problems").
             at_source = need.module in ctx.modules_at_source
             site = need.site.replace(zephyr, "zephyr/")
             ev: list[JSON] = [

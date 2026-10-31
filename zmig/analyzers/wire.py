@@ -1,4 +1,4 @@
-"""Wire formats peers depend on (docs/DESIGN-P1.md §7): an allowlist, not inference.
+"""Wire formats peers depend on (DESIGN.md, "Field-upgrade verdict"): an allowlist, not inference.
 
 Entries come from zmig/data/wire_format.yaml plus --wire-allowlist. For every image pair,
 an entry whose resolved value differs is a finding naming the entry id. Each entry is

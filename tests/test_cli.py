@@ -63,7 +63,7 @@ def test_unknown_analyzer(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
 
 def test_readme_lists_no_shipped_subcommand_as_unimplemented() -> None:
     """README's "Not implemented yet" line went stale once watch, API diffing and the
-    MCUboot checks shipped (AUDIT.md F15). A subcommand is unimplemented only if its own
+    MCUboot checks shipped (eval/AUDIT.md F15). A subcommand is unimplemented only if its own
     help says so."""
     import argparse
     import re

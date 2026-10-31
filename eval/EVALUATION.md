@@ -175,4 +175,4 @@ Lenient recall can't move further without new pairs.
 7. **Run-time behaviour** (defaults that change behaviour without a build artifact) is out
    of reach by design.
 8. **watch in CI:** fork PRs, cron, SARIF upload and cache limits are unverified
-   ([CI-TEST.md](CI-TEST.md)).
+   ([CI-TEST.md](reports/CI-TEST.md)).

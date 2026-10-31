@@ -1,4 +1,4 @@
-"""What changed between two Zephyr refs, from the tree alone (docs/DESIGN-CHANGE-DB.md).
+"""What changed between two Zephyr refs, from the tree alone (DESIGN.md, "Change database").
 
 Facts that need no build of either ref, so scans can use them when the target configure
 fails before Kconfig or devicetree. Kconfig:
@@ -443,7 +443,7 @@ def choose(candidates: list[dict[str, Any]], config: dict[str, str]) -> list[dic
     whose conditions the build makes false is dropped. One whose conditions all hold comes
     first; it is medium when it is the only such one. With none that holds, a single
     remaining candidate is medium. Everything else is low, and a same-commit candidate is
-    always low (DESIGN-CHANGE-DB §2.2)."""
+    always low (DESIGN.md, "Change database")."""
     rated = []
     for c in candidates:
         vals = [evaluate(x, config) for x in c.get("conditions", [])]

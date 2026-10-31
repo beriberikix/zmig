@@ -1,4 +1,4 @@
-"""Persistent storage across the migration (docs/DESIGN-P1.md §6).
+"""Persistent storage across the migration (DESIGN.md, "Field-upgrade verdict").
 
 Data a deployed device wrote stays where and how the source build wrote it. For the app
 image at both refs this checks:

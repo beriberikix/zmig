@@ -1,4 +1,5 @@
-"""P1 field-upgrade hazard fixtures A, B, C (docs/DESIGN-P1.md §11), built with SDK 0.17.4.
+"""P1 field-upgrade hazard fixtures A, B, C (DESIGN.md, "Field-upgrade verdict"), built with
+SDK 0.17.4.
 
 Run with: pytest -m sdk   (needs ~/.cache/zmig/sdks/zephyr-sdk-0.17.4 or ZMIG_SDK_0174, and
 network on first run). Resolved SHAs are asserted so the expectations stay tied to the

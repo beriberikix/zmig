@@ -3,7 +3,7 @@ got that far.
 
 The kconfig analyzer compares both builds' .config and symbol dumps, so it is skipped when
 the target configure fails before Kconfig. The two Zephyr trees still say which symbols
-were removed and what replaced them (zmig.changes, docs/DESIGN-CHANGE-DB.md); this
+were removed and what replaced them (zmig.changes, DESIGN.md, "Change database"); this
 analyzer looks those facts up for what the source build shows the project uses:
 
   a symbol a fragment the build merged sets   symbol-removed            (kconfig's kind)
@@ -19,7 +19,7 @@ bound by a binding at the source, whose binding the Zephyr tree no longer has.
 
 The database covers Zephyr's tree only. A symbol or compatible that a module of the target
 workspace defines (it moved into a module) isn't removed, and isn't reported
-(DESIGN-CHANGE-DB §2.1, `module_definitions`).
+(DESIGN.md, "Change database", `module_definitions`).
 
 Same category, kind and subject as those analyzers, so a finding has the same ID whether
 or not the target configured. Each part runs only when the target lacks the artifact its

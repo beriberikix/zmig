@@ -131,7 +131,7 @@ def materialize(
     """Create or reuse the workspace for a ref, cloning `modules` (west project names).
 
     shallow: fetch only each module's pinned commit (`git fetch --depth=1`), about 5x
-    less to download than its history (docs/DESIGN-WATCH.md §7). Nothing in `scan`
+    less to download than its history (DESIGN.md, "CI mode (zmig watch)"). Nothing in `scan`
     reads module history; fork triage would (see shallow_modules()).
     """
     root = cache.workspaces / resolved.ref.key

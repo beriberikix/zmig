@@ -98,7 +98,7 @@ _BARE_CONFIG = re.compile(r"(?<![`\w])CONFIG_[A-Z0-9_]+\b")
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # Standard C type names say nothing about which API an entry is about: "the event type
 # changed from uint32_t to uint64_t" would otherwise match every uint32_t in the app
-# (regression: bms-firmware, docs/DOGFOOD-2-baseline.md M4).
+# (regression: bms-firmware, eval/reports/DOGFOOD-2-baseline.md M4).
 _C_STD_TYPE = re.compile(
     r"u?int(?:8|16|32|64|ptr|max)_t|u?int_(?:least|fast)(?:8|16|32|64)_t|s?size_t|"
     r"ptrdiff_t|off_t|time_t|wchar_t|bool|float|double|char|void"

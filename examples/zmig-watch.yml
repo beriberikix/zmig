@@ -1,6 +1,6 @@
-# zmig watch: example GitHub Actions workflow (docs/DESIGN-WATCH.md §6).
+# zmig watch: example GitHub Actions workflow (DESIGN.md, "CI mode (zmig watch)").
 #
-# Ran in GitHub Actions on 2026-10-28 in a private test repo (docs/CI-TEST.md has the
+# Ran in GitHub Actions on 2026-10-28 in a private test repo (eval/reports/CI-TEST.md has the
 # runs); the fixes those runs needed are in this file. Every `uses:` is pinned to the
 # commit its tag pointed to on 2026-10-28 (`git ls-remote`). "verified" below means a real
 # run with exactly these inputs passed; "UNVERIFIED" means it never ran successfully:
@@ -27,10 +27,8 @@ env:
   ZMIG_VERSION: "0.1.0"
   # The zmig package to install, pinned by commit. zmig isn't on PyPI. The baseline
   # records the zmig build, so upgrade zmig in a PR that changes this pin and includes
-  # `zmig watch ... --rebase-baseline --reason ...` (DESIGN-WATCH.md §3.6).
-  # A private zmig repo needs a read-only token in a secret, e.g.
-  #   git+https://x-access-token:${{ secrets.ZMIG_READ }}@github.com/OWNER/zmig@COMMIT_SHA
-  ZMIG_PIP: "zmig[zephyr,api] @ git+https://github.com/OWNER/zmig@COMMIT_SHA"
+  # `zmig watch ... --rebase-baseline --reason ...` (DESIGN.md, "CI mode (zmig watch)").
+  ZMIG_PIP: "zmig[zephyr,api] @ git+https://github.com/beriberikix/zmig@COMMIT_SHA"
   ZMIG_ARGS: >-
     --shallow
     --app app --board usb2canfdv1

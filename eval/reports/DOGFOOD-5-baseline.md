@@ -3,8 +3,8 @@
 - **Date:** 2026-10-29.
 - **zmig:** `e3c78e4`. That's the oracle commit; the analyzer code is that of `91a5116`
   plus `477d419`, with docs-only commits since.
-- **Rules:** [ORACLE-RULES.md](ORACLE-RULES.md).
-- **Oracle:** [oracles/opendeck.md](oracles/opendeck.md) (`e3c78e4`), committed before
+- **Rules:** [ORACLE-RULES.md](../ORACLE-RULES.md).
+- **Oracle:** [oracles/opendeck.md](../oracles/opendeck.md) (`e3c78e4`), committed before
   zmig ran.
 
 **This project is clean.** No zmig change has been informed by it. From here on, the
@@ -22,7 +22,7 @@ only changes allowed on it are crash and misleading-output fixes, listed in §8.
 | Modules | cmsis_6, hal_stm32, mcuboot, mbedtls, tf-psa-crypto (`--shallow`); `zlibs` via `ZEPHYR_EXTRA_MODULES`; `u8g2`, `vl53l4cx`, `vl53l5cx` as `$ZEPHYR_WS/modules/…` |
 | SDK | Zephyr SDK **1.0.1** (minimal + ARM toolchain, installed for this run; SHA-256 verified) |
 
-### Patch application (`docs/examples/opendeck-patched.sh`)
+### Patch application (`eval/scripts/opendeck-patched.sh`)
 
 The source-commit patch set has 31 patches. Per-patch results are in
 `oracles/opendeck-patches-{source,target}.tsv`.

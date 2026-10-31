@@ -9,7 +9,7 @@ them in DOGFOOD-2-baseline.md.
 
 The oracle for an upgrade is the list of changes the project's maintainers made because of
 it, read from their commits. It is written and committed **before** zmig is run on that
-project, in `docs/oracles/<project>.md`.
+project, in `eval/oracles/<project>.md`.
 
 ### 1.1 Items
 

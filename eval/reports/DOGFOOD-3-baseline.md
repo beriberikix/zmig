@@ -1,10 +1,10 @@
 # Dogfood 3 baseline: module-set detection, and five more held-out configurations
 
 Date: 2026-10-28. zmig `0400082`: its code is `9c8da4a`, i.e. Step 2 plus module-set
-detection; P2 isn't implemented. Scoring follows [ORACLE-RULES.md](ORACLE-RULES.md). The
+detection; P2 isn't implemented. Scoring follows [ORACLE-RULES.md](../ORACLE-RULES.md). The
 oracles for the new configurations were committed before these runs (`0400082`):
-[oracles/golioth-configs.md](oracles/golioth-configs.md) and
-[oracles/bms-firmware-configs.md](oracles/bms-firmware-configs.md).
+[oracles/golioth-configs.md](../oracles/golioth-configs.md) and
+[oracles/bms-firmware-configs.md](../oracles/bms-firmware-configs.md).
 
 Every configuration is reported on its own. The original three (ZMK, Golioth B,
 bms-firmware A1) were re-run on the same zmig, so the table in §5 compares like with like.

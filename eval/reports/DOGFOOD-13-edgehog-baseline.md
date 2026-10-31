@@ -1,10 +1,10 @@
 # DOGFOOD-13: clean baseline on a third new held-out project (edgehog)
 
 2026-10-30. zmig `7c64974` (code as at `6227d2f`). This is the first zmig run on
-[edgehog](oracles/edgehog.md). Its oracle was committed and pushed before the run
+[edgehog](../oracles/edgehog.md). Its oracle was committed and pushed before the run
 (`7c64974`); only `--analyzers none` verification builds ran before that.
 
-Scoring follows [ORACLE-RULES.md](ORACLE-RULES.md), including §5.
+Scoring follows [ORACLE-RULES.md](../ORACLE-RULES.md), including §5.
 
 **This result is clean.** No zmig change was informed by edgehog. It is the first clean
 measurement after DOGFOOD-12's E1–E4 and E8 fixes, which were tuned on ble-copro and

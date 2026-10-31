@@ -2,12 +2,12 @@
 
 2026-10-30. zmig `c919498` (code as at `4e97c2e`). These are the first zmig runs on these
 projects. Their oracles were committed and pushed before the run (`c919498`):
-- [ble-copro](oracles/ble-copro.md);
-- [proves](oracles/proves.md).
+- [ble-copro](../oracles/ble-copro.md);
+- [proves](../oracles/proves.md).
 
 Only `--analyzers none` verification builds ran before that.
 
-Scoring follows [ORACLE-RULES.md](ORACLE-RULES.md), including §5.
+Scoring follows [ORACLE-RULES.md](../ORACLE-RULES.md), including §5.
 
 **These results are clean.** No zmig change was informed by either project. This is the
 first clean measurement since the change database (DOGFOOD-11) and the A3, C1 and A2 work,

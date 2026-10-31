@@ -1,8 +1,10 @@
 """Release boundaries crossed by the upgrade, and suggested intermediate hops.
 
 Release versions come from each ref's VERSION file and the mirror's release tags.
-LTS releases and contract-breaking boundaries come from zmig/data/releases.json,
-which is hand-maintained, so those findings carry the `hops.release-data` heuristic.
+LTS releases come from Zephyr's own release docs at the target first
+(`hops.lts-from-release-docs`), with zmig/data/releases.json as a dated fallback.
+Contract-breaking boundaries and the step size come only from that hand-maintained file,
+so findings that use it carry the `hops.release-data` heuristic.
 """
 
 from __future__ import annotations

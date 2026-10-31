@@ -1,6 +1,6 @@
 """MCUboot signed images, read with the definitions at a given MCUboot pin.
 
-docs/DESIGN-P1.md §5.5-5.6. Nothing about the format is hard-coded here: struct member
+DESIGN.md, "Field-upgrade verdict". Nothing about the format is hard-coded here: struct member
 order and types, magic values and TLV type IDs come from `image.h` at the pin (via
 zmig.srcdiff), and the byte order from imgtool's `--endian` option (its default, or the
 value the build passed). A field the definitions don't give raises ImageParseError

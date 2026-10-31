@@ -70,7 +70,8 @@ class CrossImageAnalyzer:
         )
         for key, title, action, ev, data in target:
             # Pre-existing = the source build has the same disagreement, unchanged
-            # (docs/DESIGN-P1.md §2.3); a disagreement that changed counts as introduced.
+            # (DESIGN.md, "Pre-existing problems"); a disagreement that changed counts as
+            # introduced.
             pre_existing = key in source and source[key] == data
             findings.append(
                 Finding(

@@ -171,10 +171,12 @@ def build_parser() -> argparse.ArgumentParser:
     changes = sub.add_parser(
         "changes",
         parents=[common],
-        help="what changed between two Zephyr refs, from the tree alone (Kconfig for now)",
+        help="what Zephyr removed, renamed or deprecated between two refs, from the tree alone",
         description="Builds (or reads from the cache) the change database for a ref pair: "
         "Kconfig symbols removed between them, with the symbols that replaced them and the "
-        "conditions under which those are defined. Needs no build (docs/DESIGN-CHANGE-DB.md).",
+        "conditions under which those are defined; newly deprecated symbols; devicetree "
+        "compatibles whose binding was removed; symbols that moved into a module. Needs no "
+        "build (DESIGN.md, Change database).",
     )
     changes.add_argument("--from", dest="from_ref", required=True, help="source Zephyr ref")
     changes.add_argument("--to", dest="to_ref", required=True, help="target Zephyr ref")
@@ -192,7 +194,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="CI mode: scan, compare with a committed baseline, exit nonzero on new findings",
         description="Exit codes: 0 ok; 1 internal error; 2 usage, config mismatch or no "
         "baseline; 3 new finding outside the baseline; 4 inconclusive (unless "
-        "--allow-inconclusive). See docs/DESIGN-WATCH.md.",
+        "--allow-inconclusive). See DESIGN.md, CI mode (zmig watch).",
     )
     watch.add_argument(
         "--from",
@@ -475,7 +477,7 @@ def scan_report(
         first_contexts = []
     # The same module missing at the source is a gap in the scan's module set, not a
     # migration requirement: build the source with it too, so both sides compare like for
-    # like (AUDIT.md §5.2 run 1: littlefs, missing at v4.1.0 and v4.2.0).
+    # like (eval/AUDIT.md §5.2 run 1: littlefs, missing at v4.1.0 and v4.2.0).
     at_source = _source_also_needs(old, old_ws, runner, added)
     first_old = []
     if at_source:
@@ -662,7 +664,7 @@ def _resolve_plan_from(
 
 
 def cmd_changes(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
-    """`zmig changes`: the change database for a ref pair (docs/DESIGN-CHANGE-DB.md)."""
+    """`zmig changes`: the change database for a ref pair (DESIGN.md, "Change database")."""
     from zmig.changes import load_or_build
 
     old, new = resolve_ref(args.from_ref, cache, runner), resolve_ref(args.to_ref, cache, runner)
@@ -816,7 +818,7 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_watch(args, cache, runner)
         if args.command == "changes":
             return cmd_changes(args, cache, runner)
-        raise ZmigError(f"`zmig {args.command}` is outside the MVP scope (see docs/DESIGN.md)")
+        raise ZmigError(f"`zmig {args.command}` is outside the MVP scope (see DESIGN.md)")
     except UsageError as e:
         print(f"zmig: error: {e}", file=sys.stderr)
         return EXIT_USAGE

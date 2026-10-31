@@ -82,7 +82,7 @@ class BuildSpec:
     mode: BuildMode = "full"
     sysbuild: bool = False
     cmake_args: tuple[str, ...] = ()
-    # An explicitly selected Zephyr SDK (docs/DESIGN-P1.md §10); None = Zephyr's own search.
+    # An explicitly selected Zephyr SDK (DESIGN.md, "SDK selection"); None = Zephyr's own search.
     sdk: Path | None = None
 
 

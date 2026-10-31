@@ -251,11 +251,11 @@ def outside_build(findings: list[Finding], base: ScanContext) -> list[Finding]:
     no build used (another board's .conf, a shield's overlay) become info, saying so. They
     stay in the report as hints for those configurations (regression: Golioth's
     rak5010_nrf52840.conf and an STM32H5 USB node blamed on rak5010's overlay,
-    docs/DOGFOOD-2-baseline.md M2/M3).
+    eval/reports/DOGFOOD-2-baseline.md M2/M3).
 
     Likewise for findings whose only evidence is in app source files the build doesn't
     compile (regression: echo_server's tunnel.c and vlan.c, built only with
-    CONFIG_NET_L2_IPIP / CONFIG_NET_VLAN, AUDIT.md F7). Compiled files come from the app
+    CONFIG_NET_L2_IPIP / CONFIG_NET_VLAN, eval/AUDIT.md F7). Compiled files come from the app
     image's ninja records, so only app-image findings are judged."""
     from zmig.findings import Severity
     from zmig.usage import SOURCE_SUFFIXES
@@ -284,7 +284,7 @@ def outside_build(findings: list[Finding], base: ScanContext) -> list[Finding]:
         files = {str(e["path"]) for e in f.evidence if e.get("type") == "file_line"}
         # "<v4.1.0 hello>/zephyr/zephyr.dts" is a build artifact, not a project input file
         # (regression: B-rak's partition findings were downgraded while the layout category
-        # stayed a hazard, docs/DOGFOOD-3-baseline.md M8).
+        # stayed a hazard, eval/reports/DOGFOOD-3-baseline.md M8).
         if (
             f.severity is not Severity.INFO
             and files

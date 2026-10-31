@@ -14,10 +14,13 @@ An assignment is classified with the Kconfig trees of the image that reads it:
                Also required: NEW exists at the target with OLD's type and a prompt, the
                target's own kconfiglib gives NEW the assigned value when it is merged
                after the build's fragments, and no migration-guide entry about either
-               symbol mentions a value or unit change. Only these are applied.
+               symbol mentions a value or unit change.
+  remove       absent from the target's tree, with no Kconfig-level replacement, no
+               guide rename, and no migration-guide entry mentioning it at all. The line
+               is commented out with a note.
   needs-human  absent from the target's tree, without all of the above: a rename only
                the migration guide or help text names, a type or dependency mismatch, a
-               value/unit change, or no replacement at all.
+               value/unit change, several candidates, or a guide mention.
   deps-unmet   present at the target, but the assigned value no longer takes effect.
                A different problem; never edited.
 

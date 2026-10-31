@@ -1,6 +1,6 @@
 # Evaluation harness
 
-Re-runs every scored configuration in [docs/EVALUATION.md](../docs/EVALUATION.md) with its
+Re-runs every scored configuration in [eval/EVALUATION.md](EVALUATION.md) with its
 inputs pinned to public commits, and shows what changed against the last scored run. Use it
 after any change that could move a number, and before editing EVALUATION.md.
 
@@ -58,7 +58,7 @@ and has informed fixes (EVALUATION.md, "Clean vs tuned").
 Every input was diffed against the tree the scored run used. All were identical apart from
 `thingset-zephyr-sdk/src/certs/isrgrootx1.der.inc`, which a build generates. Each
 configuration was then re-run with the zmig commit that was scored, and compared with its
-baseline. Results are in [docs/DOGFOOD-7-harness.md](../docs/DOGFOOD-7-harness.md).
+baseline. Results are in [eval/reports/DOGFOOD-7-harness.md](reports/DOGFOOD-7-harness.md).
 
 ## Not covered
 

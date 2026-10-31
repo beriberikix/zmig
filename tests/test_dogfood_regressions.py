@@ -1,4 +1,4 @@
-"""Regressions found by dogfooding zmig on public projects (docs/DOGFOOD-1.md).
+"""Regressions found by dogfooding zmig on public projects (eval/reports/DOGFOOD-1.md).
 
 Run with: pytest -m sdk
 """
@@ -90,7 +90,7 @@ SDK_0168 = Path(os.environ.get("ZMIG_SDK_0168", CACHE / "sdks" / "zephyr-sdk-0.1
 
 @pytest.mark.skipif(not SDK_0168.is_dir(), reason=f"SDK 0.16.8 not at {SDK_0168}")
 def test_target_needs_a_module_the_scan_lacks(tmp_path: Path) -> None:
-    """bms-firmware v4.0 -> v4.2 (docs/DOGFOOD-2-baseline.md): Cortex-M needs cmsis_6 from
+    """bms-firmware v4.0 -> v4.2 (eval/reports/DOGFOOD-2-baseline.md): Cortex-M needs cmsis_6 from
     v4.2, the pre-upgrade module list has only cmsis, and the whole target build was lost
     to `cmsis_core.h: No such file or directory`. On nRF the same gap stops the configure
     (a cmsis_6 glue Kconfig symbol with `&& 0` dependencies). zmig now names the module,
