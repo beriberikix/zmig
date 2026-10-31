@@ -12,7 +12,7 @@ told apart from the output fixes.
 
 ---
 
-## 1. What P2 added (as built; DESIGN-P2.md §10 decisions)
+## 1. What P2 added (as built; [DESIGN-P2.md](https://github.com/beriberikix/zmig/blob/c07a0bf/docs/DESIGN-P2.md) §10 decisions)
 
 | Step | What it reports | Commit |
 |---|---|---|

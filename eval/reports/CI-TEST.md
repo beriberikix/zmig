@@ -77,7 +77,7 @@ pip install "zmig[zephyr,api] @ git+https://x-access-token:${{ secrets.ZMIG_READ
 
 **The pinned commit must be the one whose zmig made `.zmig/baseline.json`.** A zmig
 upgrade changes the pin and adds a `--rebase-baseline` commit in the same PR
-(DESIGN-WATCH.md §3.6), as PR #1 did.
+([DESIGN-WATCH.md](https://github.com/beriberikix/zmig/blob/c07a0bf/docs/DESIGN-WATCH.md) §3.6), as PR #1 did.
 
 ## Runs
 
@@ -105,7 +105,7 @@ upgrade changes the pin and adds a `--rebase-baseline` commit in the same PR
 - SARIF upload (needs code scanning);
 - the per-repository cache size limit, and eviction under nightly churn.
 
-### Timing, against the budget (DESIGN-WATCH.md §7: PR ≤ 10 min p95, nightly ≤ 60 min cold)
+### Timing, against the budget ([DESIGN-WATCH.md](https://github.com/beriberikix/zmig/blob/c07a0bf/docs/DESIGN-WATCH.md) §7: PR ≤ 10 min p95, nightly ≤ 60 min cold)
 
 | | Measured | Within budget? |
 |---|---|---|

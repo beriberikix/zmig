@@ -1,5 +1,6 @@
 #!/bin/bash
-# Fingerprint stability (DESIGN-WATCH.md §2.4): real `zmig watch` runs, no --report.
+# Fingerprint stability (DESIGN-WATCH.md §2.4, retired; https://github.com/beriberikix/zmig/blob/c07a0bf/docs/DESIGN-WATCH.md):
+# real `zmig watch` runs, no --report.
 # Each scenario is a copy of the project with the baseline committed inside it, so the
 # config (app path, -DZEPHYR_EXTRA_MODULES) is the same in every copy.
 set -u
