@@ -173,13 +173,19 @@ if hits:
             continue
         seen.add(key)
         print(f"  {kind:<13} {sha} {where}: {what}")
-    sys.exit(1)
+    sys.exit(10)  # hits; any other nonzero exit is a scanner failure
 print("\nclean")
 PY
 )
-if ! python3 -I -c "$scan_py" "$private" "$allow" "$range" "$n"; then
+rc=0
+python3 -I -c "$scan_py" "$private" "$allow" "$range" "$n" || rc=$?
+if [ "$rc" -eq 10 ]; then
   echo
   echo "Not pushing: the scan found the hits above." >&2
+  exit 1
+elif [ "$rc" -ne 0 ]; then
+  echo
+  echo "Not pushing: the scan did not complete (exit $rc); see the error above." >&2
   exit 1
 fi
 
