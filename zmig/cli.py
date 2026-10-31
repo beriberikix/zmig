@@ -665,21 +665,14 @@ def _resolve_plan_from(
 
 def cmd_changes(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     """`zmig changes`: the change database for a ref pair (DESIGN.md, "Change database")."""
-    from zmig.changes import load_or_build
+    from zmig.changes import load_or_build, select_removed
 
     old, new = resolve_ref(args.from_ref, cache, runner), resolve_ref(args.to_ref, cache, runner)
     db = load_or_build(new.mirror, runner, cache.root, old.ref.sha, new.ref.sha)
-    removed = db["kconfig"]["removed"]
-    compats = db["devicetree"]["removed"]
-    # A name with a comma is a compatible (vnd,name); anything else a Kconfig symbol.
-    want = {s.removeprefix("CONFIG_") for s in args.symbol if "," not in s}
-    want_dt = {s for s in args.symbol if "," in s}
-    if want or want_dt:
-        unknown = sorted((want - removed.keys()) | (want_dt - compats.keys()))
-        if unknown:
-            raise UsageError(f"not removed between the refs: {', '.join(unknown)}")
-        removed = {k: v for k, v in removed.items() if k in want}
-        compats = {k: v for k, v in compats.items() if k in want_dt}
+    removed, compats = select_removed(
+        args.symbol, db["kconfig"]["removed"], db["devicetree"]["removed"]
+    )
+    requested = bool(args.symbol)
     if args.format == "json":
         print(
             json.dumps(
@@ -700,7 +693,7 @@ def cmd_changes(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     )
     for sym, v in removed.items():
         cands = v["candidates"]
-        if not cands and not want:
+        if not cands and not requested:
             continue
         print(f"  CONFIG_{sym} ({v['defined_at']})")
         for c in cands[:3]:
@@ -718,7 +711,7 @@ def cmd_changes(args: argparse.Namespace, cache: Cache, runner: Runner) -> int:
     )
     for compat, v in compats.items():
         cands = v["candidates"]
-        if not cands and not want_dt:
+        if not cands and not requested:
             continue
         print(f"  {compat} ({v['defined_at']})")
         for c in cands[:3]:

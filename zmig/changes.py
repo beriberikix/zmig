@@ -39,7 +39,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from zmig.errors import ZmigError
+from zmig.errors import UsageError, ZmigError
 
 if TYPE_CHECKING:
     from zmig.refs import Mirror
@@ -352,6 +352,38 @@ def kconfig_changes(
         "added": len(target.keys() - source.keys()),
         "symbols": {"source": len(source), "target": len(target)},
     }
+
+
+def select_removed(
+    symbols: list[str], removed: dict[str, Any], compats: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Restrict the two "removed" tables to the names given with `--symbol`.
+
+    A name with a comma is not necessarily a compatible: a compatible without a
+    vendor prefix (`arduino-nano-header-r3`) is written like a Kconfig symbol, so
+    each name is looked up in both tables."""
+    if not symbols:
+        return removed, compats
+    want: set[str] = set()
+    want_dt: set[str] = set()
+    unknown: list[str] = []
+    for name in symbols:
+        symbol = name.removeprefix("CONFIG_")
+        found = False
+        if symbol in removed:
+            want.add(symbol)
+            found = True
+        if name in compats:
+            want_dt.add(name)
+            found = True
+        if not found:
+            unknown.append(name)
+    if unknown:
+        raise UsageError(f"not removed between the refs: {', '.join(sorted(set(unknown)))}")
+    return (
+        {k: v for k, v in removed.items() if k in want},
+        {k: v for k, v in compats.items() if k in want_dt},
+    )
 
 
 def compat_changes(
