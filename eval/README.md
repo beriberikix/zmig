@@ -63,8 +63,11 @@ baseline. Results are in [eval/reports/DOGFOOD-7-harness.md](reports/DOGFOOD-7-h
 ## Not covered
 
 - **OpenDeck** (scan and plan). Its inputs are two Zephyr trees with the project's 31
-  patches applied by scripts (`~/.cache/zmig/dogfood/d6/{trees,patched,run}.sh`). Re-run it
-  with `OUT=<dir> bash ~/.cache/zmig/dogfood/d6/run.sh`. The scored reports are
+  patches applied by scripts. Copies of the patch, run and verify steps are in
+  [scripts/](scripts/) (`opendeck-patched.sh`, `opendeck-run.sh`, `opendeck-verify.sh`);
+  the steps that download the SDK and OpenDeck and fetch the pre/post trees were not
+  kept in the repository. With those trees in `~/.cache/zmig/dogfood/d6`, re-run it with
+  `OUT=<dir> bash eval/scripts/opendeck-run.sh`. The scored reports are
   `d6/rescore2/scan` and `d6/rescore3-withdir/plan`.
 - **smp_svr and the P1 fixtures.** smp_svr is a single field-upgrade hazard. The P1
   fixtures are asserted by `tests/test_p1_fixture.py` and `tests/test_cross_fixture.py`.

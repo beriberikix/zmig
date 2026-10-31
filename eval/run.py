@@ -286,7 +286,8 @@ def main() -> int:
     n.add_argument("report", type=Path)
     args = p.parse_args()
     configs = load()
-    names = getattr(args, "configs", None) or list(configs["configs"])
+    # snapshot takes one positional `config`; the others take `configs` (default: all).
+    names = [args.config] if args.cmd == "snapshot" else (args.configs or list(configs["configs"]))
     unknown = [x for x in names if x not in configs["configs"]]
     if unknown:
         raise SystemExit(f"unknown configuration(s): {', '.join(unknown)}")
