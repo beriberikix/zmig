@@ -18,7 +18,9 @@ from zmig.changes import (
     parse_pairs,
     parse_table,
     rank,
+    select_removed,
 )
+from zmig.errors import UsageError
 
 # `git log -M -p -U0` of 231b2a0c19f "drivers: sensor: rename tmp116 to tmp11x" (RIT FSW F1c),
 # trimmed to the Kconfig hunks.
@@ -759,3 +761,40 @@ def test_a_target_that_wrote_config_but_never_finished_configure_gets_the_stand_
     ctx.new_img = SimpleNamespace(dir=tmp_path / "c", has=lambda a: a is Artifact.CONFIG)
     kinds = {f.kind for f in mod.ChangesAnalyzer().analyze(ctx).findings}
     assert "symbol-removed" in kinds
+
+
+# --- `changes --symbol` ------------------------------------------------------------------------
+
+REMOVED = {
+    "UART_NATIVE_PTY_0_ON_STDINOUT": {"defined_at": "drivers/serial/Kconfig:1", "candidates": []},
+}
+COMPATS = {
+    "arduino-nano-header-r3": {
+        "defined_at": "dts/bindings/vendor-prefixes.yaml:2",
+        "candidates": [],
+    },
+    "ti,tmp116": {"defined_at": "dts/bindings/sensor/ti,tmp116.yaml:3", "candidates": []},
+}
+
+
+def test_select_removed_finds_a_compatible_without_a_vendor_prefix() -> None:
+    removed, compats = select_removed(["arduino-nano-header-r3"], REMOVED, COMPATS)
+    assert removed == {}
+    assert compats == {"arduino-nano-header-r3": COMPATS["arduino-nano-header-r3"]}
+
+
+def test_select_removed_checks_both_tables() -> None:
+    removed, compats = select_removed(
+        ["CONFIG_UART_NATIVE_PTY_0_ON_STDINOUT", "ti,tmp116"], REMOVED, COMPATS
+    )
+    assert removed == {"UART_NATIVE_PTY_0_ON_STDINOUT": REMOVED["UART_NATIVE_PTY_0_ON_STDINOUT"]}
+    assert compats == {"ti,tmp116": COMPATS["ti,tmp116"]}
+
+
+def test_select_removed_rejects_a_name_in_neither_table() -> None:
+    with pytest.raises(UsageError, match="not removed between the refs: nope"):
+        select_removed(["nope"], REMOVED, COMPATS)
+
+
+def test_select_removed_without_symbols_keeps_both_tables() -> None:
+    assert select_removed([], REMOVED, COMPATS) == (REMOVED, COMPATS)
