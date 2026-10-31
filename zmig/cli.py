@@ -401,11 +401,9 @@ def scan_report(
     keep: list[ScanContext] | None = None,
 ) -> Report:
     """The scan's report; `keep` receives its ScanContext (for `zmig fix`)."""
-    for tool in ("git", "cmake", "ninja", "dtc"):
-        find_tool(tool)
-    check_zephyr_python()
-    if "mcuboot" in args.modules:
-        check_mcuboot_python()
+    # The arguments first, then the environment: a wrong app or analyzer name is reported
+    # as such, not as a missing tool (regression: on a runner without dtc, both reported
+    # "dtc not found", tests/test_cli.py).
     app: Path = args.app
     if not (app / "CMakeLists.txt").is_file():
         raise ZmigError(f"{app} is not a Zephyr application (no CMakeLists.txt)")
@@ -413,6 +411,11 @@ def scan_report(
         "build",
         None if args.analyzers is None else [] if args.analyzers == ["none"] else args.analyzers,
     )
+    for tool in ("git", "cmake", "ninja", "dtc"):
+        find_tool(tool)
+    check_zephyr_python()
+    if "mcuboot" in args.modules:
+        check_mcuboot_python()
 
     mode: BuildMode = "fast" if args.fast else "full"
     old_r = resolve_ref(args.from_ref, cache, runner)
