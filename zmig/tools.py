@@ -198,11 +198,14 @@ class Runner:
             self.log_dir.mkdir(parents=True, exist_ok=True)
             log_path = self.log_dir / f"{inv_id}.log"
             env_lines = "".join(f"  {k}={v}\n" for k, v in sorted((env or {}).items()))
+            # Redacted like invocations.json: these logs sit in --out, which users share.
             log_path.write_text(
-                f"argv: {args}\ncwd: {cwd}\nenv overrides:\n{env_lines}"
-                f"unset: {sorted({*unset_env, 'PYTHONPATH'})}\nexit: {proc.returncode}\n"
-                f"duration_s: {duration:.3f}\n"
-                f"--- stdout ---\n{proc.stdout}\n--- stderr ---\n{proc.stderr}"
+                self.redact(
+                    f"argv: {args}\ncwd: {cwd}\nenv overrides:\n{env_lines}"
+                    f"unset: {sorted({*unset_env, 'PYTHONPATH'})}\nexit: {proc.returncode}\n"
+                    f"duration_s: {duration:.3f}\n"
+                    f"--- stdout ---\n{proc.stdout}\n--- stderr ---\n{proc.stderr}"
+                )
             )
             log_rel = f"logs/{log_path.name}"
         self.invocations.append(

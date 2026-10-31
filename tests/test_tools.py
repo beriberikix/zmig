@@ -15,7 +15,9 @@ def test_runner_logs_and_redacts(tmp_path: Path) -> None:
     assert inv.id == "cmd-001" and inv.exit == 0
     assert inv.argv == ["echo", "$TMP/x"]
     text = (tmp_path / "logs" / "cmd-001.log").read_text()
-    assert "ZMIG_TEST=1" in text and str(tmp_path / "x") in text
+    # The per-command log is redacted too: it sits in --out, which users share.
+    assert "ZMIG_TEST=1" in text and "$TMP/x" in text
+    assert str(tmp_path) not in text
 
 
 def test_runner_failure_is_actionable(tmp_path: Path) -> None:

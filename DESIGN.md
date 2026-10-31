@@ -112,7 +112,8 @@ build against each other's.
 
 Every subprocess goes through `tools.Runner`, which logs argv, cwd, environment overrides,
 exit status, duration and output under `<out>/logs/` and records each invocation in
-`logs/invocations.json` (cache root and home redacted). Discovery order: explicit flag,
+`logs/invocations.json`. Both are redacted: the cache root, home and app path are
+replaced with `$ZMIG_CACHE`, `~` and `<app>`. Discovery order: explicit flag,
 `$VIRTUAL_ENV`, `<workspace>/.venv`, `PATH`; a missing tool is a one-line error saying what
 to do. Arguments are checked before the environment, so a wrong app path isn't reported
 as a missing `dtc`. `PYTHONPATH` is removed from every command zmig runs.
