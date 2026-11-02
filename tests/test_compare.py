@@ -280,6 +280,7 @@ def test_compare_json_shape_and_determinism(
         "after",
         "from",
         "to",
+        "pinned",
         "unseen_source_build_broke",
         "inconclusive",
         "gaps",

@@ -116,7 +116,20 @@ def mismatches(before: JSON, after: JSON) -> list[str]:
         fb["environment.zmig_build"], fa["environment.zmig_build"] = bb, ab
     else:  # a 1.5 report: the version string is all there is
         fb["zmig_version"], fa["zmig_version"] = before["zmig_version"], after["zmig_version"]
-    return [f"{k}: BEFORE {fb[k]!r}, AFTER {fa[k]!r}" for k in sorted(fb) if fb[k] != fa[k]]
+    out = [f"{k}: BEFORE {fb[k]!r}, AFTER {fa[k]!r}" for k in sorted(fb) if fb[k] != fa[k]]
+    # A pinned AFTER (scan --pin-source) compares the edited app against BEFORE's source
+    # build only if that is the build it was pinned to (DESIGN-PINNED.md piece 5).
+    if before["inputs"].get("pinned_source"):
+        out.append("BEFORE is a pinned scan: compare against the original scan it was pinned to")
+    if pin := after["inputs"].get("pinned_source"):
+        source, _, _ = effective_contexts(before.get("contexts", []))
+        key = source.get("key") if source else None
+        if pin.get("key") != key:
+            out.append(
+                f"AFTER is pinned to source build {pin.get('key')!r}; "
+                f"BEFORE's source build is {key!r}"
+            )
+    return out
 
 
 def baseline_of(before: JSON, path: Path) -> Baseline:
@@ -346,6 +359,7 @@ def compare_json(
         },
         "from": after["inputs"]["from"],
         "to": after["inputs"]["to"],
+        "pinned": bool(after["inputs"].get("pinned_source")),
         "unseen_source_build_broke": res.unseen_source_build_broke,
         "inconclusive": out.inconclusive,
         "gaps": gaps_json(out),

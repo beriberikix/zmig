@@ -6,6 +6,7 @@ from pathlib import Path
 import jsonschema
 
 from zmig.findings import (
+    SCHEMA_VERSION,
     Category,
     Confidence,
     Finding,
@@ -131,7 +132,7 @@ def test_schema_1_6_fields_validate() -> None:
         contexts=[_ctx(side="source"), _ctx(side="target")],
         upgrade_path=_path({"reflash": [fid], "unknown": ["category:layout"]}),
     )
-    assert doc["schema_version"] == "1.6"
+    assert doc["schema_version"] == SCHEMA_VERSION
     jsonschema.validate(doc, SCHEMA)
 
 

@@ -46,6 +46,28 @@
         },
         "to": {
           "$ref": "#/$defs/ref"
+        },
+        "pinned_source": {
+          "type": "object",
+          "description": "since 1.7: set by `scan --pin-source`. The source side is this earlier scan's source build of the unedited app, reused by its key; the target side and app usage are the edited app's.",
+          "required": ["report", "key", "app_tree_hash"],
+          "properties": {
+            "report": {
+              "type": "string",
+              "description": "the pinned report: the path as given when relative, else the file name"
+            },
+            "key": {
+              "type": "string",
+              "description": "the reused source build's key"
+            },
+            "app_tree_hash": {
+              "type": "string",
+              "description": "the unedited app's tree hash"
+            },
+            "zmig_build": {
+              "type": ["string", "null"]
+            }
+          }
         }
       }
     },
@@ -96,6 +118,10 @@
               "target"
             ],
             "description": "since 1.6: the ref this context was built at; module recovery and salvage add contexts, so position does not say"
+          },
+          "pinned": {
+            "type": "boolean",
+            "description": "since 1.7: this source context was reused from the report in inputs.pinned_source, not built by this scan"
           }
         }
       }

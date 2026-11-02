@@ -121,7 +121,8 @@ _COMPARE_GROUPS = (
 
 def render_compare(result: dict[str, Any]) -> str:
     """`zmig compare` for the terminal, from its compare.json."""
-    lines = [f"zmig compare: {result['summary']}"]
+    pinned = " (AFTER's source side pinned to BEFORE's build)" if result.get("pinned") else ""
+    lines = [f"zmig compare: {result['summary']}{pinned}"]
     if n := result.get("unseen_source_build_broke"):
         lines.append(
             f"  {n} finding(s) unseen because the edited app no longer builds at the source ref"

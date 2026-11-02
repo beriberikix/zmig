@@ -21,6 +21,7 @@ from zmig.buildctx import (
     build,
     build_with_salvage,
     hash_tree,
+    load_build,
     pair_images,
     sdk_identity,
 )
@@ -30,6 +31,8 @@ from zmig.findings import Category, Confidence, Finding, NotChecked, Report, Sev
 from zmig.forks import DEFAULT_METHODS, compare_tree, guess_version_tag
 from zmig.manifest import load_manifest, scan_user_workspace
 from zmig.modulecheck import ModuleNeed, diagnose, needed_at_source
+from zmig.pin import mismatches as pin_mismatches
+from zmig.pin import read_pin
 from zmig.plan import PlanContext
 from zmig.refs import ResolvedRef, resolve_ref
 from zmig.report import render
@@ -135,6 +138,13 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--from", dest="from_ref", required=True)
     scan.add_argument("--to", dest="to_ref", required=True)
     _scan_args(scan)
+    scan.add_argument(
+        "--pin-source",
+        type=Path,
+        metavar="REPORT",
+        help="reuse REPORT's source build (an earlier scan of the unedited app) as this "
+        "scan's source side, so edits that only build at --to can be compared",
+    )
 
     fix = sub.add_parser(
         "fix",
@@ -462,9 +472,17 @@ def scan_report(
         check_mcuboot_python()
 
     mode: BuildMode = "fast" if args.fast else "full"
+    pin = read_pin(args.pin_source) if getattr(args, "pin_source", None) else None
     old_r = resolve_ref(args.from_ref, cache, runner)
     new_r = resolve_ref(args.to_ref, cache, runner)
-    old_ws = materialize(old_r, cache, runner, args.modules, shallow=args.shallow)
+    # A pinned source build may have been rebuilt with modules module recovery added: its
+    # workspace needs them for the key to match.
+    old_modules = (
+        [*args.modules, *(m for m in pin.modules_added if m not in args.modules)]
+        if pin
+        else args.modules
+    )
+    old_ws = materialize(old_r, cache, runner, old_modules, shallow=args.shallow)
     new_ws = materialize(new_r, cache, runner, args.modules, shallow=args.shallow)
     table = new_ws.zephyr / "boards" / "deprecated.cmake"
     mapping = map_board(
@@ -496,9 +514,32 @@ def scan_report(
             sdk=args.sdk.expanduser().resolve() if args.sdk else None,
         )
 
-    log.warning("building %s for %s at %s (%s)...", app, args.board, args.from_ref, mode)
-    old = build(old_ws, spec(args.board), cache, runner)
-    log.warning("  %s: %s", args.from_ref, old.status)
+    if pin is not None:
+        differ = pin_mismatches(
+            pin,
+            {
+                "from": old_r.ref.to_json(),
+                "to": new_r.ref.to_json(),
+                "app": str(app),
+                "board": mapping.to_json(),
+                "build_mode": mode,
+                "sysbuild": args.sysbuild,
+                "zmig_build": zmig_build(),
+            },
+        )
+        copy = old_ws.root / "apps" / pin.app_tree_hash[:16] / app.resolve().name
+        loaded, why = load_build(old_ws, spec(args.board), pin.key, copy, cache, runner)
+        if differ or loaded is None:
+            raise UsageError(
+                f"can't pin the source to {args.pin_source} (re-run that scan, or scan "
+                "without --pin-source):\n  " + "\n  ".join([*differ, *why])
+            )
+        old = loaded
+        log.warning("source: %s's build %s at %s (pinned)", args.pin_source, old.key, args.from_ref)
+    else:
+        log.warning("building %s for %s at %s (%s)...", app, args.board, args.from_ref, mode)
+        old = build(old_ws, spec(args.board), cache, runner)
+        log.warning("  %s: %s", args.from_ref, old.status)
     log.warning("building %s for %s at %s (%s)...", app, to_board, args.to_ref, mode)
     salvage = build_with_salvage(new_ws, spec(to_board), cache, runner)
     needs, added = _missing_modules(salvage, new_ws, runner)
@@ -520,7 +561,8 @@ def scan_report(
     # The same module missing at the source is a gap in the scan's module set, not a
     # migration requirement: build the source with it too, so both sides compare like for
     # like (eval/AUDIT.md §5.2 run 1: littlefs, missing at v4.1.0 and v4.2.0).
-    at_source = _source_also_needs(old, old_ws, runner, added)
+    # Pinned, the source build is the pinned report's, as it was: never rebuilt.
+    at_source = [] if pin else _source_also_needs(old, old_ws, runner, added)
     first_old = []
     if at_source:
         log.warning(
@@ -544,7 +586,13 @@ def scan_report(
     src, tgt = {"side": "source"}, {"side": "target"}
     contexts = [
         *({**c, **src, "superseded_by_module_recovery": at_source} for c in first_old),
-        {**old.to_json(), **src, **({"modules_added": at_source} if at_source else {})},
+        {
+            **old.to_json(),
+            **src,
+            **({"modules_added": at_source} if at_source else {}),
+            **({"modules_added": list(pin.modules_added)} if pin and pin.modules_added else {}),
+            **({"pinned": True} if pin else {}),
+        },
         *({**c, **tgt, "superseded_by_module_recovery": list(added)} for c in first_contexts),
         {
             **salvage.original.to_json(),
@@ -572,6 +620,7 @@ def scan_report(
             "board": mapping.to_json(),
             "build_mode": mode,
             "sysbuild": args.sysbuild,
+            **({"pinned_source": pin.to_json()} if pin else {}),
         },
         environment={
             **_environment(runner),

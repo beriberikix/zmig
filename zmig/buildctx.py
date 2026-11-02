@@ -332,6 +332,51 @@ def app_source(ws: RefWorkspace, spec: BuildSpec) -> Path:
     return ws.root / "apps" / hash_tree(spec.app)[:16] / spec.app.resolve().name
 
 
+def _from_marker(
+    ws: RefWorkspace,
+    spec: BuildSpec,
+    key: str,
+    meta: dict[str, Any],
+    src: Path,
+    cache: Cache,
+    runner: Runner,
+) -> BuildContext:
+    bdir = cache.builds / key
+    runner.redactions.setdefault(str(bdir), f"$BUILD[{key}]")
+    images = tuple(_image_from_json(x, bdir, spec, ws) for x in meta["images"])
+    return BuildContext(
+        ws, spec, key, bdir, meta["status"], cache.builds / f"{key}.log", src, images
+    )
+
+
+def load_build(
+    ws: RefWorkspace, spec: BuildSpec, key: str, src: Path, cache: Cache, runner: Runner
+) -> tuple[BuildContext | None, list[str]]:
+    """A cached build by its key, without rebuilding, for a scan that reuses an earlier
+    scan's source build for an edited app (`scan --pin-source`, DESIGN-PINNED.md piece 2).
+    `spec.app` is the live (edited) app, for usage; `src` is the copy the build was built
+    from. Returns the build, or None and why not: the build left the cache, or its recorded
+    inputs differ from this scan's in anything but the app and its module trees."""
+    bdir, marker = cache.builds / key, cache.builds / f"{key}.json"
+    if not (marker.is_file() and bdir.is_dir()):
+        return None, [f"build {key} is no longer in the cache"]
+    if not src.is_dir():
+        return None, [f"the app copy it was built from ({src}) is no longer in the cache"]
+    meta = json.loads(marker.read_text())
+    recorded = meta.get("key_inputs")
+    if recorded is None:
+        return None, [f"build {key} doesn't record its inputs"]
+    ignore = {"app", "extra_modules"}
+    now = _flat(
+        {k: v for k, v in key_inputs(ws, spec, ws.modules(runner)).items() if k not in ignore}
+    )
+    then = _flat({k: v for k, v in recorded.items() if k not in ignore})
+    diff = sorted(k for k in now.keys() | then.keys() if now.get(k) != then.get(k))
+    if diff:
+        return None, [f"{_INPUT_NAMES.get(k, k)} differs" for k in diff]
+    return _from_marker(ws, spec, key, meta, src, cache, runner), []
+
+
 def _copy_app(src: Path, dest: Path) -> None:
     if dest.is_dir():
         return
@@ -481,9 +526,7 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
         meta = json.loads(marker.read_text())
         if "key_inputs" not in meta:  # recorded from now on, for miss_reason
             marker.write_text(json.dumps({**meta, "key_inputs": inputs}, indent=2))
-        runner.redactions.setdefault(str(bdir), f"$BUILD[{key}]")
-        images = tuple(_image_from_json(x, bdir, spec, ws) for x in meta["images"])
-        return BuildContext(ws, spec, key, bdir, meta["status"], log, src, images)
+        return _from_marker(ws, spec, key, meta, src, cache, runner)
 
     log_.warning(
         "  build %s for %s at %s not in the cache; rebuilt because: %s",
