@@ -210,6 +210,20 @@ def python_environment() -> dict[str, str]:
     }
 
 
+_EXTRA_MODULES = re.compile(r"^-DZEPHYR_EXTRA_MODULES(?::[A-Z]+)?=(?P<dirs>.*)$")
+
+
+def extra_module_dirs(cmake_args: tuple[str, ...]) -> list[Path]:
+    """The project's own module directories from -DZEPHYR_EXTRA_MODULES in --cmake-arg:
+    absolute paths that exist. CMake runs in zmig's workspace, so a relative path can't
+    name the user's code."""
+    dirs: list[Path] = []
+    for arg in cmake_args:
+        if m := _EXTRA_MODULES.match(arg):
+            dirs += [Path(d) for d in m["dirs"].split(";") if d and Path(d).is_absolute()]
+    return [d for d in dirs if d.is_dir()]
+
+
 def build_key(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> str:
     return _key_of(key_inputs(ws, spec, modules))
 
@@ -222,7 +236,7 @@ def key_inputs(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> dict
     """Everything the build key is made of (and nothing else)."""
     from zmig import __version__
 
-    return {
+    inputs: dict[str, Any] = {
         "recipe": RECIPE_VERSION,
         "zmig": __version__,
         "python": python_environment(),
@@ -239,6 +253,13 @@ def key_inputs(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> dict
         "cmake_args": list(spec.cmake_args),
         "sdk": sdk_identity(spec.sdk),
     }
+    # The project's own modules are built in place, so their content is part of the build:
+    # keyed on the argument text alone, an edit to a board in one reused the build from
+    # before the edit (regression: ardep's board, a zmig compare dogfood run). Added only
+    # when present, so builds without extra modules keep their keys.
+    if extra := extra_module_dirs(spec.cmake_args):
+        inputs["extra_modules"] = [[str(d), hash_tree(d)] for d in extra]
+    return inputs
 
 
 def _flat(d: Any, prefix: str = "") -> dict[str, str]:
@@ -259,6 +280,7 @@ _INPUT_NAMES = {
     "recipe": "build recipe",
     "app": "app tree",
     "app_name": "app directory name",
+    "extra_modules": "project module tree",
     "sdk": "SDK",
 }
 
