@@ -231,7 +231,7 @@ order-independent.
 ### Report envelope
 
 ```json
-{"schema": "https://zmig.dev/schema/report/1", "schema_version": "1.5", "zmig_version": "…",
+{"schema": "https://zmig.dev/schema/report/1", "schema_version": "1.6", "zmig_version": "…",
  "command": "scan",
  "inputs": {"from": {"spec", "sha", "kind", "dirty"}, "to": {…}, "app", "app_tree_hash",
             "board": {…mapping…}, "build_mode": "full", "sysbuild": false},
@@ -251,7 +251,9 @@ order-independent.
 - **Order:** findings by (severity, confidence, category, id).
 - **Schema history:** 1.1 `image`; 1.2 `introduced_by_migration`, `remedy`, `provenance`,
   `upgrade_path`, `not_checked`, `environment.sdk`, hazard categories; 1.3 `checked`; 1.4
-  not-applicable categories need evidence; 1.5 `fix`. `tier` was added without a bump.
+  not-applicable categories need evidence; 1.5 `fix`; 1.6 `environment.zmig_build`,
+  `contexts[].side`, typed `upgrade_path.remedies` and descriptions of `fix`. `tier` was
+  added without a bump.
   Tests validate every report against `zmig/schema/report-1.json`.
 
 ### Outputs

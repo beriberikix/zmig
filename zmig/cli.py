@@ -43,6 +43,7 @@ from zmig.tools import (
     tool_version,
 )
 from zmig.verdict import upgrade_path
+from zmig.watch import zmig_build
 from zmig.workspace import RefWorkspace, materialize
 
 log = logging.getLogger("zmig")
@@ -356,6 +357,8 @@ def _environment(runner: Runner) -> dict[str, str | None]:
         "ninja": tool_version(runner, "ninja", ["--version"]),
         "dtc": tool_version(runner, "dtc", ["--version"]),
         "git": tool_version(runner, "git", ["--version"]),
+        # Two builds can share a version string; compare/watch tell them apart by this.
+        "zmig_build": zmig_build(),
     }
 
 
@@ -497,16 +500,24 @@ def scan_report(
         if built is not None:
             runner.redactions[str(built.src)] = "<app>"
 
+    # `side` (schema 1.6): module recovery and salvage add contexts, so a context's
+    # position doesn't say which ref it was built at.
+    src, tgt = {"side": "source"}, {"side": "target"}
     contexts = [
-        *({**c, "superseded_by_module_recovery": at_source} for c in first_old),
-        {**old.to_json(), **({"modules_added": at_source} if at_source else {})},
-        *({**c, "superseded_by_module_recovery": list(added)} for c in first_contexts),
-        {**salvage.original.to_json(), **({"modules_added": list(added)} if added else {})},
+        *({**c, **src, "superseded_by_module_recovery": at_source} for c in first_old),
+        {**old.to_json(), **src, **({"modules_added": at_source} if at_source else {})},
+        *({**c, **tgt, "superseded_by_module_recovery": list(added)} for c in first_contexts),
+        {
+            **salvage.original.to_json(),
+            **tgt,
+            **({"modules_added": list(added)} if added else {}),
+        },
     ]
     if salvage.salvaged is not None:
         contexts.append(
             {
                 **salvage.salvaged.to_json(),
+                **tgt,
                 "salvage_of": salvage.original.key,
                 "salvage_edits": [e.to_json() for e in salvage.edits],
             }

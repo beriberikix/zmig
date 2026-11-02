@@ -18,7 +18,7 @@ copies of your app there.
 
 ## Status
 
-**Alpha.** The CLI, the report schema (`report.json`, schema 1.5) and finding IDs may still
+**Alpha.** The CLI, the report schema (`report.json`, schema 1.6) and finding IDs may still
 change.
 
 zmig is measured against real upgrades of open-source Zephyr projects. For each one, what
