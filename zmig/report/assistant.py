@@ -100,8 +100,8 @@ A scan takes minutes, so batch edits rather than scan after each one.
 - "assistant judgment, not checked by zmig": anything else you conclude.
 
 ## Never
-- Mark `not_checked`, `unknown`, `skipped`, `partial` or "unseen" as
-  resolved.
+- Mark `not_checked`, `unknown`, `skipped`, `partial`, "unseen" or
+  "de-escalated" as resolved.
 - Raise a confidence or lower a severity.
 - Say "verified", "migrated" or "safe".
 - Paste logs/ into the chat.

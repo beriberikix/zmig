@@ -336,6 +336,7 @@ class ApiAnalyzer:
             for k, v in t["decls"].items():
                 new_decls.setdefault(k, v)
         parsed_at_target = {t["file"] for t in tgt}
+        clean_files = {t["file"] for t in tgt if not t["errors"]}
         # Compatibility aliases at the target: an object-like macro whose whole expansion is
         # one identifier keeps an old name compiling as the new one (Zephyr 4.4's
         # net_compat.h: `#define sockaddr_in net_sockaddr_in`). An old name is compared with
@@ -567,6 +568,9 @@ class ApiAnalyzer:
             change = self._change(
                 name, what, o, n, sites, callback_diags, truncations, explained,
                 value_uses.get(name, {"unknown"}),
+                clean_at_target=bool(sites) and all(
+                    s.rsplit(":", 1)[0] in clean_files for s in sites
+                ),
             )  # fmt: skip
             if change is not None:
                 sev, why, extra_sites = change
@@ -814,6 +818,7 @@ class ApiAnalyzer:
         truncations: list[dict[str, Any]],
         explained: set[str],
         value_use: frozenset[str] | set[str] = frozenset({"unknown"}),
+        clean_at_target: bool = False,
     ) -> tuple[Severity, str, list[str]] | None:
         """(severity, action, extra sites) when the declaration changed in a way §10.3
         reports; None otherwise."""
@@ -892,6 +897,17 @@ class ApiAnalyzer:
             sev = Severity.INFO if what == "function" else Severity.RISKY
             return sev, "Only const/volatile qualifiers changed.", []
         fn_ptr = "(*)" in str(n.get("type"))
+        if what == "typedef" and fn_ptr and not cb_sites and clean_at_target:
+            # Every file using it parsed cleanly at the target and no callback of the
+            # project's mismatches it (clang's incompatible-pointer diagnostic): the code
+            # already matches the new type (regression: golioth's net_mgmt_event_handler_t
+            # stayed breaking after the handler took the 64-bit event).
+            return (
+                Severity.RISKY,
+                "Its function-pointer type changed; your code already matches it at the "
+                "target. Check what calls through it.",
+                [],
+            )
         if what == "function" or cb_sites or fn_ptr:
             return (
                 Severity.BREAKING,

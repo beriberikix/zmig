@@ -115,6 +115,7 @@ _COMPARE_GROUPS = (
     ("revealed", "revealed (BEFORE could not see these; hidden, or caused by the edit)"),
     ("unseen", "unseen (gone, but AFTER could not check; still open)"),
     ("fixed", "fixed"),
+    ("de-escalated", "de-escalated (same finding, less severe)"),
     ("updated", "updated (same finding, changed value or fewer sites)"),
 )
 
@@ -146,7 +147,9 @@ def render_compare(result: dict[str, Any]) -> str:
                 else ""
             )
             sites = (
-                f" (was: {i['error_before']})"
+                f" (was {i['severity_before']})"
+                if "severity_before" in i
+                else f" (was: {i['error_before']})"
                 if "error_before" in i
                 else f" ({i['sites_before']} -> {i['sites_after']} sites)"
                 if "sites_before" in i
