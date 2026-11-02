@@ -46,7 +46,7 @@ from zmig.changes import (
     parse_table,
 )
 from zmig.findings import JSON, Category, Confidence, Finding, Severity, file_line, tool_output
-from zmig.scan import ScanContext
+from zmig.scan import ScanContext, live_path, still_declares
 from zmig.usage import Loc, dt_token
 
 
@@ -255,6 +255,10 @@ class ChangesAnalyzer:
                 path, _, line = loc.rpartition(":")
                 full = os.path.normpath(os.path.join(ctx.old.workspace.zephyr, path))
                 if (rel := project_path(full, roots)) and line.isdigit():
+                    # Pinned, the snapshot is the unedited Kconfig: keep a declaration only
+                    # while the tree still has it (DESIGN.md, "Pinned-source scans").
+                    if ctx.pinned and not still_declares(ctx, full, int(line), sym):
+                        continue
                     own.append(file_line(rel, int(line), f"config {sym}"))
             if own:
                 title = f"Your Kconfig re-declares CONFIG_{sym}, gone in {ctx.new_spec}"
@@ -289,8 +293,9 @@ def project_kconfig_references(
         shown = project_path(path, roots)
         if shown is None:
             continue
+        # Pinned, the source build's app copy is the unedited app: read the user's tree.
         try:
-            text = Path(path).read_text()
+            text = (live_path(ctx, path) if ctx.pinned else Path(path)).read_text()
         except (OSError, UnicodeDecodeError):
             continue
         for line, sym, code in kconfig_references(text, symbols):

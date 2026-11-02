@@ -129,6 +129,7 @@ def _tus(
             }
         )
     ctx = SimpleNamespace(
+        pinned=False,
         old=SimpleNamespace(workspace=SimpleNamespace(zephyr=tmp / "old", root=tmp / "old")),
         new=SimpleNamespace(workspace=SimpleNamespace(zephyr=tmp / "new", root=tmp / "new")),
         new_spec="new",
@@ -235,6 +236,7 @@ def test_callback_findings_cite_definitions_and_uses(tmp_path: Path) -> None:
         ("st_run", "main.c:4")
     ]
     ctx = SimpleNamespace(
+        pinned=False,
         new=SimpleNamespace(
             workspace=SimpleNamespace(zephyr=tmp_path / "new", root=tmp_path / "new")
         ),
@@ -338,7 +340,9 @@ def test_value_changes_demoted_only_when_provably_unused_as_a_value(tmp_path: Pa
         "M_SIZE": "other",
     }
     ws = SimpleNamespace(zephyr=tmp_path, root=tmp_path / "new")
-    ctx = SimpleNamespace(new=SimpleNamespace(workspace=ws), new_spec="new", scope=("s",))
+    ctx = SimpleNamespace(
+        pinned=False, new=SimpleNamespace(workspace=ws), new_spec="new", scope=("s",)
+    )
     found = {
         f.subject: f.severity for f in ApiAnalyzer()._declaration_changes(ctx, [out[0]], [out[1]])
     }  # type: ignore[arg-type]
@@ -366,7 +370,9 @@ def test_function_that_became_a_macro_at_the_target(tmp_path: Path) -> None:
                                "where": "zephyr/include/t.h:9"}},
             "refs": [{"name": "k_ms", "kind": "macro", "at": "a.c:4"}]}]  # fmt: skip
     ws = SimpleNamespace(zephyr=tmp_path, root=tmp_path)
-    ctx = SimpleNamespace(new=SimpleNamespace(workspace=ws), new_spec="new", scope=("s",))
+    ctx = SimpleNamespace(
+        pinned=False, new=SimpleNamespace(workspace=ws), new_spec="new", scope=("s",)
+    )
     (f,) = ApiAnalyzer()._declaration_changes(ctx, src, tgt)  # type: ignore[arg-type]
     assert (f.kind, f.severity) == ("function-became-macro", Severity.INFO)
 
@@ -477,8 +483,9 @@ def test_compiler_builtin_headers_are_not_zephyr_api(tmp_path: Path) -> None:
         fields = ("decls", "refs", "diags", "fn_values", "errors", "dropped")
         out.append({"file": "main.c", **{k: getattr(r, k) for k in fields}})
     ws = SimpleNamespace(zephyr=tmp_path, root=tmp_path)
-    ctx = SimpleNamespace(old=SimpleNamespace(workspace=ws), new=SimpleNamespace(workspace=ws),
-                          new_spec="new", scope=("s",))  # fmt: skip
+    ctx = SimpleNamespace(pinned=False, old=SimpleNamespace(workspace=ws),
+                          new=SimpleNamespace(workspace=ws), new_spec="new",
+                          scope=("s",))  # fmt: skip
     assert ApiAnalyzer()._declaration_changes(ctx, [out[0]], [out[1]]) == []  # type: ignore[arg-type]
     # ZMK (zephyr fork v3.2 -> v3.5): size_t from Zephyr's libc header at the source and
     # clang's stddef.h at the target is not a removal.
@@ -577,8 +584,63 @@ def test_compatibility_macros_are_followed_not_reported(tmp_path: Path) -> None:
     compat.parent.mkdir(parents=True)
     compat.write_text("#define in_port_t     net_in_port_t\n")
     ws = SimpleNamespace(zephyr=tmp_path, root=tmp_path)
-    ctx = SimpleNamespace(old=SimpleNamespace(workspace=ws), new=SimpleNamespace(workspace=ws),
-                          new_spec="v4.4.2", scope=("s",))  # fmt: skip
+    ctx = SimpleNamespace(pinned=False, old=SimpleNamespace(workspace=ws),
+                          new=SimpleNamespace(workspace=ws), new_spec="v4.4.2",
+                          scope=("s",))  # fmt: skip
     found = ApiAnalyzer()._declaration_changes(ctx, [src], [tgt])  # type: ignore[arg-type]
     # Only the value that really changed through its alias (SOCK_DGRAM 2 -> 3).
     assert [(f.kind, f.subject) for f in found] == [("enum-changed", "SOCK_DGRAM")]
+
+
+def test_keyed_deps_are_stored_with_the_build(tmp_path: Path, monkeypatch: Any) -> None:
+    """The include digests of a build are recorded the first time and read back after, so
+    they keep describing the files it was built from when the user then edits a project
+    module built in place (a scan pinned to this build as its source: DESIGN.md,
+    "Pinned-source scans")."""
+    import zmig.analyzers.api as api
+
+    ws, bdir, mod = tmp_path / "ws", tmp_path / "build", tmp_path / "mod"
+    for d in (ws, bdir, mod):
+        d.mkdir()
+    tu, hdr = mod / "src.c", mod / "board.h"
+    tu.write_text("#include <board.h>\n")
+    hdr.write_text("#define N 1\n")
+    monkeypatch.setattr(
+        api, "build_dependencies", lambda img, runner: {"src.c.obj": [str(tu), str(hdr)]}
+    )
+    img = SimpleNamespace(dir=bdir)
+    b = SimpleNamespace(workspace=SimpleNamespace(root=ws))
+    roots = {str(mod): "mod/"}
+    entries = {"mod/src.c": {"file": str(tu), "command": "cc", "output": "src.c.obj"}}
+
+    first = api._keyed_deps(img, b, roots, entries, None)  # type: ignore[arg-type]
+    assert set(first["mod/src.c"]) == {"tu:", "project:mod/board.h"}
+    assert (bdir / api.DEPS_FILE).is_file()
+    hdr.write_text("#define N 2\n")
+    tu.write_text("#include <board.h>\nint x;\n")
+    assert api._keyed_deps(img, b, roots, entries, None) == first  # type: ignore[arg-type]
+
+
+def test_pinned_uses_come_from_a_clean_target_parse(tmp_path: Path) -> None:
+    """Pinned (DESIGN.md, "Pinned-source scans"), the source parse is the unedited app's: a call the
+    edit removed is no longer a use once the target parsed that file cleanly. A target
+    parse with errors (it records no reference to a call it couldn't type-check) leaves the
+    source's uses standing, and so does an unpinned scan."""
+    from zmig.analyzers.api import ApiAnalyzer
+
+    runs = iter(range(10))
+
+    def subjects(pinned: bool, errors: list[str]) -> set[str]:
+        tmp = tmp_path / str(next(runs))
+        tmp.mkdir()
+        src, tgt, ctx = _tus(tmp, MAIN_USED)
+        tgt[0]["refs"] = [r for r in tgt[0]["refs"] if r["name"] != "used_fn"]  # the edit
+        tgt[0]["errors"] = errors
+        ctx.pinned = pinned
+        return {f.subject for f in ApiAnalyzer()._declaration_changes(ctx, src, tgt)}  # type: ignore[arg-type]
+
+    assert "used_fn" in subjects(pinned=False, errors=[])
+    assert "used_fn" not in subjects(pinned=True, errors=[])
+    assert "used_fn" in subjects(pinned=True, errors=["main.c:3: error"])
+    # Other uses in the same file are untouched.
+    assert "register_cb" in subjects(pinned=True, errors=[])

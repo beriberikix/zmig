@@ -387,6 +387,7 @@ def rebase_baseline(
 @dataclass
 class Item:
     # new | escalated | new-use-site | updated | unchanged | fixed | unseen
+    # (+ revealed, set by zmig.compare)
     state: str
     fingerprint: str
     severity: str
@@ -672,6 +673,25 @@ class Outcome:
     def inconclusive(self) -> list[str]:
         """The blocking gaps' details (what makes the run inconclusive)."""
         return [g.gap.detail for g in self.blocking_gaps]
+
+
+def assess(
+    report: JSON, baseline: Baseline, today: dt.date, pinned: JSON | None = None
+) -> tuple[list[GapState], Comparison]:
+    """The report's gaps against the baseline's accepted ones, then its findings against
+    the accepted entries (blind when a gap blocks). Shared by `watch` and `compare`."""
+    gap_states = classify_gaps(gaps(report, baseline.data), baseline, today)
+    cmp = compare(report, baseline, today, pinned, blind=any(g.blocking for g in gap_states))
+    return gap_states, cmp
+
+
+def policy_for(fail_on: str, allow_inconclusive: bool, on_target_movement: str = "fail") -> Policy:
+    """`--fail-on breaking|risky` as a Policy (risky fails on both)."""
+    return Policy(
+        fail_on=("breaking", "risky") if fail_on == "risky" else ("breaking",),
+        allow_inconclusive=allow_inconclusive,
+        on_target_movement=on_target_movement,
+    )
 
 
 def decide(cmp: Comparison, gap_states: list[GapState], policy: Policy) -> Outcome:
@@ -975,23 +995,29 @@ def watch_json(report: JSON, baseline: Baseline, cmp: Comparison, out: Outcome) 
         "target_moved": cmp.moved,
         "attributed": cmp.attributed,
         "inconclusive": out.inconclusive,
-        "gaps": [
-            {"id": g.gap.id, "level": g.gap.level, "state": g.state, "detail": g.gap.detail}
-            for g in out.gaps
-        ],
-        "items": [
-            {
-                "state": i.state,
-                "fingerprint": i.fingerprint,
-                "severity": i.severity,
-                "title": i.title,
-                "path": i.path,
-                **({"line": first_line(i.finding)} if i.finding and first_line(i.finding) else {}),
-                **({"id": i.finding["id"]} if i.finding else {}),
-                **({"cause": i.cause} if i.cause else {}),
-                **({"expired": True} if i.expired else {}),
-                **({"new_sites": i.new_sites} if i.new_sites else {}),
-            }
-            for i in cmp.items
-        ],
+        "gaps": gaps_json(out),
+        "items": [item_json(i) for i in cmp.items],
+    }
+
+
+def gaps_json(out: Outcome) -> list[JSON]:
+    return [
+        {"id": g.gap.id, "level": g.gap.level, "state": g.state, "detail": g.gap.detail}
+        for g in out.gaps
+    ]
+
+
+def item_json(i: Item) -> JSON:
+    """One comparison item, as watch.json and compare.json write it."""
+    return {
+        "state": i.state,
+        "fingerprint": i.fingerprint,
+        "severity": i.severity,
+        "title": i.title,
+        "path": i.path,
+        **({"line": first_line(i.finding)} if i.finding and first_line(i.finding) else {}),
+        **({"id": i.finding["id"]} if i.finding else {}),
+        **({"cause": i.cause} if i.cause else {}),
+        **({"expired": True} if i.expired else {}),
+        **({"new_sites": i.new_sites} if i.new_sites else {}),
     }

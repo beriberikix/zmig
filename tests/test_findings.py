@@ -6,6 +6,7 @@ from pathlib import Path
 import jsonschema
 
 from zmig.findings import (
+    SCHEMA_VERSION,
     Category,
     Confidence,
     Finding,
@@ -91,3 +92,67 @@ def test_markdown_lists_breaking_first() -> None:
     )
     assert md.index("CONFIG_B removed") < md.index("CONFIG_I removed")
     assert "`prj.conf:3`" in md and "## Do these first" in md
+
+
+def _doc(**top: object) -> dict[str, object]:
+    """A rendered report with fields set, for schema tests (schema 1.6)."""
+    fs = [finding(Severity.BREAKING, "CONFIG_B", True)]
+    doc: dict[str, object] = json.loads(render(report(fs), "json"))
+    doc.update(top)
+    return doc
+
+
+def _path(remedies: object) -> dict[str, object]:
+    return {
+        "verdict": "needs-changes",
+        "confidence": "medium",
+        "categories": {},
+        "assumptions": [],
+        "remedies": remedies,
+    }
+
+
+def _ctx(**kw: object) -> dict[str, object]:
+    base = {"ref": "a" * 40, "board": "native_sim", "mode": "full", "status": "ok", "key": "k"}
+    return {**base, **kw}
+
+
+def _invalid(doc: dict[str, object]) -> bool:
+    try:
+        jsonschema.validate(doc, SCHEMA)
+    except jsonschema.ValidationError:
+        return True
+    return False
+
+
+def test_schema_1_6_fields_validate() -> None:
+    fid = make_id(Category.KCONFIG, "symbol-removed", "CONFIG_B", SCOPE)
+    doc = _doc(
+        environment={"python": "3.14", "zmig_build": "0123456789abcdef"},
+        contexts=[_ctx(side="source"), _ctx(side="target")],
+        upgrade_path=_path({"reflash": [fid], "unknown": ["category:layout"]}),
+    )
+    assert doc["schema_version"] == SCHEMA_VERSION
+    jsonschema.validate(doc, SCHEMA)
+
+
+def test_schema_accepts_1_5_reports() -> None:
+    # No zmig_build, no side: both are optional.
+    jsonschema.validate(_doc(schema_version="1.5", contexts=[_ctx(), _ctx()]), SCHEMA)
+
+
+def test_schema_rejects_unknown_remedy() -> None:
+    assert _invalid(_doc(upgrade_path=_path({"rewrite-it": ["category:layout"]})))
+
+
+def test_schema_rejects_remedy_value_that_is_not_an_id() -> None:
+    assert _invalid(_doc(upgrade_path=_path({"reflash": ["CONFIG_B"]})))
+    assert _invalid(_doc(upgrade_path=_path({"reflash": "category:layout"})))
+
+
+def test_schema_rejects_non_string_zmig_build() -> None:
+    assert _invalid(_doc(environment={"python": "3.14", "zmig_build": None}))
+
+
+def test_schema_rejects_unknown_context_side() -> None:
+    assert _invalid(_doc(contexts=[_ctx(side="both")]))

@@ -63,6 +63,9 @@ class ScanContext:
     modules_added: tuple[str, ...] = ()
     # Of those, the ones the source build needed too; zmig added them there as well.
     modules_at_source: tuple[str, ...] = ()
+    # `scan --pin-source`: `old` is an earlier scan's source build of the unedited app,
+    # while the target and app usage are the edited app's (DESIGN.md, "Pinned-source scans").
+    pinned: bool = False
     # Caches shared by the contexts of all images of one scan.
     shared: dict[str, Any] = field(default_factory=dict)
 
@@ -183,6 +186,11 @@ class ScanContext:
             return None
         roots = project_roots(self.old, self.old_img.dir)
         files = {rel for fs in deps.values() for f in fs if (rel := project_path(f, roots))}
+        if self.pinned and (new := build_dependencies(self.new_img, self.runner)) is not None:
+            # Pinned, the source build is the unedited app's: a file the edit added is used
+            # only by the target build (DESIGN.md, "Pinned-source scans").
+            new_roots = project_roots(self.new, self.new_img.dir)
+            files |= {r for fs in new.values() for f in fs if (r := project_path(f, new_roots))}
         # An app always compiles a file of its own; none mapping means the paths didn't
         # (unknown), not that nothing was compiled.
         return files or None
@@ -308,6 +316,29 @@ _FRAGMENT = re.compile(r"^(?:Loaded|Merged) configuration '(.+)'$", re.M)
 def fragments_named(log: str) -> list[str]:
     """Every Kconfig fragment a configure log says Kconfig loaded or merged, in order."""
     return _FRAGMENT.findall(log)
+
+
+def live_path(ctx: ScanContext, path: str) -> Path:
+    """The file a source-build path names, as it is in the user's tree now: a path in the
+    built app copy maps to the app (from_copy); anything else (a project module, built in
+    place) is already live."""
+    p = Path(path)
+    return from_copy(p, ctx.old.spec.app.resolve(), [ctx.old]) or p
+
+
+_KCONFIG_DECL = re.compile(r"^\s*(?:menu)?config\s+(\w+)\s*$")
+
+
+def still_declares(ctx: ScanContext, path: str, line: int, sym: str, near: int = 3) -> bool:
+    """Whether the live file still declares `config SYM` or `menuconfig SYM` within `near`
+    lines of `line` (1-based): a pinned scan's source snapshot holds the unedited Kconfig,
+    so a declaration the user renamed or removed must be checked in the tree."""
+    try:
+        lines = live_path(ctx, path).read_text().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return False
+    lo, hi = max(0, line - 1 - near), min(len(lines), line + near)
+    return any((m := _KCONFIG_DECL.match(t)) and m[1] == sym for t in lines[lo:hi])
 
 
 def from_copy(p: Path, app: Path, builds: list[BuildContext]) -> Path | None:

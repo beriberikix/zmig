@@ -21,6 +21,7 @@ from zmig.buildctx import (
     build,
     build_with_salvage,
     hash_tree,
+    load_build,
     pair_images,
     sdk_identity,
 )
@@ -30,9 +31,13 @@ from zmig.findings import Category, Confidence, Finding, NotChecked, Report, Sev
 from zmig.forks import DEFAULT_METHODS, compare_tree, guess_version_tag
 from zmig.manifest import load_manifest, scan_user_workspace
 from zmig.modulecheck import ModuleNeed, diagnose, needed_at_source
+from zmig.pin import mismatches as pin_mismatches
+from zmig.pin import read_pin
 from zmig.plan import PlanContext
 from zmig.refs import ResolvedRef, resolve_ref
 from zmig.report import render
+from zmig.report.assistant import POINTER as ASSISTANT_POINTER
+from zmig.report.assistant import render_assistant
 from zmig.scan import ScanContext
 from zmig.tiers import assign as assign_tiers
 from zmig.tools import (
@@ -43,6 +48,7 @@ from zmig.tools import (
     tool_version,
 )
 from zmig.verdict import upgrade_path
+from zmig.watch import zmig_build
 from zmig.workspace import RefWorkspace, materialize
 
 log = logging.getLogger("zmig")
@@ -132,6 +138,13 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--from", dest="from_ref", required=True)
     scan.add_argument("--to", dest="to_ref", required=True)
     _scan_args(scan)
+    scan.add_argument(
+        "--pin-source",
+        type=Path,
+        metavar="REPORT",
+        help="reuse REPORT's source build (an earlier scan of the unedited app) as this "
+        "scan's source side, so edits that only build at --to can be compared",
+    )
 
     fix = sub.add_parser(
         "fix",
@@ -280,6 +293,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
     watch.add_argument("--today", default=None, help=argparse.SUPPRESS)
 
+    compare = sub.add_parser(
+        "compare",
+        help="compare two scans of the same app: before and after an edit (reads the two "
+        "report.json files; builds nothing)",
+    )
+    compare.add_argument("before", type=Path, help="report.json of the scan before the edit")
+    compare.add_argument("after", type=Path, help="report.json of the same scan after it")
+    compare.add_argument(
+        "--format", choices=["human", "json"], default="human", help="stdout format"
+    )
+    compare.add_argument("--out", type=Path, help="write compare.json to this directory")
+    compare.add_argument(
+        "--fail-on",
+        choices=["breaking", "risky"],
+        default="breaking",
+        help="lowest severity of a new finding that fails the run (default: breaking)",
+    )
+    compare.add_argument(
+        "--allow-inconclusive",
+        action="store_true",
+        help="exit 0 with a warning instead of 4 when AFTER couldn't check everything or "
+        "has revealed findings",
+    )
+    compare.add_argument("-v", "--verbose", action="count", default=0)
+
     for name, what in (("verify", "post-migration verification"),):
         s = sub.add_parser(name, parents=[common], help=f"{what} (not in the MVP)")
         s.add_argument("rest", nargs=argparse.REMAINDER)
@@ -356,6 +394,8 @@ def _environment(runner: Runner) -> dict[str, str | None]:
         "ninja": tool_version(runner, "ninja", ["--version"]),
         "dtc": tool_version(runner, "dtc", ["--version"]),
         "git": tool_version(runner, "git", ["--version"]),
+        # Two builds can share a version string; compare/watch tell them apart by this.
+        "zmig_build": zmig_build(),
     }
 
 
@@ -364,12 +404,24 @@ def _emit(report: Report, runner: Runner, args: argparse.Namespace) -> None:
         out: Path = args.out
         out.mkdir(parents=True, exist_ok=True)
         (out / "report.json").write_text(render(report, "json"))
-        (out / "MIGRATION.md").write_text(render(report, "markdown"))
+        migration = render(report, "markdown")
+        if report.command == "scan":
+            migration = _with_pointer(migration)
+            (out / "ASSISTANT.md").write_text(render_assistant(report))
+        (out / "MIGRATION.md").write_text(migration)
         (out / "report.sarif").write_text(render(report, "sarif"))
         (out / "logs" / "invocations.json").write_text(
             json.dumps([i.to_json() for i in runner.invocations], indent=2) + "\n"
         )
+        if report.command == "scan":
+            print(ASSISTANT_POINTER, file=sys.stderr)
     sys.stdout.write(render(report, args.format))
+
+
+def _with_pointer(migration: str) -> str:
+    """MIGRATION.md with the ASSISTANT.md pointer as the line under its title."""
+    title, _, rest = migration.partition("\n")
+    return f"{title}\n\n{ASSISTANT_POINTER}\n{rest}"
 
 
 def _historic_alias_tables(old: ResolvedRef, new: ResolvedRef) -> Iterator[tuple[str, str]]:
@@ -420,9 +472,17 @@ def scan_report(
         check_mcuboot_python()
 
     mode: BuildMode = "fast" if args.fast else "full"
+    pin = read_pin(args.pin_source) if getattr(args, "pin_source", None) else None
     old_r = resolve_ref(args.from_ref, cache, runner)
     new_r = resolve_ref(args.to_ref, cache, runner)
-    old_ws = materialize(old_r, cache, runner, args.modules, shallow=args.shallow)
+    # A pinned source build may have been rebuilt with modules module recovery added: its
+    # workspace needs them for the key to match.
+    old_modules = (
+        [*args.modules, *(m for m in pin.modules_added if m not in args.modules)]
+        if pin
+        else args.modules
+    )
+    old_ws = materialize(old_r, cache, runner, old_modules, shallow=args.shallow)
     new_ws = materialize(new_r, cache, runner, args.modules, shallow=args.shallow)
     table = new_ws.zephyr / "boards" / "deprecated.cmake"
     mapping = map_board(
@@ -454,9 +514,32 @@ def scan_report(
             sdk=args.sdk.expanduser().resolve() if args.sdk else None,
         )
 
-    log.warning("building %s for %s at %s (%s)...", app, args.board, args.from_ref, mode)
-    old = build(old_ws, spec(args.board), cache, runner)
-    log.warning("  %s: %s", args.from_ref, old.status)
+    if pin is not None:
+        differ = pin_mismatches(
+            pin,
+            {
+                "from": old_r.ref.to_json(),
+                "to": new_r.ref.to_json(),
+                "app": str(app),
+                "board": mapping.to_json(),
+                "build_mode": mode,
+                "sysbuild": args.sysbuild,
+                "zmig_build": zmig_build(),
+            },
+        )
+        copy = old_ws.root / "apps" / pin.app_tree_hash[:16] / app.resolve().name
+        loaded, why = load_build(old_ws, spec(args.board), pin.key, copy, cache, runner)
+        if differ or loaded is None:
+            raise UsageError(
+                f"can't pin the source to {args.pin_source} (re-run that scan, or scan "
+                "without --pin-source):\n  " + "\n  ".join([*differ, *why])
+            )
+        old = loaded
+        log.warning("source: %s's build %s at %s (pinned)", args.pin_source, old.key, args.from_ref)
+    else:
+        log.warning("building %s for %s at %s (%s)...", app, args.board, args.from_ref, mode)
+        old = build(old_ws, spec(args.board), cache, runner)
+        log.warning("  %s: %s", args.from_ref, old.status)
     log.warning("building %s for %s at %s (%s)...", app, to_board, args.to_ref, mode)
     salvage = build_with_salvage(new_ws, spec(to_board), cache, runner)
     needs, added = _missing_modules(salvage, new_ws, runner)
@@ -478,7 +561,8 @@ def scan_report(
     # The same module missing at the source is a gap in the scan's module set, not a
     # migration requirement: build the source with it too, so both sides compare like for
     # like (eval/AUDIT.md §5.2 run 1: littlefs, missing at v4.1.0 and v4.2.0).
-    at_source = _source_also_needs(old, old_ws, runner, added)
+    # Pinned, the source build is the pinned report's, as it was: never rebuilt.
+    at_source = [] if pin else _source_also_needs(old, old_ws, runner, added)
     first_old = []
     if at_source:
         log.warning(
@@ -497,16 +581,30 @@ def scan_report(
         if built is not None:
             runner.redactions[str(built.src)] = "<app>"
 
+    # `side` (schema 1.6): module recovery and salvage add contexts, so a context's
+    # position doesn't say which ref it was built at.
+    src, tgt = {"side": "source"}, {"side": "target"}
     contexts = [
-        *({**c, "superseded_by_module_recovery": at_source} for c in first_old),
-        {**old.to_json(), **({"modules_added": at_source} if at_source else {})},
-        *({**c, "superseded_by_module_recovery": list(added)} for c in first_contexts),
-        {**salvage.original.to_json(), **({"modules_added": list(added)} if added else {})},
+        *({**c, **src, "superseded_by_module_recovery": at_source} for c in first_old),
+        {
+            **old.to_json(),
+            **src,
+            **({"modules_added": at_source} if at_source else {}),
+            **({"modules_added": list(pin.modules_added)} if pin and pin.modules_added else {}),
+            **({"pinned": True} if pin else {}),
+        },
+        *({**c, **tgt, "superseded_by_module_recovery": list(added)} for c in first_contexts),
+        {
+            **salvage.original.to_json(),
+            **tgt,
+            **({"modules_added": list(added)} if added else {}),
+        },
     ]
     if salvage.salvaged is not None:
         contexts.append(
             {
                 **salvage.salvaged.to_json(),
+                **tgt,
                 "salvage_of": salvage.original.key,
                 "salvage_edits": [e.to_json() for e in salvage.edits],
             }
@@ -522,6 +620,7 @@ def scan_report(
             "board": mapping.to_json(),
             "build_mode": mode,
             "sysbuild": args.sysbuild,
+            **({"pinned_source": pin.to_json()} if pin else {}),
         },
         environment={
             **_environment(runner),
@@ -545,6 +644,7 @@ def scan_report(
         module_needs=tuple(needs),
         modules_added=tuple(added),
         modules_at_source=tuple(at_source),
+        pinned=pin is not None,
     )
     report.findings, report.analyzers, report.not_checked = analyzers.run_build_analyzers(
         selected, ctx
@@ -784,6 +884,15 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     level = [logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbose, 2)]
     logging.basicConfig(level=level, format="zmig: %(message)s", stream=sys.stderr)
+    if args.command == "compare":
+        # Reads two reports: no cache, no tools, no logs/.
+        from zmig.compare import run as cmd_compare
+
+        try:
+            return cmd_compare(args)
+        except UsageError as e:
+            print(f"zmig: error: {e}", file=sys.stderr)
+            return EXIT_USAGE
 
     cache = Cache(args.cache_dir or default_cache_root())
     cache.ensure()

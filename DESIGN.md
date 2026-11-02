@@ -35,6 +35,13 @@ the evidence behind the decisions (oracles, measurements, per-project results) i
 - **Say how it was derived.** Every contributing heuristic is named on the finding, and a
   finding's confidence is never higher than its weakest source.
 - **Additive schema.** New report fields are optional; old reports keep validating.
+- **An assistant's judgment is never evidence.** A coding assistant may edit the user's
+  tree, and those edits are ordinary project source to the next scan. Nothing an assistant
+  concludes becomes a finding, a status or a confidence. zmig reads no assistant files;
+  `ASSISTANT.md` asks assistants to leave the protected outputs alone: `report.json`,
+  `MIGRATION.md`, `report.sarif`, `ASSISTANT.md`, `logs/`, `compare.json`, watch
+  baselines, and everything under `eval/`. Reports are deterministic, so re-running a scan
+  shows whether one was edited.
 - **Regressions become tests.** A false positive or negative found on a real project gets
   a test, and the code comment at the fix names the case.
 
@@ -63,9 +70,10 @@ the evidence behind the decisions (oracles, measurements, per-project results) i
 | Command | What it does |
 |---|---|
 | `plan` | workspace triage without building: upstream `west.yml` diff, forks and local patches, release hops |
-| `scan` | builds the app at both refs and runs the build analyzers |
+| `scan` | builds the app at both refs and runs the build analyzers; `--pin-source` reuses an earlier scan's source build |
 | `fix kconfig` | a scan, then renames or comments out Kconfig assignments with Kconfig-level evidence |
 | `watch` | a scan compared with a committed baseline: CI exit codes, SARIF, PR comment |
+| `compare` | two saved scan reports of the same app, before and after an edit (no build) |
 | `changes` | prints the change database for a ref pair (no build) |
 | `doctor` | checks host tools, Python packages and the SDK/toolchain a board needs |
 | `verify` | stub; not implemented |
@@ -85,8 +93,9 @@ the evidence behind the decisions (oracles, measurements, per-project results) i
 | `forks.py`, `plan.py` | fork classification; `PlanContext` |
 | `fixes.py`, `fixkconfig.py`, `fixcmd.py`, `tiers.py` | the `fix` field; `zmig fix kconfig`; tiers |
 | `watch.py`, `watchcmd.py` | baseline comparison (pure, on report JSON); the command |
+| `compare.py` | `zmig compare`: watch's engine on two reports, plus pairing and "revealed" |
 | `sbom.py`, `size.py`, `tools.py` | SPDX reader; ROM/RAM (pyelftools); logged subprocess wrapper |
-| `findings.py`, `schema/report-1.json`, `report/` | data model, JSON Schema, renderers |
+| `findings.py`, `schema/report-1.json`, `report/` | data model, JSON Schema, renderers; `report/assistant.py` renders `ASSISTANT.md` |
 | `data/` | `releases.json`, `hazard_seeds.yaml`, `wire_format.yaml` |
 
 ### Cache layout
@@ -207,6 +216,23 @@ The pass never adds, drops or re-grades a finding, so it can't move recall or pr
 (tested). `source` names the facts; `confidence` never exceeds theirs (a guide rename or
 compiler suggestion is at most medium).
 
+What a `fix` means as an edit (also in the schema's descriptions):
+
+- `file` is relative to the app root; `line` is 1-based or null.
+- `old` and `new` both null: a location, not an edit.
+- `old` null, `new` set: insert `new`; the position is a hint. For `device-missing`
+  without an overlay to point at, `file` is a C use site and `new` a devicetree snippet
+  that belongs in an overlay.
+- `old` set: text to find on or near `line`, a whole trimmed line or one token, replaced
+  by `new`. It may not occur verbatim (the Kconfig fallback gives `CONFIG_<sym>` for a
+  `select <sym>` line; a guide match may name the bare symbol); then the fix is a location
+  only.
+- `callback-type-changed`: `old` and `new` are a pair of types, not line text.
+- `source` starts with `kconfig:`, `guide:`, `bindings:`, `build:`, `api:`, `compiler:`,
+  `devicetree:` or `evidence`. `kconfig:` also covers renames from Kconfig help text, at
+  medium confidence; the text after the prefix says which, and those are the renames
+  `fix kconfig` holds back.
+
 ### Tiers
 
 Each finding gets a `tier`, for grouping output only: the verdict, exit codes, watch
@@ -231,12 +257,13 @@ order-independent.
 ### Report envelope
 
 ```json
-{"schema": "https://zmig.dev/schema/report/1", "schema_version": "1.5", "zmig_version": "…",
+{"schema": "https://zmig.dev/schema/report/1", "schema_version": "1.6", "zmig_version": "…",
  "command": "scan",
  "inputs": {"from": {"spec", "sha", "kind", "dirty"}, "to": {…}, "app", "app_tree_hash",
             "board": {…mapping…}, "build_mode": "full", "sysbuild": false},
- "environment": {"python", "west", "cmake", "dtc", "libclang", "sdk"},
- "contexts": [{"ref", "board", "status", "key", "images": […]}, {"salvage_of", "salvage_edits"}],
+ "environment": {"python", "west", "cmake", "dtc", "libclang", "sdk", "zmig_build"},
+ "contexts": [{"ref", "board", "status", "key", "side", "images": […]},
+              {"salvage_of", "salvage_edits"}],
  "analyzers": [{"name": "kconfig", "status": "ok", "findings": 4, "hazards": 2}, …],
  "summary": {"counts": {…}, "top": […]}, "findings": […],
  "upgrade_path": {…}, "not_checked": […], "checked": […]}
@@ -249,9 +276,24 @@ order-independent.
 - **`top`:** the first five breaking or risky findings; introduced ones first, then
   breaking findings with evidence in the user's files.
 - **Order:** findings by (severity, confidence, category, id).
+- **`environment.zmig_build`:** the content hash of zmig's own code (the one watch
+  baselines record), so two commits with the same version string differ.
+- **`contexts[].side`:** `source` or `target`. Module recovery and salvage add contexts,
+  so position doesn't say which ref a context was built at.
+- **`inputs.pinned_source`**, and `pinned` on the source context: set by
+  `scan --pin-source` ([Pinned-source scans](#pinned-source-scans)).
+- **Versioning:** adding a field bumps the minor version; removing one or changing its
+  meaning bumps the major. Readers should ignore fields they don't know.
+- **The assistant contract:** the fields `ASSISTANT.md` lets an assistant rely on are
+  `schema_version`; per finding `id`, `severity`, `confidence`, `tier`, `category`,
+  `kind`, `title`, `evidence`, `action`, `fix`, `remedy`; and `not_checked`, `checked`,
+  `upgrade_path`, `contexts[].status`. A finding's `old` and `new` stay opaque. The list
+  is `FIELDS` in `report/assistant.py`, tested against the schema and the text.
 - **Schema history:** 1.1 `image`; 1.2 `introduced_by_migration`, `remedy`, `provenance`,
   `upgrade_path`, `not_checked`, `environment.sdk`, hazard categories; 1.3 `checked`; 1.4
-  not-applicable categories need evidence; 1.5 `fix`. `tier` was added without a bump.
+  not-applicable categories need evidence; 1.5 `fix`; 1.6 `environment.zmig_build`,
+  `contexts[].side`, typed `upgrade_path.remedies` and descriptions of `fix`; 1.7
+  `inputs.pinned_source`, `contexts[].pinned`. `tier` was added without a bump.
   Tests validate every report against `zmig/schema/report-1.json`.
 
 ### Outputs
@@ -266,7 +308,15 @@ order-independent.
 - **SARIF 2.1.0:** only findings with `file_line` evidence in the user's own files, paths
   relative to `APPROOT` (the app for `scan`, the workspace for `plan`); rule id
   `category/kind`; level error/warning/note by severity.
-- **`--out DIR`:** `report.json`, `MIGRATION.md`, `report.sarif`, `logs/`.
+- **`--out DIR`:** `report.json`, `MIGRATION.md`, `report.sarif`, `logs/`; for `scan`
+  also `ASSISTANT.md`, fixed guidance for a coding assistant (the field contract, the
+  protected outputs, the compare loop, how to label its own statements), with a pointer
+  line under `MIGRATION.md`'s title and on stderr. It holds no paths or per-run values.
+- **`compare.json`** (`zmig compare --out`): the exit code, a summary, both reports'
+  refs, `unseen_source_build_broke`, the gaps, and one item per fingerprint with its state,
+  the finding `ids`, and `sites_before`/`sites_after` where the pairing pass counted
+  sites. Absolute report paths are written as file names. No `cause`: `compare` claims
+  none.
 
 ### Exit codes
 
@@ -276,6 +326,7 @@ order-independent.
 | `fix kconfig` | as above; 2 also for `--apply` on a dirty tree; 3 when the rebuilt target has a finding the fix introduced |
 | `doctor` | 0 if no check failed, else 1 |
 | `watch` | 0–4 ([CI mode](#exit-codes-1)) |
+| `compare` | 0 nothing gating and nothing inconclusive (or only inconclusive, with `--allow-inconclusive`); 1 internal error; 2 usage error or reports not comparable; 3 a new, escalated or new-use-site finding at or above `--fail-on`; 4 a new gap or a revealed finding. 3 takes precedence over 4 |
 
 An interrupted run exits 130.
 
@@ -1046,6 +1097,44 @@ a ref-independent identity, a baseline, an exit policy, and code-scanning and PR
 outputs. The comparison (`watch.py`) works on report JSON only, so it reruns on saved
 reports (`--report`, `--pinned-report`).
 
+`zmig compare BEFORE AFTER` reuses this engine on two scan reports of the same app, with
+BEFORE as an in-memory baseline. It refuses reports whose app, refs, board, build mode,
+sysbuild, analyzers or zmig build differ. It adds a pairing pass (a "fixed" and a "new"
+item with the same category, kind, subject and image become one "updated" or
+"new-use-site" item by site count, since clearing the first cited file changes the
+fingerprint) and a "revealed" state (a new finding that BEFORE couldn't have reported,
+because its target build or analyzer gap has closed); revealed findings make the run
+inconclusive, since `compare` can't tell a hidden finding from one the edit caused. It
+also refuses a pinned BEFORE, and an AFTER pinned to any build but BEFORE's source.
+
+### Pinned-source scans
+
+A migration edit uses what only the target has, so the edited app stops building at the
+source ref, and every finding that needed the source build becomes "unseen" (ardep, first
+batch: 5 of 5). `zmig scan --pin-source REPORT` reuses REPORT's source build, an earlier
+scan of the unedited app, by its cache key (`buildctx.load_build`), and builds only the
+edited app at the target. The source side then means the firmware deployed today, and the
+target the candidate.
+
+- **Checks, all before any build (exit 2):** REPORT is a 1.7+ scan report, not itself
+  pinned, with an `ok` source build still in the cache along with the app copy it was built
+  from; app, refs, boards, build mode, sysbuild and zmig build match; the build's recorded
+  key inputs match this scan's except the app and its module trees.
+- **What a pinned scan reads:** the source build's artifacts as built; app usage from the
+  edited tree; the API analyzer's source parse through the include digests the source build
+  stored on first analysis (`zmig-api-deps.json` in its image directory), not by rehashing
+  project modules the user has since edited in place.
+- **Rules where the source would outlive a correct fix:** API uses of a file count only
+  while a clean target parse of it still references the name (a target parse with errors
+  leaves the source's uses, with a note); a `changes` Kconfig override counts only while
+  the live file still declares it near that line; `symbol-deprecated` reads the project's
+  Kconfig from the live tree; `input-not-applied` skips a file the user moved; the files a
+  build used (tiers) include the target's records.
+- **Difference findings stay on:** a source-versus-target difference is a difference from
+  the deployed firmware, whoever caused it; `compare` claims no cause. In the eval
+  baselines the only such kinds above info are `dependency-changed`, `new-warning` and
+  `node-changed`, all risky.
+
 ### What a run compares
 
 - **`--from`** defaults to `manifest`: the `zephyr` revision in the nearest `west.yml` above
@@ -1205,6 +1294,15 @@ The example workflow is `examples/zmig-watch.yml`.
 - **Watch:** zmig upgrades can change fingerprints (rebase needed); fork PRs can't comment
   or upload SARIF; how code scanning shows `absent` and region-less results, and Actions
   cache limits under nightly churn, are unverified.
+- **Compare:** `--module`, `--cmake-arg`, `--to-board` and `--wire-allowlist` aren't
+  recorded in `inputs`, so a change to them between the two scans isn't detected. A
+  finding that disappears because the edit broke the source build is "unseen", not
+  "fixed"; `compare.json` counts those (`unseen_source_build_broke`). Pinned scans avoid
+  that.
+- **Pinned scans:** evidence text read from a project module file at a source-build path
+  may show the edited line (text only; ids and fingerprints don't use it). Files the edit
+  added aren't API-parsed (the target build's compile errors still report misuse). `fix`
+  and `watch` can't pin. An evicted source build can't be pinned to: re-run the scan.
 - **First run** clones Zephyr in full (about 1 GB).
 
 ### Future work
@@ -1229,4 +1327,8 @@ the evidence behind it.
   their instantiation sites.
 - **Watch:** `--accept <fingerprint>`, a Checks-API neutral conclusion, baseline schema
   validation, a watch mode for `plan`.
+- **Coding assistants:** applying high-confidence fixes without asking, if a dogfood run
+  shows users approve them and none is wrong; baseline writers that refuse
+  to run without a terminal; packaging (a skill or plugin) once `ASSISTANT.md` is proven
+  end to end.
 - **Other bootloaders** and sysbuild images beyond `MAIN`/`BOOTLOADER`; macOS and Windows.

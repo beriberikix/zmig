@@ -46,11 +46,39 @@
         },
         "to": {
           "$ref": "#/$defs/ref"
+        },
+        "pinned_source": {
+          "type": "object",
+          "description": "since 1.7: set by `scan --pin-source`. The source side is this earlier scan's source build of the unedited app, reused by its key; the target side and app usage are the edited app's.",
+          "required": ["report", "key", "app_tree_hash"],
+          "properties": {
+            "report": {
+              "type": "string",
+              "description": "the pinned report: the path as given when relative, else the file name"
+            },
+            "key": {
+              "type": "string",
+              "description": "the reused source build's key"
+            },
+            "app_tree_hash": {
+              "type": "string",
+              "description": "the unedited app's tree hash"
+            },
+            "zmig_build": {
+              "type": ["string", "null"]
+            }
+          }
         }
       }
     },
     "environment": {
       "type": "object",
+      "properties": {
+        "zmig_build": {
+          "type": "string",
+          "description": "since 1.6: content hash of the installed zmig package (zmig.watch.zmig_build); tells apart two builds with the same zmig_version"
+        }
+      },
       "additionalProperties": {
         "type": [
           "string",
@@ -83,6 +111,17 @@
               "full",
               "fast"
             ]
+          },
+          "side": {
+            "enum": [
+              "source",
+              "target"
+            ],
+            "description": "since 1.6: the ref this context was built at; module recovery and salvage add contexts, so position does not say"
+          },
+          "pinned": {
+            "type": "boolean",
+            "description": "since 1.7: this source context was reused from the report in inputs.pinned_source, not built by this scan"
           }
         }
       }
@@ -200,7 +239,32 @@
           }
         },
         "remedies": {
-          "type": "object"
+          "type": "object",
+          "description": "since 1.6 typed (the shape is unchanged): Remedy value -> the finding ids, or category:<name> for a hazard category with no finding, that need it",
+          "propertyNames": {
+            "enum": [
+              "config-pin",
+              "app-change",
+              "intermediate-hop",
+              "bootloader-update",
+              "reflash",
+              "unknown"
+            ]
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/id"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^category:[a-z][a-z0-9-]*$"
+                }
+              ]
+            }
+          }
         },
         "assumptions": {
           "type": "array",
@@ -459,12 +523,30 @@
           "description": "since 1.5 (zmig.fixes): where the fix goes and, when known, the edit; additive",
           "required": ["file", "source", "confidence"],
           "properties": {
-            "file": {"type": "string"},
-            "line": {"type": ["integer", "null"]},
-            "old": {"type": ["string", "null"]},
-            "new": {"type": ["string", "null"]},
-            "source": {"type": "string"},
-            "confidence": {"enum": ["high", "medium", "low"]}
+            "file": {
+              "type": "string",
+              "description": "the project file, as the finding's evidence names it"
+            },
+            "line": {
+              "type": ["integer", "null"],
+              "description": "1-based, or null when only the file is known"
+            },
+            "old": {
+              "type": ["string", "null"],
+              "description": "old and new both null: a location only, not an edit. Otherwise the text to find on or near line (the whole trimmed line, or one token) and replace with new; it may not occur there verbatim (a Kconfig rename gives CONFIG_<sym> even for `select <sym>`), in which case the fix is a location only. For callback-type-changed, old and new are function types, not line text"
+            },
+            "new": {
+              "type": ["string", "null"],
+              "description": "with old null: text to insert; the position is a hint. For devicetree device-missing with no applied overlay, file is the code use site and new is an overlay snippet that belongs in an overlay"
+            },
+            "source": {
+              "type": "string",
+              "description": "what the fix was built from; starts with kconfig:, guide:, bindings:, build:, api:, compiler:, devicetree: or is evidence. The text after kconfig: says whether a rename came from help text (medium confidence)"
+            },
+            "confidence": {
+              "enum": ["high", "medium", "low"],
+              "description": "never above the finding's; guide and compiler fixes are at most medium"
+            }
           }
         }
       }

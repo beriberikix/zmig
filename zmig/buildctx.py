@@ -210,6 +210,20 @@ def python_environment() -> dict[str, str]:
     }
 
 
+_EXTRA_MODULES = re.compile(r"^-DZEPHYR_EXTRA_MODULES(?::[A-Z]+)?=(?P<dirs>.*)$")
+
+
+def extra_module_dirs(cmake_args: tuple[str, ...]) -> list[Path]:
+    """The project's own module directories from -DZEPHYR_EXTRA_MODULES in --cmake-arg:
+    absolute paths that exist. CMake runs in zmig's workspace, so a relative path can't
+    name the user's code."""
+    dirs: list[Path] = []
+    for arg in cmake_args:
+        if m := _EXTRA_MODULES.match(arg):
+            dirs += [Path(d) for d in m["dirs"].split(";") if d and Path(d).is_absolute()]
+    return [d for d in dirs if d.is_dir()]
+
+
 def build_key(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> str:
     return _key_of(key_inputs(ws, spec, modules))
 
@@ -222,7 +236,7 @@ def key_inputs(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> dict
     """Everything the build key is made of (and nothing else)."""
     from zmig import __version__
 
-    return {
+    inputs: dict[str, Any] = {
         "recipe": RECIPE_VERSION,
         "zmig": __version__,
         "python": python_environment(),
@@ -239,6 +253,13 @@ def key_inputs(ws: RefWorkspace, spec: BuildSpec, modules: list[Module]) -> dict
         "cmake_args": list(spec.cmake_args),
         "sdk": sdk_identity(spec.sdk),
     }
+    # The project's own modules are built in place, so their content is part of the build:
+    # keyed on the argument text alone, an edit to a board in one reused the build from
+    # before the edit (regression: ardep's board, a zmig compare dogfood run). Added only
+    # when present, so builds without extra modules keep their keys.
+    if extra := extra_module_dirs(spec.cmake_args):
+        inputs["extra_modules"] = [[str(d), hash_tree(d)] for d in extra]
+    return inputs
 
 
 def _flat(d: Any, prefix: str = "") -> dict[str, str]:
@@ -259,6 +280,7 @@ _INPUT_NAMES = {
     "recipe": "build recipe",
     "app": "app tree",
     "app_name": "app directory name",
+    "extra_modules": "project module tree",
     "sdk": "SDK",
 }
 
@@ -308,6 +330,51 @@ def app_source(ws: RefWorkspace, spec: BuildSpec) -> Path:
     keeps those lookups isolated from whatever surrounds the user's app.
     """
     return ws.root / "apps" / hash_tree(spec.app)[:16] / spec.app.resolve().name
+
+
+def _from_marker(
+    ws: RefWorkspace,
+    spec: BuildSpec,
+    key: str,
+    meta: dict[str, Any],
+    src: Path,
+    cache: Cache,
+    runner: Runner,
+) -> BuildContext:
+    bdir = cache.builds / key
+    runner.redactions.setdefault(str(bdir), f"$BUILD[{key}]")
+    images = tuple(_image_from_json(x, bdir, spec, ws) for x in meta["images"])
+    return BuildContext(
+        ws, spec, key, bdir, meta["status"], cache.builds / f"{key}.log", src, images
+    )
+
+
+def load_build(
+    ws: RefWorkspace, spec: BuildSpec, key: str, src: Path, cache: Cache, runner: Runner
+) -> tuple[BuildContext | None, list[str]]:
+    """A cached build by its key, without rebuilding, for a scan that reuses an earlier
+    scan's source build for an edited app (`scan --pin-source`, DESIGN.md, "Pinned-source scans").
+    `spec.app` is the live (edited) app, for usage; `src` is the copy the build was built
+    from. Returns the build, or None and why not: the build left the cache, or its recorded
+    inputs differ from this scan's in anything but the app and its module trees."""
+    bdir, marker = cache.builds / key, cache.builds / f"{key}.json"
+    if not (marker.is_file() and bdir.is_dir()):
+        return None, [f"build {key} is no longer in the cache"]
+    if not src.is_dir():
+        return None, [f"the app copy it was built from ({src}) is no longer in the cache"]
+    meta = json.loads(marker.read_text())
+    recorded = meta.get("key_inputs")
+    if recorded is None:
+        return None, [f"build {key} doesn't record its inputs"]
+    ignore = {"app", "extra_modules"}
+    now = _flat(
+        {k: v for k, v in key_inputs(ws, spec, ws.modules(runner)).items() if k not in ignore}
+    )
+    then = _flat({k: v for k, v in recorded.items() if k not in ignore})
+    diff = sorted(k for k in now.keys() | then.keys() if now.get(k) != then.get(k))
+    if diff:
+        return None, [f"{_INPUT_NAMES.get(k, k)} differs" for k in diff]
+    return _from_marker(ws, spec, key, meta, src, cache, runner), []
 
 
 def _copy_app(src: Path, dest: Path) -> None:
@@ -459,9 +526,7 @@ def build(ws: RefWorkspace, spec: BuildSpec, cache: Cache, runner: Runner) -> Bu
         meta = json.loads(marker.read_text())
         if "key_inputs" not in meta:  # recorded from now on, for miss_reason
             marker.write_text(json.dumps({**meta, "key_inputs": inputs}, indent=2))
-        runner.redactions.setdefault(str(bdir), f"$BUILD[{key}]")
-        images = tuple(_image_from_json(x, bdir, spec, ws) for x in meta["images"])
-        return BuildContext(ws, spec, key, bdir, meta["status"], log, src, images)
+        return _from_marker(ws, spec, key, meta, src, cache, runner)
 
     log_.warning(
         "  build %s for %s at %s not in the cache; rebuilt because: %s",

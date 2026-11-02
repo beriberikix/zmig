@@ -89,3 +89,31 @@ def test_copies_with_different_directory_names_do_not_share_a_build(tmp_path: Pa
     assert key(a) != key(b)
     assert key(a) == key(c)  # same content and name, wherever it lives: one build
     assert "app_name" in _INPUT_NAMES
+
+
+def test_extra_module_content_is_in_the_key(tmp_path: Path) -> None:
+    """An edit to the project's own module (ZEPHYR_EXTRA_MODULES) changes the key. Keyed on
+    the argument text alone, zmig compare's after-scan of ardep reused the build from
+    before its board edit and reported the old Kconfig lines."""
+    from types import SimpleNamespace
+
+    from zmig.buildctx import BuildSpec, build_key, extra_module_dirs
+
+    app, mod = tmp_path / "app", tmp_path / "mod"
+    (app / "src").mkdir(parents=True)
+    (app / "src" / "main.c").write_text("int main(void) { return 0; }\n")
+    (mod / "boards").mkdir(parents=True)
+    (mod / "boards" / "board.yml").write_text("board:\n  name: b\n")
+    ws = SimpleNamespace(resolved=SimpleNamespace(ref=SimpleNamespace(key={"sha": "1" * 40})))
+    args = (f"-DZEPHYR_EXTRA_MODULES={mod};relative/dir;{tmp_path / 'missing'}",)
+
+    def key(cmake_args: tuple[str, ...]) -> str:
+        spec = BuildSpec(app=app, board="b", cmake_args=cmake_args)
+        return build_key(ws, spec, [])  # type: ignore[arg-type]
+
+    assert extra_module_dirs(args) == [mod]
+    assert extra_module_dirs(("-DZEPHYR_EXTRA_MODULES:STRING=" + str(mod),)) == [mod]
+    plain, before = key(()), key(args)
+    (mod / "boards" / "board.yml").write_text("board:\n  name: b\n  full_name: B\n")
+    assert key(args) != before
+    assert key(()) == plain  # no extra modules: the key is unchanged

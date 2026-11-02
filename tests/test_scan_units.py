@@ -152,6 +152,7 @@ def test_build_files_unknown_when_no_record_maps_to_the_project(
     deps = {"CMakeFiles/app.dir/src/main.c.obj": [f"{first}/src/main.c", "/z/include/k.h"]}
     monkeypatch.setattr(scan, "build_dependencies", lambda img, runner: deps)
     fake = SimpleNamespace(
+        pinned=False,
         old=SimpleNamespace(src=second, workspace=SimpleNamespace(root=tmp_path / "ws")),
         old_img=SimpleNamespace(dir=build),
         runner=None,

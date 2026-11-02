@@ -10,16 +10,31 @@ from zmig.findings import Finding, Report, Severity
 MARK = {Severity.BREAKING: "BREAKING", Severity.RISKY: "risky   ", Severity.INFO: "info    "}
 
 
-def target_build(contexts: list[dict[str, Any]]) -> str:
+Ctx = dict[str, Any]
+
+
+def effective_contexts(contexts: list[Ctx]) -> tuple[Ctx | None, Ctx | None, Ctx | None]:
+    """(source, raw target, salvaged target): the contexts a scan analyzed. Module recovery
+    adds superseded contexts and salvage adds one, so position alone doesn't say which is
+    which. Schema 1.6 contexts carry `side`; for 1.5 the source is the first context that
+    wasn't superseded, and the targets follow it."""
+    live = [c for c in contexts if "superseded_by_module_recovery" not in c]
+    if any("side" in c for c in contexts):
+        source = next((c for c in live if c.get("side") == "source"), None)
+        targets = [c for c in live if c.get("side") == "target"]
+    else:
+        source = live[0] if live else None
+        targets = live[1:]
+    raw = next((c for c in targets if "salvage_of" not in c), None)
+    salvaged = next((c for c in targets if "salvage_of" in c), None)
+    return source, raw, salvaged
+
+
+def target_build(contexts: list[Ctx]) -> str:
     """'target build: ok', or how it failed and whether a salvaged build was compared."""
-    targets = contexts[1:]
-    if not targets:
+    _, raw, salv = effective_contexts(contexts)
+    if raw is None:
         return "target build: not run"
-    raw = next(
-        (c for c in targets if "salvage_of" not in c and "superseded_by_module_recovery" not in c),
-        targets[0],
-    )
-    salv = next((c for c in targets if "salvage_of" in c), None)
     out = f"target build: {raw.get('status')}"
     if raw.get("modules_added"):
         out += f" (with {', '.join(map(str, raw['modules_added']))} added)"
@@ -89,4 +104,50 @@ def render_human(report: Report) -> str:
     bad = [a for a in report.analyzers if a.status != "ok"]
     for a in bad:
         lines.append(f"! analyzer {a.name} {a.status}: {a.reason}")
+    return "\n".join(lines) + "\n"
+
+
+# Most actionable first; "unchanged" items are only counted.
+_COMPARE_GROUPS = (
+    ("new", "new (not in BEFORE)"),
+    ("escalated", "escalated (higher severity)"),
+    ("new-use-site", "new use sites"),
+    ("revealed", "revealed (BEFORE could not see these; hidden, or caused by the edit)"),
+    ("unseen", "unseen (gone, but AFTER could not check; still open)"),
+    ("fixed", "fixed"),
+    ("updated", "updated (same finding, changed value or fewer sites)"),
+)
+
+
+def render_compare(result: dict[str, Any]) -> str:
+    """`zmig compare` for the terminal, from its compare.json."""
+    pinned = " (AFTER's source side pinned to BEFORE's build)" if result.get("pinned") else ""
+    lines = [f"zmig compare: {result['summary']}{pinned}"]
+    if n := result.get("unseen_source_build_broke"):
+        lines.append(
+            f"  {n} finding(s) unseen because the edited app no longer builds at the source ref"
+        )
+    for g in result.get("gaps", []):
+        if g["state"] != "accepted":
+            lines.append(f"  gap: {g['detail']} ({g['state']})")
+    items = result.get("items", [])
+    for state, heading in _COMPARE_GROUPS:
+        group = [i for i in items if i["state"] == state]
+        if not group:
+            continue
+        lines += ["", f"{heading}: {len(group)}"]
+        for i in group:
+            ident = ", ".join(i.get("ids") or []) or i["fingerprint"]
+            where = (
+                f"  [{i['path']}{':' + str(i['line']) if i.get('line') else ''}]"
+                if i["path"]
+                else ""
+            )
+            sites = (
+                f" ({i['sites_before']} -> {i['sites_after']} sites)" if "sites_before" in i else ""
+            )
+            lines.append(f"  {ident} {i['severity']} {i['title']}{sites}{where}")
+    same = sum(1 for i in items if i["state"] == "unchanged")
+    if same:
+        lines += ["", f"unchanged: {same}"]
     return "\n".join(lines) + "\n"
