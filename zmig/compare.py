@@ -22,7 +22,7 @@ import argparse
 import datetime as dt
 import json
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -32,6 +32,7 @@ from zmig.findings import SCHEMA_URI
 from zmig.report.human import effective_contexts, render_compare
 from zmig.watch import (
     EXIT_INCONCLUSIVE,
+    EXIT_NEW_FINDING,
     EXIT_OK,
     GATED,
     Acceptance,
@@ -316,6 +317,7 @@ def classify(
     for i in cmp.items:
         i.cause = None  # compare claims no cause (watch says "change": the target didn't move)
     out = decide(cmp, gap_states, policy_for(fail_on, allow_inconclusive))
+    out.summary = summary(out, allow_inconclusive)
     if res.revealed and out.code == EXIT_OK:
         what = f"{len(res.revealed)} revealed finding(s): hidden before, or caused by the edit"
         if allow_inconclusive:
@@ -334,6 +336,30 @@ def classify(
     if src_b and src_a and src_b.get("status") == "ok" and src_a.get("status") != "ok":
         res.unseen_source_build_broke = sum(1 for i in cmp.items if i.state == "unseen")
     return res
+
+
+# How compare names watch's gap states: BEFORE is the baseline, so an "accepted" gap is one
+# both scans have.
+GAP_STATES = {"accepted": "in both scans", "unaccepted": "new in AFTER", "worse": "worse in AFTER"}
+
+
+def summary(out: Outcome, allow_inconclusive: bool) -> str:
+    """The outcome in compare's terms. watch's text speaks of a baseline and accepted gaps;
+    compare has two scans (regression: "no new finding outside the baseline; analysis
+    incomplete (accepted gaps)" on every ardep dogfood run)."""
+    if out.code == EXIT_NEW_FINDING:
+        n = Counter(i.severity for i in out.failing)
+        what = ", ".join(f"{v} {k}" for k, v in sorted(n.items(), key=lambda kv: _SEV_RANK[kv[0]]))
+        return f"new in AFTER: {what}"
+    blocking = [g for g in out.gaps if g.blocking]
+    if blocking:
+        what = f"AFTER couldn't check everything BEFORE did ({len(blocking)} gap(s) new or worse)"
+        if allow_inconclusive:
+            return f"nothing new; WARNING: {what} (allowed by --allow-inconclusive)"
+        return f"inconclusive: nothing new, but {what}"
+    if out.gaps:
+        return "nothing new; some analyses were incomplete in both scans"
+    return "nothing new"
 
 
 def _shown(path: Path) -> str:

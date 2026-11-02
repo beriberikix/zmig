@@ -127,9 +127,11 @@ def render_compare(result: dict[str, Any]) -> str:
         lines.append(
             f"  {n} finding(s) unseen because the edited app no longer builds at the source ref"
         )
+    from zmig.compare import GAP_STATES
+
     for g in result.get("gaps", []):
         if g["state"] != "accepted":
-            lines.append(f"  gap: {g['detail']} ({g['state']})")
+            lines.append(f"  gap: {g['detail']} ({GAP_STATES.get(g['state'], g['state'])})")
     items = result.get("items", [])
     for state, heading in _COMPARE_GROUPS:
         group = [i for i in items if i["state"] == state]

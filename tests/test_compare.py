@@ -419,3 +419,29 @@ def test_target_failure_whose_error_changed_says_so() -> None:
     out2 = compare_json(run(before, after2), before, after2, Path("b.json"), Path("a.json"))
     (item2,) = [i for i in out2["items"] if g["id"] in i["ids"]]
     assert "error_before" not in item2
+
+
+def test_summary_speaks_of_two_scans_not_a_baseline() -> None:
+    """compare's summary and gap labels are its own: BEFORE isn't a baseline, and a gap
+    both scans have isn't "accepted" (regression: watch's "no new finding outside the
+    baseline; analysis incomplete (accepted gaps)" on every ardep dogfood run)."""
+    from zmig.report.human import render_compare
+
+    def text(before: JSON, after: JSON, allow: bool = False) -> tuple[str, str]:
+        res = run(before, after, allow=allow)
+        out = compare_json(res, before, after, Path("b.json"), Path("a.json"))
+        return res.outcome.summary, render_compare(out)
+
+    r = load("cannectivity-c1")
+    same, _ = text(r, copy.deepcopy(r))
+    assert same in ("nothing new", "nothing new; some analyses were incomplete in both scans")
+    new, _ = text(r, add_new(r, "node-changed", "/new", "breaking"))
+    assert new == "new in AFTER: 1 breaking"
+    g = load("golioth-b")
+    gap, shown = text(g, skip(g, "api"))
+    assert gap.startswith("inconclusive: nothing new, but AFTER couldn't check everything")
+    assert "(new in AFTER)" in shown or "(worse in AFTER)" in shown
+    allowed, _ = text(g, skip(g, "api"), allow=True)
+    assert allowed.startswith("nothing new; WARNING:")
+    for s in (same, new, gap, allowed, shown):
+        assert "baseline" not in s and "accepted" not in s
