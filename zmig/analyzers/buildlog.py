@@ -35,7 +35,7 @@ from zmig.findings import (
     plural,
     tool_output,
 )
-from zmig.scan import ScanContext
+from zmig.scan import ScanContext, live_path
 from zmig.size import footprint
 from zmig.snapshots import build_dependencies, kconfig_symbols
 from zmig.tools import find_tool
@@ -468,6 +468,16 @@ def inputs_not_applied(
     return out
 
 
+def _live_exists(ctx: ScanContext, shown: str) -> bool:
+    """Whether a project file, shown as evidence shows it (app-relative, or "<module>/..."),
+    exists in the user's tree now."""
+    roots = project_roots(ctx.old, ctx.old_img.dir)
+    for root, prefix in sorted(roots.items(), key=lambda kv: -len(kv[1])):
+        if shown.startswith(prefix):
+            return live_path(ctx, os.path.join(root, shown[len(prefix) :])).is_file()
+    return True  # not a project path: nothing to check
+
+
 # add(kind, subject, title, severity, action, evidence, old, new)
 Add = Callable[..., None]
 _COMPILER_ERROR = re.compile(
@@ -534,6 +544,11 @@ class BuildlogAnalyzer:
                 project_roots(ctx.new_raw, raw.dir),
                 target_dts,
             ):
+                # Pinned, the source applied the unedited tree's file: if the user moved or
+                # deleted it (the usual fix), the target's own inputs cover the new path
+                # (DESIGN-PINNED.md piece 3).
+                if ctx.pinned and not _live_exists(ctx, path):
+                    continue
                 verb = "merged" if what == "configuration fragment" else "applied"
                 add(
                     "input-not-applied",

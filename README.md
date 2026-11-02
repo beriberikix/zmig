@@ -152,6 +152,7 @@ zmig scan --app <dir> --board <board> --from <ref> --to <ref> [options] --out DI
 | `--all-guide-entries` | also list migration-guide entries that don't match your app |
 | `--deployed-image FILE` | a signed image read from a device, for the MCUboot checks |
 | `--wire-allowlist FILE` | extra wire-format values your peers depend on |
+| `--pin-source REPORT` | reuse REPORT's source build, an earlier scan of your unedited app, so edits that only build at `--to` can be compared ([`zmig compare`](#zmig-compare)) |
 
 What it checks:
 
@@ -249,6 +250,18 @@ for, because something couldn't be checked in the second scan), new, revealed (n
 first scan couldn't have seen it), escalated, a new use site, updated or unchanged.
 `--out` writes `compare.json`, with the finding ids on every item.
 
+An edit that uses what only the target has stops your app building at the source ref, so
+everything that needed the source build would be unseen. Scan the edited app with
+`--pin-source before/report.json` instead: the second scan reuses the first one's source
+build (the firmware you ship today) and builds only the edited app at the target.
+
+```sh
+zmig scan ... --out before                       # the unedited app
+# edit, commit
+zmig scan ... --out after --pin-source before/report.json
+zmig compare before/report.json after/report.json
+```
+
 | Exit | Meaning |
 |---|---|
 | 0 | nothing new and nothing inconclusive |
@@ -333,8 +346,9 @@ Each finding's `confidence` says how it was derived:
 Give your assistant the `ASSISTANT.md` that `zmig scan --out DIR` writes. It tells the
 assistant which `report.json` fields to rely on, to show you every edit before applying
 it, and to commit in batches by category. After each batch it re-runs the same scan into a
-new folder and runs `zmig compare DIR/report.json NEW/report.json`, always against the
-first scan, and stops on exit 3 or 4.
+new folder, pinned to the first one (`--pin-source DIR/report.json`), and runs
+`zmig compare DIR/report.json NEW/report.json`, always against the first scan, and stops
+on exit 3 or 4.
 
 The assistant's conclusions are never zmig findings. `ASSISTANT.md` asks it to label every
 statement as a zmig finding, its own edit, or its own judgment, and never to edit zmig's

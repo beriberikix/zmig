@@ -282,3 +282,63 @@ def test_only_scan_takes_pin_source() -> None:
     assert "--pin-source" in options(sub.choices["scan"])
     assert "--pin-source" not in options(sub.choices["fix"])
     assert "--pin-source" not in options(sub.choices["watch"])
+
+
+# --- pinned-mode rules (piece 3) ----------------------------------------------------------
+
+
+def test_pinned_build_files_include_the_targets(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A file the edit added is compiled only by the target: pinned, it counts as used."""
+    from zmig import scan
+
+    deps = {
+        "old": {"a.obj": ["/s/app/src/main.c"]},
+        "new": {"a.obj": ["/t/app/src/main.c"], "b.obj": ["/t/app/src/added.c"]},
+    }
+    monkeypatch.setattr(scan, "build_dependencies", lambda img, runner: deps[img.dir])
+    monkeypatch.setattr(
+        scan, "project_roots", lambda b, d: {"/s/app": ""} if d == "old" else {"/t/app": ""}
+    )
+
+    def files(pinned: bool) -> set[str] | None:
+        fake = SimpleNamespace(
+            pinned=pinned,
+            old=SimpleNamespace(),
+            new=SimpleNamespace(),
+            old_img=SimpleNamespace(dir="old"),
+            new_img=SimpleNamespace(dir="new"),
+            runner=None,
+        )
+        return scan.ScanContext.build_files.func(fake)  # type: ignore[attr-defined,no-any-return]
+
+    assert files(False) == {"src/main.c"}
+    assert files(True) == {"src/main.c", "src/added.c"}
+
+
+def test_moved_input_is_checked_in_the_live_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """input-not-applied, pinned: a fragment the unedited source applied and the user has
+    since moved (the usual fix) no longer exists at that path, so it isn't reported."""
+    from zmig.analyzers import buildlog
+
+    copy, app, mod = (
+        tmp_path / "ws" / "apps" / "0123456789abcdef" / "app",
+        tmp_path / "app",
+        tmp_path / "mod",
+    )
+    for d in (copy / "boards", app / "boards", mod / "boards"):
+        d.mkdir(parents=True)
+    monkeypatch.setattr(buildlog, "project_roots", lambda b, d: {str(copy): "", str(mod): "mod/"})
+    ws = SimpleNamespace(root=tmp_path / "ws")
+    ctx = SimpleNamespace(
+        old=SimpleNamespace(src=copy, spec=SimpleNamespace(app=app), workspace=ws),
+        old_img=SimpleNamespace(dir=tmp_path),
+    )
+    (copy / "boards" / "b.conf").write_text("")  # in the unedited copy only: moved
+    assert not buildlog._live_exists(ctx, "boards/b.conf")  # type: ignore[arg-type]
+    (app / "boards" / "b.conf").write_text("")
+    assert buildlog._live_exists(ctx, "boards/b.conf")  # type: ignore[arg-type]
+    assert not buildlog._live_exists(ctx, "mod/boards/x.conf")  # type: ignore[arg-type]
+    (mod / "boards" / "x.conf").write_text("")
+    assert buildlog._live_exists(ctx, "mod/boards/x.conf")  # type: ignore[arg-type]

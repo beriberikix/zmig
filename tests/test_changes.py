@@ -325,6 +325,7 @@ def _ctx(tmp_path: Path, target_configured: bool, prior: list[Any] | None = None
     img = SimpleNamespace(dir=tmp_path / "b", has=lambda a: a is Artifact.CONFIG)
     return SimpleNamespace(
         is_app=True,
+        pinned=False,
         old_img=img,
         new_img=SimpleNamespace(dir=tmp_path / "c", has=lambda a: target_configured),
         old_config={"TMP116": "y", "CAN_STM32_FDCAN": "y", "CAN_MAX_STD_ID_FILTER": "12"},
@@ -479,6 +480,7 @@ def _dt_ctx(tmp_path: Path, target_edt: bool) -> Any:
 
     return SimpleNamespace(
         is_app=True,
+        pinned=False,
         old_edt=_edt("ti,tmp116"), new_edt=_edt(None),
         old_facts=parse_log(""), new_raw_facts=parse_log(""),
         new_raw=SimpleNamespace(src=tmp_path),
@@ -759,3 +761,33 @@ def test_a_target_that_wrote_config_but_never_finished_configure_gets_the_stand_
     ctx.new_img = SimpleNamespace(dir=tmp_path / "c", has=lambda a: a is Artifact.CONFIG)
     kinds = {f.kind for f in mod.ChangesAnalyzer().analyze(ctx).findings}
     assert "symbol-removed" in kinds
+
+
+def test_pinned_override_needs_the_declaration_in_the_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pinned (DESIGN-PINNED.md piece 3), the source Kconfig snapshot is the unedited app's:
+    a re-declaration counts only while the live file still has it near that line
+    (regression: ardep batch 1 renamed both overrides, and the pinned scan kept them)."""
+    from types import SimpleNamespace
+
+    from zmig.analyzers import changes as mod
+
+    monkeypatch.setattr(mod, "database", lambda ctx: DB)
+    monkeypatch.setattr(mod, "project_roots", lambda b, d: {str(tmp_path / "ardep"): "ardep/"})
+    ctx = _ctx(tmp_path, target_configured=False)
+    ctx.pinned = True
+    ctx.old.workspace.root = tmp_path / "ws"
+    ctx.old.spec = SimpleNamespace(app=tmp_path / "app")
+    defconfig = tmp_path / "ardep" / "boards" / "mercedes" / "ardep" / "Kconfig.defconfig"
+
+    def kinds(line17: str) -> set[str]:
+        defconfig.write_text("\n" * 16 + line17 + "\n\tdefault 12\n")
+        return {f.kind for f in mod.ChangesAnalyzer().analyze(ctx).findings}
+
+    assert "kconfig-override-orphaned" in kinds("config CAN_MAX_STD_ID_FILTER")
+    assert "kconfig-override-orphaned" not in kinds("config CAN_STM32_FDCAN_MAX_STD_ID_FILTERS")
+    defconfig.unlink()  # the file itself removed
+    assert "kconfig-override-orphaned" not in {
+        f.kind for f in mod.ChangesAnalyzer().analyze(ctx).findings
+    }

@@ -312,7 +312,13 @@ class ApiAnalyzer:
                     gaps.append(
                         NotChecked(
                             f"API use in {t['file']} ({side} parse)",
-                            f"{len(t['errors'])} parse error(s); first: {t['errors'][0]}",
+                            f"{len(t['errors'])} parse error(s); first: {t['errors'][0]}"
+                            + (
+                                "; pinned: the edit's effect on its API use isn't checked, "
+                                "the unedited source's uses stand"
+                                if ctx.pinned and side == "target"
+                                else ""
+                            ),
                             self.name,
                         )
                     )
@@ -358,10 +364,26 @@ class ApiAnalyzer:
             now = ".".join(alias.get(part, part) for part in parts)
             return now if now != name else None
 
+        # Pinned (DESIGN-PINNED.md piece 3), the source parse is the unedited app's: a use
+        # the edit removed would never go away. Where the target parsed the same file
+        # without errors, a source use counts only while the target still references the
+        # name (or what it is an alias of now). A target parse with errors records no
+        # reference to a call it couldn't type-check, so its file keeps the source's uses.
+        clean_tgt = {t["file"]: t for t in tgt if not t["errors"]} if ctx.pinned else {}
+
+        def still_used(t: dict[str, Any], name: str) -> bool:
+            now = clean_tgt.get(t["file"])
+            if now is None:
+                return True
+            names = {r["name"] for r in now["refs"]}
+            return name in names or through(name) in names
+
         uses: dict[str, list[str]] = {}
         value_uses: dict[str, set[str]] = {}
         for t in src:
             for r in t["refs"]:
+                if not still_used(t, r["name"]):
+                    continue
                 uses.setdefault(r["name"], []).append(r["at"])
                 value_uses.setdefault(r["name"], set()).add(r.get("use", "unknown"))
         old_diag_sites = {(d["at"], d.get("kind")) for t in src for d in t["diags"]}

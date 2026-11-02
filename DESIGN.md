@@ -70,7 +70,7 @@ the evidence behind the decisions (oracles, measurements, per-project results) i
 | Command | What it does |
 |---|---|
 | `plan` | workspace triage without building: upstream `west.yml` diff, forks and local patches, release hops |
-| `scan` | builds the app at both refs and runs the build analyzers |
+| `scan` | builds the app at both refs and runs the build analyzers; `--pin-source` reuses an earlier scan's source build |
 | `fix kconfig` | a scan, then renames or comments out Kconfig assignments with Kconfig-level evidence |
 | `watch` | a scan compared with a committed baseline: CI exit codes, SARIF, PR comment |
 | `compare` | two saved scan reports of the same app, before and after an edit (no build) |
@@ -280,6 +280,8 @@ order-independent.
   baselines record), so two commits with the same version string differ.
 - **`contexts[].side`:** `source` or `target`. Module recovery and salvage add contexts,
   so position doesn't say which ref a context was built at.
+- **`inputs.pinned_source`**, and `pinned` on the source context: set by
+  `scan --pin-source` ([Pinned-source scans](#pinned-source-scans)).
 - **Versioning:** adding a field bumps the minor version; removing one or changing its
   meaning bumps the major. Readers should ignore fields they don't know.
 - **The assistant contract:** the fields `ASSISTANT.md` lets an assistant rely on are
@@ -290,8 +292,8 @@ order-independent.
 - **Schema history:** 1.1 `image`; 1.2 `introduced_by_migration`, `remedy`, `provenance`,
   `upgrade_path`, `not_checked`, `environment.sdk`, hazard categories; 1.3 `checked`; 1.4
   not-applicable categories need evidence; 1.5 `fix`; 1.6 `environment.zmig_build`,
-  `contexts[].side`, typed `upgrade_path.remedies` and descriptions of `fix`. `tier` was
-  added without a bump.
+  `contexts[].side`, typed `upgrade_path.remedies` and descriptions of `fix`; 1.7
+  `inputs.pinned_source`, `contexts[].pinned`. `tier` was added without a bump.
   Tests validate every report against `zmig/schema/report-1.json`.
 
 ### Outputs
@@ -1102,7 +1104,36 @@ item with the same category, kind, subject and image become one "updated" or
 "new-use-site" item by site count, since clearing the first cited file changes the
 fingerprint) and a "revealed" state (a new finding that BEFORE couldn't have reported,
 because its target build or analyzer gap has closed); revealed findings make the run
-inconclusive, since `compare` can't tell a hidden finding from one the edit caused.
+inconclusive, since `compare` can't tell a hidden finding from one the edit caused. It
+also refuses a pinned BEFORE, and an AFTER pinned to any build but BEFORE's source.
+
+### Pinned-source scans
+
+A migration edit uses what only the target has, so the edited app stops building at the
+source ref, and every finding that needed the source build becomes "unseen" (ardep, first
+batch: 5 of 5). `zmig scan --pin-source REPORT` reuses REPORT's source build, an earlier
+scan of the unedited app, by its cache key (`buildctx.load_build`), and builds only the
+edited app at the target. The source side then means the firmware deployed today, and the
+target the candidate.
+
+- **Checks, all before any build (exit 2):** REPORT is a 1.7+ scan report, not itself
+  pinned, with an `ok` source build still in the cache along with the app copy it was built
+  from; app, refs, boards, build mode, sysbuild and zmig build match; the build's recorded
+  key inputs match this scan's except the app and its module trees.
+- **What a pinned scan reads:** the source build's artifacts as built; app usage from the
+  edited tree; the API analyzer's source parse through the include digests the source build
+  stored on first analysis (`zmig-api-deps.json` in its image directory), not by rehashing
+  project modules the user has since edited in place.
+- **Rules where the source would outlive a correct fix:** API uses of a file count only
+  while a clean target parse of it still references the name (a target parse with errors
+  leaves the source's uses, with a note); a `changes` Kconfig override counts only while
+  the live file still declares it near that line; `symbol-deprecated` reads the project's
+  Kconfig from the live tree; `input-not-applied` skips a file the user moved; the files a
+  build used (tiers) include the target's records.
+- **Difference findings stay on:** a source-versus-target difference is a difference from
+  the deployed firmware, whoever caused it; `compare` claims no cause. In the eval
+  baselines the only such kinds above info are `dependency-changed`, `new-warning` and
+  `node-changed`, all risky.
 
 ### What a run compares
 
@@ -1266,7 +1297,12 @@ The example workflow is `examples/zmig-watch.yml`.
 - **Compare:** `--module`, `--cmake-arg`, `--to-board` and `--wire-allowlist` aren't
   recorded in `inputs`, so a change to them between the two scans isn't detected. A
   finding that disappears because the edit broke the source build is "unseen", not
-  "fixed"; `compare.json` counts those (`unseen_source_build_broke`).
+  "fixed"; `compare.json` counts those (`unseen_source_build_broke`). Pinned scans avoid
+  that.
+- **Pinned scans:** evidence text read from a project module file at a source-build path
+  may show the edited line (text only; ids and fingerprints don't use it). Files the edit
+  added aren't API-parsed (the target build's compile errors still report misuse). `fix`
+  and `watch` can't pin. An evicted source build can't be pinned to: re-run the scan.
 - **First run** clones Zephyr in full (about 1 GB).
 
 ### Future work
@@ -1292,8 +1328,7 @@ the evidence behind it.
 - **Watch:** `--accept <fingerprint>`, a Checks-API neutral conclusion, baseline schema
   validation, a watch mode for `plan`.
 - **Coding assistants:** applying high-confidence fixes without asking, if a dogfood run
-  shows users approve them and none is wrong; pinned-source scans for `compare`, if
-  `unseen_source_build_broke` is most of the unseen findings; baseline writers that refuse
+  shows users approve them and none is wrong; baseline writers that refuse
   to run without a terminal; packaging (a skill or plugin) once `ASSISTANT.md` is proven
   end to end.
 - **Other bootloaders** and sysbuild images beyond `MAIN`/`BOOTLOADER`; macOS and Windows.

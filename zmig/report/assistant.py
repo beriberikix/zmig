@@ -79,9 +79,12 @@ compare.json, watch baselines, or anything under eval/. Never run
    and `fix.source`, or say that it is your own edit. Apply only what the
    user approves.
 5. After each commit, re-run the same `zmig scan` command with
-   `--out <new-dir>`, then run
+   `--out <new-dir> --pin-source <this folder>/report.json`, then run
    `zmig compare <this folder>/report.json <new-dir>/report.json`.
-   Always compare against this folder, the original scan.
+   Always pin to and compare against this folder, the original scan.
+   Pinning reuses this scan's source build, so edits that only build at
+   the target ref can still be compared. If the pinned scan exits 2, show
+   its message to the user: this folder's build may have left zmig's cache.
 6. On exit 3, stop. Show the new findings and wait for the user.
 7. On exit 4, stop. Report every "unseen" finding as still open, and say
    why. Show every "revealed" finding: zmig could not see it before, and
@@ -102,6 +105,7 @@ A scan takes minutes, so batch edits rather than scan after each one.
 - Raise a confidence or lower a severity.
 - Say "verified", "migrated" or "safe".
 - Paste logs/ into the chat.
+- Pass `--pin-source` a report other than this folder's.
 """
 
 POINTER = "Using a coding assistant? Give it ASSISTANT.md from this folder."

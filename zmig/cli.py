@@ -644,6 +644,7 @@ def scan_report(
         module_needs=tuple(needs),
         modules_added=tuple(added),
         modules_at_source=tuple(at_source),
+        pinned=pin is not None,
     )
     report.findings, report.analyzers, report.not_checked = analyzers.run_build_analyzers(
         selected, ctx
