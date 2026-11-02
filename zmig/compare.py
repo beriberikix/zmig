@@ -165,6 +165,9 @@ class Result:
     site_counts: dict[int, tuple[int, int]] = field(default_factory=dict)
     revealed: list[Item] = field(default_factory=list)
     unseen_source_build_broke: int = 0
+    # id(item) -> BEFORE's title, for a target failure whose error changed: its site counts
+    # compare two different errors, so they aren't shown.
+    error_before: dict[int, str] = field(default_factory=dict)
 
 
 def _by_fingerprint(report: JSON) -> dict[str, list[JSON]]:
@@ -198,6 +201,19 @@ def _by_sites(
     return None, []
 
 
+_TARGET_FAILURES = ("target-configure-failed", "target-build-failed")
+
+
+def _note_error_change(res: Result, item: Item, before_f: JSON) -> None:
+    """A target failure keeps its id whatever the error; when the error changed (the edit
+    fixed one and the build now stops at another), say so instead of counting sites
+    (regression: ardep's board.yml error, fixed, then a Kconfig abort, read "1 -> 0
+    sites")."""
+    after = item.finding
+    if after and after["kind"] in _TARGET_FAILURES and after["title"] != before_f["title"]:
+        res.error_before[id(item)] = before_f["title"]
+
+
 def pair(res: Result, before_fp: dict[str, list[JSON]], ctx: FingerprintContext) -> None:
     """Merge gone+new items that are one finding under a moved fingerprint, and apply site
     counts to the items watch matched by fingerprint."""
@@ -214,6 +230,7 @@ def pair(res: Result, before_fp: dict[str, list[JSON]], ctx: FingerprintContext)
             continue
         before_f = olds[k]
         res.site_counts[id(i)] = (sites(before_f), sites(i.finding))
+        _note_error_change(res, i, before_f)
         if i.state in ("unchanged", "updated"):
             state, added = _by_sites(before_f, i.finding, ctx)
             if state:
@@ -250,6 +267,7 @@ def pair(res: Result, before_fp: dict[str, list[JSON]], ctx: FingerprintContext)
         n.cause = None
         n.new_sites = added
         res.site_counts[id(n)] = (sites(before_f), sites(n.finding))
+        _note_error_change(res, n, before_f)
         merged[id(g)] = n
     res.cmp.items = [i for i in items if id(i) not in merged]
 
@@ -337,7 +355,9 @@ def compare_json(
     def one(i: Item) -> JSON:
         j = {k: v for k, v in item_json(i).items() if k not in ("cause", "expired", "id")}
         j["ids"] = ids(i)
-        if (sc := res.site_counts.get(id(i))) and i.state in (
+        if id(i) in res.error_before:
+            j["error_before"] = res.error_before[id(i)]
+        elif (sc := res.site_counts.get(id(i))) and i.state in (
             "updated",
             "new-use-site",
             "escalated",

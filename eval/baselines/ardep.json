@@ -1,7 +1,7 @@
 {
  "config": "ardep",
  "scored": "DOGFOOD-11 §11 (A2, tuned)",
- "schema_version": "1.5",
+ "schema_version": "1.7",
  "verdict": "unknown",
  "findings": [
   {
@@ -100,8 +100,8 @@
    "confidence": "high",
    "kind": "symbol-deprecated",
    "title": "CONFIG_STD_C11 is deprecated in v4.4.0",
-   "action": "In prj.conf:9, ardep/boards/mercedes/ardep/Kconfig.uds:19, ardep/modules/iso14229/Kconfig:10: move off it before the release that removes it. (The target configure didn't reach Kconfig; this comes from the Kconfig trees at both refs: zmig changes.)",
-   "files": "ardep/boards/mercedes/ardep/Kconfig.uds ardep/modules/iso14229/Kconfig prj.conf"
+   "action": "In prj.conf:9, ardep/boards/mercedes/ardep/Kconfig.uds:19: move off it before the release that removes it. (The target configure didn't reach Kconfig; this comes from the Kconfig trees at both refs: zmig changes.)",
+   "files": "ardep/boards/mercedes/ardep/Kconfig.uds prj.conf"
   },
   {
    "id": "KCONFIG-SYMBOL-REMOVED-57758c3d",
