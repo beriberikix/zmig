@@ -582,3 +582,31 @@ def test_compatibility_macros_are_followed_not_reported(tmp_path: Path) -> None:
     found = ApiAnalyzer()._declaration_changes(ctx, [src], [tgt])  # type: ignore[arg-type]
     # Only the value that really changed through its alias (SOCK_DGRAM 2 -> 3).
     assert [(f.kind, f.subject) for f in found] == [("enum-changed", "SOCK_DGRAM")]
+
+
+def test_keyed_deps_are_stored_with_the_build(tmp_path: Path, monkeypatch: Any) -> None:
+    """The include digests of a build are recorded the first time and read back after, so
+    they keep describing the files it was built from when the user then edits a project
+    module built in place (a scan pinned to this build as its source, DESIGN-PINNED.md)."""
+    import zmig.analyzers.api as api
+
+    ws, bdir, mod = tmp_path / "ws", tmp_path / "build", tmp_path / "mod"
+    for d in (ws, bdir, mod):
+        d.mkdir()
+    tu, hdr = mod / "src.c", mod / "board.h"
+    tu.write_text("#include <board.h>\n")
+    hdr.write_text("#define N 1\n")
+    monkeypatch.setattr(
+        api, "build_dependencies", lambda img, runner: {"src.c.obj": [str(tu), str(hdr)]}
+    )
+    img = SimpleNamespace(dir=bdir)
+    b = SimpleNamespace(workspace=SimpleNamespace(root=ws))
+    roots = {str(mod): "mod/"}
+    entries = {"mod/src.c": {"file": str(tu), "command": "cc", "output": "src.c.obj"}}
+
+    first = api._keyed_deps(img, b, roots, entries, None)  # type: ignore[arg-type]
+    assert set(first["mod/src.c"]) == {"tu:", "project:mod/board.h"}
+    assert (bdir / api.DEPS_FILE).is_file()
+    hdr.write_text("#define N 2\n")
+    tu.write_text("#include <board.h>\nint x;\n")
+    assert api._keyed_deps(img, b, roots, entries, None) == first  # type: ignore[arg-type]

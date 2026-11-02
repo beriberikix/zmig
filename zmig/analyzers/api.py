@@ -1050,15 +1050,31 @@ def _macro_at(ws: Any, where: str, name: str) -> dict[str, Any] | None:
     return None
 
 
+# The digests of a build image's project TUs and their includes, stored in the image dir.
+DEPS_FILE = "zmig-api-deps.json"
+
+
 def _keyed_deps(
     img: ImageContext, b: Any, roots: dict[str, str], entries: dict[str, Any], runner: Any
 ) -> dict[str, dict[str, str]]:
-    """{project TU: {file key: content hash}} for every file the TU included, from ninja's
-    dependency records. Keys don't depend on the build directory or workspace location
-    (workspace-relative, build-relative, or the project path), so two builds of the same
-    content compare equal."""
+    """{project TU: {file key: content hash}} for the TU itself ("tu:") and every file it
+    included, from ninja's dependency records. Keys don't depend on the build directory or
+    workspace location (workspace-relative, build-relative, or the project path), so two
+    builds of the same content compare equal.
+
+    Stored with the build (DEPS_FILE in the image directory) the first time, and read from
+    there after: the digests then describe the files the build was built from, even after
+    the user edits a project module that is built in place, which a scan pinned to this
+    build as its source side needs (DESIGN-PINNED.md, piece 1). The build key covers the
+    module trees, so the record is written while they are as built."""
     import hashlib
 
+    stored = img.dir / DEPS_FILE
+    if stored.is_file():
+        data = json.loads(stored.read_text())
+        if data.get("version") == API_VERSION:
+            recorded: dict[str, dict[str, str]] = data["deps"]
+            return {rel: d for rel, d in recorded.items() if rel in entries}
     deps = build_dependencies(img, runner)
     if deps is None:
         return {}
@@ -1082,7 +1098,7 @@ def _keyed_deps(
         files = deps.get(obj) if obj else None
         if files is None:
             continue
-        keyed = {}
+        keyed = {"tu:": digest(e["file"])}
         for f in files:
             if f == e["file"]:
                 continue
@@ -1097,6 +1113,9 @@ def _keyed_deps(
                 k = f"abs:{f}"
             keyed[k] = digest(f)
         out[rel] = keyed
+    tmp = stored.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"version": API_VERSION, "deps": out}, sort_keys=True))
+    tmp.replace(stored)
     return out
 
 
@@ -1111,16 +1130,14 @@ def _object_of(e: dict[str, Any]) -> str | None:
 
 
 def _parse_key(version: str, e: dict[str, Any], b: Any, deps: dict[str, str] | None) -> str | None:
-    """Content key of one TU parse: the parser, the TU's text, its flags with build- and
-    workspace-specific paths replaced, and the content of every file it included. None
-    (don't cache) when the included files aren't known."""
+    """Content key of one TU parse: the parser, its flags with build- and workspace-specific
+    paths replaced, and the content of the TU and of every file it included (`deps`, from
+    _keyed_deps: the TU is "tu:"). None (don't cache) when the included files aren't known.
+    Nothing is read from disk, so the key of a stored build's parse holds after the user
+    edits its files."""
     import hashlib
 
     if deps is None:
-        return None
-    try:
-        text = Path(e["file"]).read_bytes()
-    except OSError:
         return None
     cmd = e["command"].replace(str(b.dir), "<build>").replace(str(b.workspace.root), "<ws>")
     cmd = cmd.replace(str(b.src), "<app>")
@@ -1128,5 +1145,4 @@ def _parse_key(version: str, e: dict[str, Any], b: Any, deps: dict[str, str] | N
     for part in (str(API_VERSION), version, cmd, json.dumps(sorted(deps.items()))):
         h.update(part.encode())
         h.update(b"\0")
-    h.update(text)
     return h.hexdigest()
