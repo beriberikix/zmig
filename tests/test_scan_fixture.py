@@ -91,6 +91,13 @@ def test_builds_and_salvage(report: dict[str, Any]) -> None:
     ]
 
 
+def test_assistant_contract(report: dict[str, Any]) -> None:
+    """Schema 1.6: ASSISTANT.md beside the report, zmig_build and a side on every context."""
+    assert (Path(report["_out"]) / "ASSISTANT.md").is_file()
+    assert report["environment"]["zmig_build"]
+    assert all(c["side"] in ("source", "target") for c in report["contexts"])
+
+
 def test_expected_findings(report: dict[str, Any]) -> None:
     f = find(report, "board-renamed", "native_sim_64")
     assert f["severity"] == "risky" and f["new"] == "native_sim/native/64"

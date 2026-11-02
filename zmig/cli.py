@@ -33,6 +33,8 @@ from zmig.modulecheck import ModuleNeed, diagnose, needed_at_source
 from zmig.plan import PlanContext
 from zmig.refs import ResolvedRef, resolve_ref
 from zmig.report import render
+from zmig.report.assistant import POINTER as ASSISTANT_POINTER
+from zmig.report.assistant import render_assistant
 from zmig.scan import ScanContext
 from zmig.tiers import assign as assign_tiers
 from zmig.tools import (
@@ -392,12 +394,24 @@ def _emit(report: Report, runner: Runner, args: argparse.Namespace) -> None:
         out: Path = args.out
         out.mkdir(parents=True, exist_ok=True)
         (out / "report.json").write_text(render(report, "json"))
-        (out / "MIGRATION.md").write_text(render(report, "markdown"))
+        migration = render(report, "markdown")
+        if report.command == "scan":
+            migration = _with_pointer(migration)
+            (out / "ASSISTANT.md").write_text(render_assistant(report))
+        (out / "MIGRATION.md").write_text(migration)
         (out / "report.sarif").write_text(render(report, "sarif"))
         (out / "logs" / "invocations.json").write_text(
             json.dumps([i.to_json() for i in runner.invocations], indent=2) + "\n"
         )
+        if report.command == "scan":
+            print(ASSISTANT_POINTER, file=sys.stderr)
     sys.stdout.write(render(report, args.format))
+
+
+def _with_pointer(migration: str) -> str:
+    """MIGRATION.md with the ASSISTANT.md pointer as the line under its title."""
+    title, _, rest = migration.partition("\n")
+    return f"{title}\n\n{ASSISTANT_POINTER}\n{rest}"
 
 
 def _historic_alias_tables(old: ResolvedRef, new: ResolvedRef) -> Iterator[tuple[str, str]]:

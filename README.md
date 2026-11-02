@@ -94,9 +94,11 @@ zmig scan --app tests/fixtures/app --board native_sim_64 --module zcbor \
 | [`zmig changes`](#zmig-changes) | What Zephyr removed, renamed or deprecated between two refs, from the tree alone (no build) |
 | [`zmig fix kconfig`](#zmig-fix-kconfig) | Renames or removes Kconfig assignments where Kconfig itself says what replaced them |
 | [`zmig watch`](#zmig-watch) | CI mode: scans, compares with a committed baseline, and fails on new findings |
+| [`zmig compare`](#zmig-compare) | Compares two saved scans of your app, before and after an edit (no build) |
 
-Options every command takes:
-- `--out DIR`: write `report.json`, `MIGRATION.md`, `report.sarif` and `logs/` there.
+Options every command except `compare` takes:
+- `--out DIR`: write `report.json`, `MIGRATION.md`, `report.sarif` and `logs/` there
+  (`scan` also writes `ASSISTANT.md`).
 - `--format human|json|markdown|sarif`: what goes to stdout (default `human`).
 - `--cache-dir DIR`: the cache root (default `$ZMIG_CACHE` or `~/.cache/zmig`).
 - `-v`: verbose.
@@ -235,6 +237,25 @@ It writes a PR comment (`--pr-comment`) and SARIF (`--sarif`).
 [examples/zmig-watch.yml](examples/zmig-watch.yml) is a GitHub Actions workflow to start
 from, with PR and nightly runs and caching.
 
+### `zmig compare`
+
+```sh
+zmig compare before/report.json after/report.json [--out DIR] [--format human|json]
+```
+
+Compares two `zmig scan` reports of the same app, refs and board: one from before an edit,
+one from after. Nothing is built. Each finding is fixed, unseen (it may not have been looked
+for, because something couldn't be checked in the second scan), new, revealed (new, but the
+first scan couldn't have seen it), escalated, a new use site, updated or unchanged.
+`--out` writes `compare.json`, with the finding ids on every item.
+
+| Exit | Meaning |
+|---|---|
+| 0 | nothing new and nothing inconclusive |
+| 2 | usage error, or the reports can't be compared (it lists every difference) |
+| 3 | a new, escalated or new-use-site breaking finding (`--fail-on risky` to include risky) |
+| 4 | inconclusive: a new gap or a revealed finding (`--allow-inconclusive` to pass) |
+
 ## How it works
 
 The key techniques, grouped. [DESIGN.md](DESIGN.md) has the detail.
@@ -297,7 +318,8 @@ With `--out DIR`:
 | File | For |
 |---|---|
 | `MIGRATION.md` | people: a checklist by tier and category, with the field-upgrade verdict |
-| `report.json` | scripts and agents: every finding, with evidence, inputs and analyzer status (versioned schema in `zmig/schema/`) |
+| `report.json` | scripts and assistants: every finding, with evidence, inputs and analyzer status (versioned schema in `zmig/schema/`; the fields an assistant may rely on are listed in `ASSISTANT.md`) |
+| `ASSISTANT.md` | coding assistants (`scan` only): how to read `report.json` and work through it with you |
 | `report.sarif` | code-scanning UIs: findings located in your files |
 | `logs/` | every command zmig ran, with its output (`invocations.json` lists them) |
 
@@ -305,6 +327,19 @@ An analyzer that can't run is listed as skipped, with the reason, never silently
 Each finding's `confidence` says how it was derived:
 - `high`: from a build artifact or git identity;
 - `medium` or `low`: from names or wording, with the heuristics used listed.
+
+## Using zmig with a coding assistant
+
+Give your assistant the `ASSISTANT.md` that `zmig scan --out DIR` writes. It tells the
+assistant which `report.json` fields to rely on, to show you every edit before applying
+it, and to commit in batches by category. After each batch it re-runs the same scan into a
+new folder and runs `zmig compare DIR/report.json NEW/report.json`, always against the
+first scan, and stops on exit 3 or 4.
+
+The assistant's conclusions are never zmig findings. `ASSISTANT.md` asks it to label every
+statement as a zmig finding, its own edit, or its own judgment, and never to edit zmig's
+outputs. zmig reads nothing the assistant writes; only your committed code goes into the
+next scan.
 
 ## Limitations
 
