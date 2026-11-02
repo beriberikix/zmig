@@ -247,7 +247,8 @@ zmig compare before/report.json after/report.json [--out DIR] [--format human|js
 Compares two `zmig scan` reports of the same app, refs and board: one from before an edit,
 one from after. Nothing is built. Each finding is fixed, unseen (it may not have been looked
 for, because something couldn't be checked in the second scan), new, revealed (new, but the
-first scan couldn't have seen it), escalated, a new use site, updated or unchanged.
+first scan couldn't have seen it), escalated, de-escalated (less severe, still open), a new
+use site, updated or unchanged.
 `--out` writes `compare.json`, with the finding ids on every item.
 
 An edit that uses what only the target has stops your app building at the source ref, so

@@ -685,3 +685,40 @@ def test_a_function_changed_only_through_a_reported_typedef_is_not_reported(
                           scope=("s",))  # fmt: skip
     found = {f.subject: f.kind for f in ApiAnalyzer()._declaration_changes(ctx, [old], [new])}  # type: ignore[arg-type]
     assert found == {"FILE": "typedef-changed", "fwrite": "function-changed"}
+
+
+def test_a_function_pointer_typedef_the_code_already_matches_is_risky(tmp_path: Path) -> None:
+    """golioth: net_mgmt_event_handler_t's event went from uint32_t to uint64_t. Once the
+    handler took a uint64_t, the target parse had no mismatched callback, yet the typedef
+    stayed breaking. Matched and parsed cleanly at the target: risky. A mismatched callback,
+    or a target parse with errors (which may have lost the diagnostic): still breaking."""
+    from zmig.analyzers.api import ApiAnalyzer
+    from zmig.findings import Severity
+
+    def tu(t: str, errors: list[str], diags: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "file": "src/net.c",
+            "decls": {"handler_t": {"kind": "typedef", "type": t, "where": "net_mgmt.h:9"}},
+            "refs": [{"name": "handler_t", "at": "src/net.c:36"}],
+            "diags": diags, "fn_values": {}, "errors": errors, "dropped": [],
+        }  # fmt: skip
+
+    old_t, new_t = "void (*)(unsigned int)", "void (*)(unsigned long long)"
+    mismatch = {
+        "at": "src/net.c:36",
+        "kind": "callback",
+        "message": "incompatible function pointer types assigning to 'handler_t'",
+    }
+    ws = SimpleNamespace(zephyr=tmp_path, root=tmp_path)
+    ctx = SimpleNamespace(pinned=False, old=SimpleNamespace(workspace=ws),
+                          new=SimpleNamespace(workspace=ws), new_spec="new",
+                          scope=("s",))  # fmt: skip
+
+    def severity(errors: list[str], diags: list[dict[str, Any]]) -> Severity:
+        src, tgt = tu(old_t, [], []), tu(new_t, errors, diags)
+        (f,) = ApiAnalyzer()._declaration_changes(ctx, [src], [tgt])  # type: ignore[arg-type]
+        return f.severity
+
+    assert severity([], []) is Severity.RISKY
+    assert severity([], [mismatch]) is Severity.BREAKING
+    assert severity(["src/net.c:40: error"], []) is Severity.BREAKING

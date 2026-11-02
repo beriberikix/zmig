@@ -445,3 +445,24 @@ def test_summary_speaks_of_two_scans_not_a_baseline() -> None:
     assert allowed.startswith("nothing new; WARNING:")
     for s in (same, new, gap, allowed, shown):
         assert "baseline" not in s and "accepted" not in s
+
+
+@pytest.mark.parametrize("to", ["risky", "info"])
+def test_a_less_severe_finding_is_de_escalated_not_unchanged_or_fixed(to: str) -> None:
+    """golioth: NET_EVENT_IPV4_ADDR_ADD went from breaking (stored in a narrower type) to
+    risky once the edit widened the variable, and compare said "unchanged". A drop to info
+    left the compared set and read "fixed". Both are "de-escalated", with BEFORE's
+    severity; it doesn't gate."""
+    from zmig.report.human import render_compare
+
+    before = load("golioth-b")
+    breaking = next(f for f in before["findings"] if f["severity"] == "breaking")
+    after = copy.deepcopy(before)
+    next(f for f in after["findings"] if f["id"] == breaking["id"])["severity"] = to
+    res = run(before, after)
+    assert res.outcome.code == 0
+    out = compare_json(res, before, after, Path("b.json"), Path("a.json"))
+    (item,) = [i for i in out["items"] if breaking["id"] in i["ids"]]
+    assert item["state"] == "de-escalated"
+    assert item["severity_before"] == "breaking" and item["severity"] == to
+    assert "(was breaking)" in render_compare(out)

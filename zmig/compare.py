@@ -169,6 +169,8 @@ class Result:
     # id(item) -> BEFORE's title, for a target failure whose error changed: its site counts
     # compare two different errors, so they aren't shown.
     error_before: dict[int, str] = field(default_factory=dict)
+    # id(item) -> BEFORE's severity, for "de-escalated" items.
+    severity_before: dict[int, str] = field(default_factory=dict)
 
 
 def _by_fingerprint(report: JSON) -> dict[str, list[JSON]]:
@@ -232,6 +234,15 @@ def pair(res: Result, before_fp: dict[str, list[JSON]], ctx: FingerprintContext)
         before_f = olds[k]
         res.site_counts[id(i)] = (sites(before_f), sites(i.finding))
         _note_error_change(res, i, before_f)
+        if i.state in ("unchanged", "updated") and (
+            _SEV_RANK[i.finding["severity"]] > _SEV_RANK[before_f["severity"]]
+        ):
+            # Less severe than in BEFORE: watch has no state for it, so it read "unchanged"
+            # (regression: golioth's NET_EVENT_IPV4_ADDR_ADD, breaking -> risky once the
+            # edit stopped narrowing it).
+            i.state = "de-escalated"
+            res.severity_before[id(i)] = before_f["severity"]
+            continue
         if i.state in ("unchanged", "updated"):
             state, added = _by_sites(before_f, i.finding, ctx)
             if state:
@@ -271,6 +282,20 @@ def pair(res: Result, before_fp: dict[str, list[JSON]], ctx: FingerprintContext)
         _note_error_change(res, n, before_f)
         merged[id(g)] = n
     res.cmp.items = [i for i in items if id(i) not in merged]
+
+
+def to_info(res: Result, after: JSON) -> None:
+    """A "fixed" item whose findings are all still in AFTER at info severity was only
+    de-escalated: compare looks at breaking and risky findings, so a drop to info read as
+    fixed."""
+    info = {f["id"]: f for f in after["findings"] if f["severity"] == "info"}
+    for i in res.cmp.items:
+        ids = res.before_ids.get(i.fingerprint, [])
+        if i.state == "fixed" and ids and all(x in info for x in ids):
+            i.state = "de-escalated"
+            i.finding = info[ids[0]]
+            res.severity_before[id(i)] = i.severity
+            i.severity = "info"
 
 
 def _app_image(contexts: list[JSON]) -> str | None:
@@ -313,6 +338,7 @@ def classify(
         {fp: [f["id"] for f in fs] for fp, fs in before_fp.items()},
     )
     pair(res, before_fp, FingerprintContext.of(after))
+    to_info(res, after)
     reveal(res, gaps(before), [g.gap for g in gap_states], after)
     for i in cmp.items:
         i.cause = None  # compare claims no cause (watch says "change": the target didn't move)
@@ -381,6 +407,8 @@ def compare_json(
     def one(i: Item) -> JSON:
         j = {k: v for k, v in item_json(i).items() if k not in ("cause", "expired", "id")}
         j["ids"] = ids(i)
+        if id(i) in res.severity_before:
+            j["severity_before"] = res.severity_before[id(i)]
         if id(i) in res.error_before:
             j["error_before"] = res.error_before[id(i)]
         elif (sc := res.site_counts.get(id(i))) and i.state in (
