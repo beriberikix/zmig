@@ -144,7 +144,11 @@ def render_compare(result: dict[str, Any]) -> str:
                 else ""
             )
             sites = (
-                f" ({i['sites_before']} -> {i['sites_after']} sites)" if "sites_before" in i else ""
+                f" (was: {i['error_before']})"
+                if "error_before" in i
+                else f" ({i['sites_before']} -> {i['sites_after']} sites)"
+                if "sites_before" in i
+                else ""
             )
             lines.append(f"  {ident} {i['severity']} {i['title']}{sites}{where}")
     same = sum(1 for i in items if i["state"] == "unchanged")

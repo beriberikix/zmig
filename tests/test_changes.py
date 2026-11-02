@@ -307,10 +307,13 @@ DB = {
 }  # fmt: skip
 
 
-def _ctx(tmp_path: Path, target_configured: bool, prior: list[Any] | None = None) -> Any:
+def _ctx(
+    tmp_path: Path, target_configured: bool, prior: list[Any] | None = None, target_log: str = ""
+) -> Any:
     from types import SimpleNamespace
 
     from zmig.buildctx import Artifact
+    from zmig.diagnostics import parse_log
     from zmig.usage import Loc
 
     zephyr = tmp_path / "ws" / "zephyr"
@@ -338,6 +341,7 @@ def _ctx(tmp_path: Path, target_configured: bool, prior: list[Any] | None = None
         new_spec="v4.4.0", scope=("s",), prior=prior or [],
         runner=SimpleNamespace(redact=lambda s: s),
         shared={"module_definitions": (set(), set())},
+        old_facts=parse_log(""), new_raw_facts=parse_log(target_log), old_spec="v4.2.0",
     )  # fmt: skip
 
 
@@ -791,3 +795,69 @@ def test_pinned_override_needs_the_declaration_in_the_tree(
     assert "kconfig-override-orphaned" not in {
         f.kind for f in mod.ChangesAnalyzer().analyze(ctx).findings
     }
+
+
+ARDEP_PSA_LOG = """\
+warning: PSA_WANT_KEY_TYPE_AES (defined at modules/mbedtls/Kconfig.psa.auto:263,
+modules/mbedtls/Kconfig.psa.auto:263) was assigned the value 'y' but got the value 'n'. Check these
+unsatisfied dependencies: (PSA_CRYPTO_CLIENT || (PSA_CRYPTO_CLIENT && 0)) (=n). See
+http://docs.zephyrproject.org/latest/kconfig.html#CONFIG_PSA_WANT_KEY_TYPE_AES and/or look up
+PSA_WANT_KEY_TYPE_AES in the menuconfig/guiconfig interface. The Application Development Primer,
+Setting Configuration Values, and Kconfig - Tips and Best Practices sections of the manual might be
+helpful too.
+
+warning: PSA_WANT_ALG_SHA_256 (defined at modules/mbedtls/Kconfig.psa.auto:139, modules/mbedtls/Kconfig.psa.auto:139) has direct dependencies PSA_CRYPTO_CLIENT || (PSA_CRYPTO_CLIENT && 0) with value n, but is currently being y-selected by the following symbols:
+ - MBEDTLS_ENTROPY_C (defined at modules/mbedtls/Kconfig.tf-psa-crypto:170, modules/mbedtls/Kconfig.tf-psa-crypto:170), with value y, direct dependencies MBEDTLS || (MBEDTLS && 0) (value: y), and select condition !PSA_WANT_ALG_SHA_512 && MBEDTLS (value: y)
+
+error: Aborting due to Kconfig warnings
+"""
+
+
+def test_assignments_the_aborted_target_configure_did_not_take_are_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A target configure that aborts on Kconfig warnings leaves no .config, so the kconfig
+    analyzer is skipped; the changes analyzer reports the assignments its log says didn't
+    take, with the kconfig analyzer's id (regression: ardep's PSA_WANT_KEY_TYPE_AES, added
+    by an edit without a PSA provider, and compare exited 0)."""
+    from zmig.analyzers import changes as mod
+    from zmig.diagnostics import parse_log
+    from zmig.findings import Category, Severity, make_id
+    from zmig.usage import Loc
+
+    monkeypatch.setattr(mod, "database", lambda ctx: DB)
+    ctx = _ctx(tmp_path, target_configured=False, target_log=ARDEP_PSA_LOG)
+    ctx.usage.kconfig_set["PSA_WANT_KEY_TYPE_AES"] = [
+        (Loc("prj.conf", 26, "CONFIG_PSA_WANT_KEY_TYPE_AES=y"), "y")
+    ]
+
+    def not_taken() -> list[Any]:
+        found = mod.ChangesAnalyzer().analyze(ctx).findings
+        return [f for f in found if f.kind == "value-not-taken"]
+
+    (f,) = not_taken()  # PSA_WANT_ALG_SHA_256 is selected, not assigned: not reported
+    assert f.id == make_id(
+        Category.KCONFIG, "value-not-taken", "CONFIG_PSA_WANT_KEY_TYPE_AES", ("s",)
+    )
+    assert f.severity is Severity.BREAKING and f.introduced_by_migration
+    assert f.evidence[0]["path"] == "prj.conf" and f.evidence[0]["line"] == 26
+    assert f.new["got"] == "n" and "PSA_CRYPTO_CLIENT" in f.new["unsatisfied"]
+    # The same warning at the source: the edit didn't cause it, so info.
+    ctx.old_facts = parse_log(ARDEP_PSA_LOG)
+    (pre,) = not_taken()
+    assert pre.severity is Severity.INFO and not pre.introduced_by_migration
+
+
+def test_a_dependency_with_a_current_alternative_does_not_rely_on_a_deprecated_symbol() -> None:
+    """iso14229's `depends on STD_C11 || STD_C17 || STD_C23` is met by C17: not a site to
+    move off CONFIG_STD_C11. A dependency on it alone, or a default, still is."""
+    from zmig.analyzers.changes import has_alternative
+
+    dep = {"STD_C11"}
+    assert has_alternative("\tdepends on STD_C11 || STD_C17 || STD_C23", dep)
+    assert has_alternative("depends on (A && STD_C11) || B  # comment", dep)
+    assert not has_alternative("depends on STD_C11", dep)
+    assert not has_alternative("depends on UDS && !STD_C11", dep)
+    assert not has_alternative("depends on (STD_C11 || B) && C", dep)
+    assert not has_alternative("default STD_C11", dep)
+    assert not has_alternative("depends on STD_C11 || STD_C99", {"STD_C11", "STD_C99"})

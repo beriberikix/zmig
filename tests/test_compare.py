@@ -389,3 +389,33 @@ def test_effective_contexts_with_module_recovery_and_salvage() -> None:
         "target build: configure-failed; salvaged build ok (1 line(s) disabled)"
     )
     assert target_build([{"status": "ok"}]) == "target build: not run"
+
+
+def test_target_failure_whose_error_changed_says_so() -> None:
+    """A target failure keeps its id whatever the error: when the edit fixed one error and
+    the build now stops at another, compare shows the old error, not a site count of two
+    different errors (regression: ardep's board.yml error, then a Kconfig abort, "1 -> 0
+    sites")."""
+    from zmig.report.human import render_compare
+
+    before = load("cannectivity-c1")
+    after = copy.deepcopy(before)
+    f = finding(after, "target-build-failed")
+    old_title = f["title"]
+    f["title"] = "The target build fails: 1 error (compiler)"
+    f["evidence"] = [e for e in f["evidence"] if e["type"] != "file_line"]
+    res = run(before, after)
+    out = compare_json(res, before, after, Path("b.json"), Path("a.json"))
+    (item,) = [i for i in out["items"] if f["id"] in i["ids"]]
+    assert item["error_before"] == old_title
+    assert "sites_before" not in item
+    assert f"(was: {old_title})" in render_compare(out)
+    # The same error with fewer sites still counts sites.
+    after2 = copy.deepcopy(before)
+    g = finding(after2, "target-build-failed")
+    g["evidence"] = [e for e in g["evidence"] if e["type"] != "file_line"][:1] + [
+        e for e in g["evidence"] if e["type"] == "file_line"
+    ][:1]
+    out2 = compare_json(run(before, after2), before, after2, Path("b.json"), Path("a.json"))
+    (item2,) = [i for i in out2["items"] if g["id"] in i["ids"]]
+    assert "error_before" not in item2

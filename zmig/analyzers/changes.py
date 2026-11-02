@@ -30,6 +30,7 @@ candidates are ranked by the conditions the source build satisfies (zmig.changes
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
@@ -45,6 +46,7 @@ from zmig.changes import (
     load_or_build,
     parse_table,
 )
+from zmig.diagnostics import preexisting
 from zmig.findings import JSON, Category, Confidence, Finding, Severity, file_line, tool_output
 from zmig.scan import ScanContext, live_path, still_declares
 from zmig.usage import Loc, dt_token
@@ -112,6 +114,7 @@ class ChangesAnalyzer:
             removed = {s: v for s, v in db["kconfig"]["removed"].items() if s not in in_modules}
             findings += self._kconfig(ctx, removed, reported)
             findings += self._deprecated(ctx, db["kconfig"].get("deprecated", {}), reported)
+            findings += self._not_taken(ctx, reported | {(f.kind, f.subject) for f in findings})
         if dts:
             gone = {
                 c: v for c, v in db["devicetree"]["removed"].items() if c not in compats_in_modules
@@ -125,6 +128,53 @@ class ChangesAnalyzer:
                     )
         return AnalyzerResult(findings)
 
+    def _not_taken(self, ctx: ScanContext, reported: set[tuple[str, str]]) -> list[Finding]:
+        """Assignments of the project's that the target configure printed as not taking
+        effect ("was assigned the value 'y' but got the value 'n'"), from its log: a
+        configure that then aborted on Kconfig warnings leaves no .config for the kconfig
+        analyzer, so without this an assignment an edit added that never takes effect went
+        unreported and `compare` exited 0 (regression: ardep's PSA_WANT_KEY_TYPE_AES
+        without a PSA provider, a pinned dogfood batch). Same id as the kconfig analyzer's;
+        info when the source configure printed the same warning."""
+        findings = []
+        for d in ctx.new_raw_facts.diagnostics:
+            if d.kind != "kconfig-not-taken" or d.symbol not in ctx.usage.kconfig_set:
+                continue
+            if ("value-not-taken", f"CONFIG_{d.symbol}") in reported:
+                continue
+            reported = reported | {("value-not-taken", f"CONFIG_{d.symbol}")}
+            assigns = ctx.usage.kconfig_set[d.symbol]
+            _, value = assigns[-1]
+            pre = preexisting(d, ctx.old_facts.diagnostics)
+            ev = tuple(file_line(loc.path, loc.line, loc.text) for loc, _ in assigns)
+            ev += (tool_output("target configure", ctx.runner.redact(d.message)),)
+            findings.append(
+                Finding(
+                    category=Category.KCONFIG,
+                    kind="value-not-taken",
+                    subject=f"CONFIG_{d.symbol}",
+                    title=(
+                        f"CONFIG_{d.symbol}={value} has no effect (it gets {d.got}); already "
+                        f"not taken at {ctx.old_spec}"
+                        if pre
+                        else f"CONFIG_{d.symbol}={value} doesn't take effect in {ctx.new_spec} "
+                        f"(it gets {d.got})"
+                    ),
+                    severity=Severity.INFO if pre else Severity.BREAKING,
+                    confidence=Confidence.HIGH,
+                    action=f"Unmet dependencies: {d.deps or 'see the evidence'}. Enable them, "
+                    "or drop the assignment. (The target configure stopped in Kconfig; this "
+                    "comes from its warnings: zmig changes.)",
+                    analyzer=self.name,
+                    scope=ctx.scope,
+                    evidence=ev,
+                    old=ctx.old_config.get(d.symbol),
+                    new={"assigned": value, "got": d.got, "unsatisfied": d.deps},
+                    introduced_by_migration=not pre,
+                )
+            )
+        return findings
+
     def _deprecated(
         self, ctx: ScanContext, deprecated: dict[str, Any], reported: set[tuple[str, str]]
     ) -> list[Finding]:
@@ -134,7 +184,10 @@ class ChangesAnalyzer:
         enabled = {s for s in deprecated if ctx.old_config.get(s) == "y"}
         if not enabled:
             return []
-        refs = project_kconfig_references(ctx, enabled)
+        refs = {
+            sym: [r for r in rs if not has_alternative(r[2], enabled)]
+            for sym, rs in project_kconfig_references(ctx, enabled).items()
+        }
         findings = []
         for sym in sorted(enabled):
             if ("symbol-deprecated", f"CONFIG_{sym}") in reported:
@@ -275,6 +328,32 @@ class ChangesAnalyzer:
             add(Category.KCONFIG, "read-symbol-removed", sym, title, Severity.BREAKING, ev, cands,
                 "#ifdef/IS_ENABLED() on it is now always false; use")  # fmt: skip
         return findings
+
+
+_DEPENDS = re.compile(r"^\s*(?:depends\s+on|visible\s+if|if)\b(?P<expr>.*)$")
+
+
+def has_alternative(line: str, deprecated: set[str]) -> bool:
+    """Whether a dependency line (`depends on`, `visible if`, `if`) is satisfied without the
+    deprecated symbols: its expression is a top-level `||` with an alternative naming none
+    of them. Such a line doesn't rely on them, so it isn't a site to move off
+    (regression: iso14229's `depends on STD_C11 || STD_C17 || STD_C23` kept CONFIG_STD_C11
+    "deprecated" after ardep moved to C17, a pinned dogfood batch)."""
+    m = _DEPENDS.match(line.split("#", 1)[0])
+    if m is None:
+        return False
+    parts, depth, cur = [], 0, ""
+    for ch in m["expr"]:
+        depth += (ch == "(") - (ch == ")")
+        cur += ch
+        if depth == 0 and cur.endswith("||"):
+            parts.append(cur[:-2])
+            cur = ""
+    parts.append(cur)
+    if len(parts) < 2:
+        return False
+    names = [set(re.findall(r"\b[A-Z][A-Z0-9_]*\b", p)) for p in parts]
+    return any(n and not (n & deprecated) for n in names)
 
 
 def project_kconfig_references(
