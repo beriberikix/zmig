@@ -644,3 +644,44 @@ def test_pinned_uses_come_from_a_clean_target_parse(tmp_path: Path) -> None:
     assert "used_fn" in subjects(pinned=True, errors=["main.c:3: error"])
     # Other uses in the same file are untouched.
     assert "register_cb" in subjects(pinned=True, errors=[])
+
+
+def test_a_function_changed_only_through_a_reported_typedef_is_not_reported(
+    tmp_path: Path,
+) -> None:
+    """ardep's iso14229.c calls fread with a FILE *: when the libc changed, FILE's struct
+    went from struct __sFILE to struct __file, so fread's signature changed only through
+    that typedef. The typedef change is reported once; fread isn't reported again. A
+    function whose change goes beyond the typedef still is."""
+    from zmig.analyzers.api import ApiAnalyzer, through_typedefs
+
+    changes = {("struct __sFILE", "struct __file")}
+    assert (
+        through_typedefs("unsigned int (void *, unsigned int, struct __sFILE *)", changes)
+        == "unsigned int (void *, unsigned int, struct __file *)"
+    )
+    assert through_typedefs("struct __sFILEX *", changes) == "struct __sFILEX *"
+
+    def decl(kind: str, t: str) -> dict[str, Any]:
+        return {"kind": kind, "type": t, "where": "stdio.h:1"}
+
+    def tu(file_t: str, fread_t: str, fwrite_t: str) -> dict[str, Any]:
+        return {
+            "file": "iso14229.c",
+            "decls": {
+                "FILE": decl("typedef", file_t),
+                "fread": decl("function", fread_t),
+                "fwrite": decl("function", fwrite_t),
+            },
+            "refs": [{"name": n, "at": "iso14229.c:574"} for n in ("FILE", "fread", "fwrite")],
+            "diags": [], "fn_values": {}, "errors": [], "dropped": [],
+        }  # fmt: skip
+
+    old = tu("struct __sFILE", "int (struct __sFILE *)", "int (struct __sFILE *)")
+    new = tu("struct __file", "int (struct __file *)", "long (struct __file *)")
+    ws = SimpleNamespace(zephyr=tmp_path, root=tmp_path)
+    ctx = SimpleNamespace(pinned=False, old=SimpleNamespace(workspace=ws),
+                          new=SimpleNamespace(workspace=ws), new_spec="new",
+                          scope=("s",))  # fmt: skip
+    found = {f.subject: f.kind for f in ApiAnalyzer()._declaration_changes(ctx, [old], [new])}  # type: ignore[arg-type]
+    assert found == {"FILE": "typedef-changed", "fwrite": "function-changed"}

@@ -557,6 +557,13 @@ class ApiAnalyzer:
             decl_new = tool_output("declaration at the target", f"{n['where']}: {shown(n)}")
             if what == "field" and (o.get("type"), n.get("type")) in typedef_changes:
                 continue  # the same change as a typedef reported for these lines
+            if what == "function" and through_typedefs(
+                str(aliased(o).get("type", "")), typedef_changes
+            ) == n.get("type"):
+                # Only a typedef's underlying type changed, and that typedef is reported
+                # itself (regression: fread's FILE parameter, struct __sFILE -> struct
+                # __file when the libc changed, flagged breaking in ardep's iso14229.c).
+                continue
             change = self._change(
                 name, what, o, n, sites, callback_diags, truncations, explained,
                 value_uses.get(name, {"unknown"}),
@@ -1070,6 +1077,14 @@ def _macro_at(ws: Any, where: str, name: str) -> dict[str, Any] | None:
                 "deprecated": False,
             }
     return None
+
+
+def through_typedefs(spelled: str, changes: set[tuple[str, str]]) -> str:
+    """A type with each changed typedef's old underlying type spelled as its new one: the
+    old type as it reads once the typedef changes alone are applied."""
+    for old, new in sorted(changes, key=lambda c: -len(c[0])):
+        spelled = re.sub(rf"(?<![\w]){re.escape(old)}(?![\w])", new, spelled)
+    return spelled
 
 
 # The digests of a build image's project TUs and their includes, stored in the image dir.
