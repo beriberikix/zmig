@@ -256,7 +256,7 @@ class ChangesAnalyzer:
                 full = os.path.normpath(os.path.join(ctx.old.workspace.zephyr, path))
                 if (rel := project_path(full, roots)) and line.isdigit():
                     # Pinned, the snapshot is the unedited Kconfig: keep a declaration only
-                    # while the tree still has it (DESIGN-PINNED.md piece 3).
+                    # while the tree still has it (DESIGN.md, "Pinned-source scans").
                     if ctx.pinned and not still_declares(ctx, full, int(line), sym):
                         continue
                     own.append(file_line(rel, int(line), f"config {sym}"))

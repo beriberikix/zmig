@@ -353,7 +353,7 @@ def load_build(
     ws: RefWorkspace, spec: BuildSpec, key: str, src: Path, cache: Cache, runner: Runner
 ) -> tuple[BuildContext | None, list[str]]:
     """A cached build by its key, without rebuilding, for a scan that reuses an earlier
-    scan's source build for an edited app (`scan --pin-source`, DESIGN-PINNED.md piece 2).
+    scan's source build for an edited app (`scan --pin-source`, DESIGN.md, "Pinned-source scans").
     `spec.app` is the live (edited) app, for usage; `src` is the copy the build was built
     from. Returns the build, or None and why not: the build left the cache, or its recorded
     inputs differ from this scan's in anything but the app and its module trees."""

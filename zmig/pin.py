@@ -3,7 +3,7 @@ reused from the cache by its key, while the target is built from the (edited) ap
 
 The source then means the firmware deployed today, and the target the candidate: an edit
 that only builds at the target ref is still compared against the unedited app's source
-build (DESIGN-PINNED.md). Every check runs before any build.
+build (DESIGN.md, "Pinned-source scans"). Every check runs before any build.
 """
 
 from __future__ import annotations

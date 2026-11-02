@@ -1,4 +1,4 @@
-"""`zmig scan --pin-source REPORT` (DESIGN-PINNED.md, piece 2): reading and checking the
+"""`zmig scan --pin-source REPORT` (DESIGN.md, "Pinned-source scans"): reading and checking the
 pinned report, loading its source build from the cache, and compare's refusals. Nothing
 builds."""
 
@@ -266,7 +266,7 @@ def test_scan_takes_pin_source() -> None:
 
 
 def test_only_scan_takes_pin_source() -> None:
-    """fix and watch reuse scan_report but not the option (DESIGN-PINNED.md Non-Goals)."""
+    """fix and watch reuse scan_report but not the option (DESIGN.md, "Pinned-source scans")."""
     import argparse
 
     sub = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))

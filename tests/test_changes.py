@@ -766,7 +766,7 @@ def test_a_target_that_wrote_config_but_never_finished_configure_gets_the_stand_
 def test_pinned_override_needs_the_declaration_in_the_tree(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Pinned (DESIGN-PINNED.md piece 3), the source Kconfig snapshot is the unedited app's:
+    """Pinned (DESIGN.md, "Pinned-source scans"), the source Kconfig snapshot is the unedited app's:
     a re-declaration counts only while the live file still has it near that line
     (regression: ardep batch 1 renamed both overrides, and the pinned scan kept them)."""
     from types import SimpleNamespace

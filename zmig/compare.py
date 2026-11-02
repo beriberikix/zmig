@@ -118,7 +118,7 @@ def mismatches(before: JSON, after: JSON) -> list[str]:
         fb["zmig_version"], fa["zmig_version"] = before["zmig_version"], after["zmig_version"]
     out = [f"{k}: BEFORE {fb[k]!r}, AFTER {fa[k]!r}" for k in sorted(fb) if fb[k] != fa[k]]
     # A pinned AFTER (scan --pin-source) compares the edited app against BEFORE's source
-    # build only if that is the build it was pinned to (DESIGN-PINNED.md piece 5).
+    # build only if that is the build it was pinned to (DESIGN.md, "Pinned-source scans").
     if before["inputs"].get("pinned_source"):
         out.append("BEFORE is a pinned scan: compare against the original scan it was pinned to")
     if pin := after["inputs"].get("pinned_source"):

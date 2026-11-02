@@ -364,7 +364,7 @@ class ApiAnalyzer:
             now = ".".join(alias.get(part, part) for part in parts)
             return now if now != name else None
 
-        # Pinned (DESIGN-PINNED.md piece 3), the source parse is the unedited app's: a use
+        # Pinned (DESIGN.md, "Pinned-source scans"), the source parse is the unedited app's: a use
         # the edit removed would never go away. Where the target parsed the same file
         # without errors, a source use counts only while the target still references the
         # name (or what it is an alias of now). A target parse with errors records no
@@ -1087,7 +1087,7 @@ def _keyed_deps(
     Stored with the build (DEPS_FILE in the image directory) the first time, and read from
     there after: the digests then describe the files the build was built from, even after
     the user edits a project module that is built in place, which a scan pinned to this
-    build as its source side needs (DESIGN-PINNED.md, piece 1). The build key covers the
+    build as its source side needs (DESIGN.md, "Pinned-source scans"). The build key covers the
     module trees, so the record is written while they are as built."""
     import hashlib
 

@@ -546,7 +546,7 @@ class BuildlogAnalyzer:
             ):
                 # Pinned, the source applied the unedited tree's file: if the user moved or
                 # deleted it (the usual fix), the target's own inputs cover the new path
-                # (DESIGN-PINNED.md piece 3).
+                # (DESIGN.md, "Pinned-source scans").
                 if ctx.pinned and not _live_exists(ctx, path):
                     continue
                 verb = "merged" if what == "configuration fragment" else "applied"

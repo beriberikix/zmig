@@ -64,7 +64,7 @@ class ScanContext:
     # Of those, the ones the source build needed too; zmig added them there as well.
     modules_at_source: tuple[str, ...] = ()
     # `scan --pin-source`: `old` is an earlier scan's source build of the unedited app,
-    # while the target and app usage are the edited app's (DESIGN-PINNED.md, piece 3).
+    # while the target and app usage are the edited app's (DESIGN.md, "Pinned-source scans").
     pinned: bool = False
     # Caches shared by the contexts of all images of one scan.
     shared: dict[str, Any] = field(default_factory=dict)
@@ -188,7 +188,7 @@ class ScanContext:
         files = {rel for fs in deps.values() for f in fs if (rel := project_path(f, roots))}
         if self.pinned and (new := build_dependencies(self.new_img, self.runner)) is not None:
             # Pinned, the source build is the unedited app's: a file the edit added is used
-            # only by the target build (DESIGN-PINNED.md piece 3).
+            # only by the target build (DESIGN.md, "Pinned-source scans").
             new_roots = project_roots(self.new, self.new_img.dir)
             files |= {r for fs in new.values() for f in fs if (r := project_path(f, new_roots))}
         # An app always compiles a file of its own; none mapping means the paths didn't

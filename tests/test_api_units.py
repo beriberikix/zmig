@@ -595,7 +595,8 @@ def test_compatibility_macros_are_followed_not_reported(tmp_path: Path) -> None:
 def test_keyed_deps_are_stored_with_the_build(tmp_path: Path, monkeypatch: Any) -> None:
     """The include digests of a build are recorded the first time and read back after, so
     they keep describing the files it was built from when the user then edits a project
-    module built in place (a scan pinned to this build as its source, DESIGN-PINNED.md)."""
+    module built in place (a scan pinned to this build as its source: DESIGN.md,
+    "Pinned-source scans")."""
     import zmig.analyzers.api as api
 
     ws, bdir, mod = tmp_path / "ws", tmp_path / "build", tmp_path / "mod"
@@ -621,7 +622,7 @@ def test_keyed_deps_are_stored_with_the_build(tmp_path: Path, monkeypatch: Any) 
 
 
 def test_pinned_uses_come_from_a_clean_target_parse(tmp_path: Path) -> None:
-    """Pinned (DESIGN-PINNED.md piece 3), the source parse is the unedited app's: a call the
+    """Pinned (DESIGN.md, "Pinned-source scans"), the source parse is the unedited app's: a call the
     edit removed is no longer a use once the target parsed that file cleanly. A target
     parse with errors (it records no reference to a call it couldn't type-check) leaves the
     source's uses standing, and so does an unpinned scan."""
