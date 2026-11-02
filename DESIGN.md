@@ -1104,8 +1104,10 @@ item with the same category, kind, subject and image become one "updated" or
 "new-use-site" item by site count, since clearing the first cited file changes the
 fingerprint) and a "revealed" state (a new finding that BEFORE couldn't have reported,
 because its target build or analyzer gap has closed); revealed findings make the run
-inconclusive, since `compare` can't tell a hidden finding from one the edit caused. It
-also refuses a pinned BEFORE, and an AFTER pinned to any build but BEFORE's source.
+inconclusive, since `compare` can't tell a hidden finding from one the edit caused. A
+finding less severe in AFTER (down to info included) is "de-escalated", with BEFORE's
+severity; it doesn't gate. It also refuses a pinned BEFORE, and an AFTER pinned to any
+build but BEFORE's source.
 
 ### Pinned-source scans
 
