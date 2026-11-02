@@ -281,6 +281,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
     watch.add_argument("--today", default=None, help=argparse.SUPPRESS)
 
+    compare = sub.add_parser(
+        "compare",
+        help="compare two scans of the same app: before and after an edit (reads the two "
+        "report.json files; builds nothing)",
+    )
+    compare.add_argument("before", type=Path, help="report.json of the scan before the edit")
+    compare.add_argument("after", type=Path, help="report.json of the same scan after it")
+    compare.add_argument(
+        "--format", choices=["human", "json"], default="human", help="stdout format"
+    )
+    compare.add_argument("--out", type=Path, help="write compare.json to this directory")
+    compare.add_argument(
+        "--fail-on",
+        choices=["breaking", "risky"],
+        default="breaking",
+        help="lowest severity of a new finding that fails the run (default: breaking)",
+    )
+    compare.add_argument(
+        "--allow-inconclusive",
+        action="store_true",
+        help="exit 0 with a warning instead of 4 when AFTER couldn't check everything or "
+        "has revealed findings",
+    )
+    compare.add_argument("-v", "--verbose", action="count", default=0)
+
     for name, what in (("verify", "post-migration verification"),):
         s = sub.add_parser(name, parents=[common], help=f"{what} (not in the MVP)")
         s.add_argument("rest", nargs=argparse.REMAINDER)
@@ -795,6 +820,15 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     level = [logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbose, 2)]
     logging.basicConfig(level=level, format="zmig: %(message)s", stream=sys.stderr)
+    if args.command == "compare":
+        # Reads two reports: no cache, no tools, no logs/.
+        from zmig.compare import run as cmd_compare
+
+        try:
+            return cmd_compare(args)
+        except UsageError as e:
+            print(f"zmig: error: {e}", file=sys.stderr)
+            return EXIT_USAGE
 
     cache = Cache(args.cache_dir or default_cache_root())
     cache.ensure()
